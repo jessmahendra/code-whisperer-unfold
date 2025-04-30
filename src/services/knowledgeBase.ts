@@ -1,14 +1,16 @@
 
 import { getFileContent, getRepositoryContents } from './githubConnector';
 import { extractKnowledge } from './codeParser';
+import { CodeStructure } from './astParser';
 
 // Interface for knowledge entries
 interface KnowledgeEntry {
-  type: 'comment' | 'function' | 'export';
+  type: 'comment' | 'function' | 'export' | 'class' | 'apiEndpoint';
   content: string;
   filePath: string;
   metadata?: Record<string, any>;
   keywords: string[];
+  codeStructure?: Partial<CodeStructure>;
 }
 
 // Knowledge base with some predefined entries for demo purposes
@@ -95,7 +97,7 @@ async function processModule(modulePath: string): Promise<void> {
     for (const item of contents) {
       if (item.type === 'file') {
         // Process JavaScript files
-        if (item.name.endsWith('.js')) {
+        if (item.name.endsWith('.js') || item.name.endsWith('.jsx') || item.name.endsWith('.ts') || item.name.endsWith('.tsx')) {
           await processFile(item.path);
         }
       } else if (item.type === 'dir') {
@@ -127,10 +129,14 @@ async function processFile(filePath: string): Promise<void> {
         content: comment,
         filePath,
         keywords: extractKeywords(comment),
+        codeStructure: knowledge.structure ? { 
+          imports: knowledge.structure.imports,
+          exports: knowledge.structure.exports 
+        } : undefined
       });
     }
     
-    // Add function definitions to knowledge base
+    // Add function definitions to knowledge base (from regex extraction)
     for (const func of knowledge.functions) {
       const funcContent = `function ${func.name}(${func.params}) { ... }`;
       knowledgeBase.push({
@@ -140,6 +146,36 @@ async function processFile(filePath: string): Promise<void> {
         metadata: func,
         keywords: extractKeywords(funcContent + ' ' + func.name),
       });
+    }
+    
+    // Add AST-extracted classes
+    if (knowledge.structure && knowledge.structure.classes) {
+      for (const classInfo of knowledge.structure.classes) {
+        const classContent = `class ${classInfo.name} ${classInfo.superClass ? `extends ${classInfo.superClass} ` : ''}{ ... }`;
+        knowledgeBase.push({
+          type: 'class',
+          content: classContent,
+          filePath,
+          metadata: classInfo,
+          keywords: extractKeywords(classContent + ' ' + classInfo.methods.join(' ')),
+          codeStructure: { classes: [classInfo] }
+        });
+      }
+    }
+    
+    // Add AST-extracted API endpoints
+    if (knowledge.structure && knowledge.structure.apiEndpoints) {
+      for (const endpoint of knowledge.structure.apiEndpoints) {
+        const endpointContent = `${endpoint.method.toUpperCase()} ${endpoint.path}`;
+        knowledgeBase.push({
+          type: 'apiEndpoint',
+          content: endpointContent,
+          filePath,
+          metadata: endpoint,
+          keywords: extractKeywords(`api ${endpoint.method} ${endpoint.path} ${endpoint.handler}`),
+          codeStructure: { apiEndpoints: [endpoint] }
+        });
+      }
     }
     
     // Add exports to knowledge base
