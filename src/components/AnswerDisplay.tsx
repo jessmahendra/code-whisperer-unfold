@@ -71,6 +71,9 @@ export default function AnswerDisplay({
   
   const hasVersionInfo = references.some(ref => ref.lastUpdated);
 
+  // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
+  const confidencePercentage = Math.round(confidence * 100);
+
   return (
     <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6">
       <div className="mb-4">
@@ -126,7 +129,7 @@ export default function AnswerDisplay({
       </div>
       <div className="border-t pt-4">
         <div className="mb-4">
-          <ConfidenceScore score={confidence} />
+          <ConfidenceScore score={confidencePercentage} />
         </div>
         <h4 className="text-sm font-medium mb-2">References</h4>
         <div className="space-y-2">
