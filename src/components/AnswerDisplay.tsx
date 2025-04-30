@@ -27,34 +27,34 @@ export default function AnswerDisplay({
   references,
   timestamp,
 }: AnswerDisplayProps) {
-  const [displayedText, setDisplayedText] = useState("");
+  const [displayedParagraphs, setDisplayedParagraphs] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(true);
-  const [charIndex, setCharIndex] = useState(0);
-  const typingSpeed = 15; // milliseconds per character
-  const paragraphs = answer.split('\n\n');
-  const fullTextRef = useRef(answer);
+  const [paragraphIndex, setParagraphIndex] = useState(0);
+  const typingSpeed = 300; // milliseconds per paragraph
+  const paragraphs = answer.split('\n\n').filter(p => p.trim() !== '');
+  const fullTextRef = useRef(paragraphs);
 
   useEffect(() => {
-    fullTextRef.current = answer;
-    setCharIndex(0);
-    setDisplayedText("");
+    fullTextRef.current = answer.split('\n\n').filter(p => p.trim() !== '');
+    setParagraphIndex(0);
+    setDisplayedParagraphs([]);
     setIsTyping(true);
   }, [answer]);
 
   useEffect(() => {
     if (!isTyping) return;
 
-    if (charIndex < fullTextRef.current.length) {
+    if (paragraphIndex < fullTextRef.current.length) {
       const timeout = setTimeout(() => {
-        setDisplayedText(fullTextRef.current.substring(0, charIndex + 1));
-        setCharIndex(prev => prev + 1);
+        setDisplayedParagraphs(prev => [...prev, fullTextRef.current[paragraphIndex]]);
+        setParagraphIndex(prev => prev + 1);
       }, typingSpeed);
 
       return () => clearTimeout(timeout);
     } else {
       setIsTyping(false);
     }
-  }, [charIndex, isTyping]);
+  }, [paragraphIndex, isTyping]);
 
   const handleCopyAnswer = () => {
     navigator.clipboard.writeText(answer);
@@ -62,22 +62,9 @@ export default function AnswerDisplay({
   };
 
   const handleCompleteTyping = () => {
-    setDisplayedText(fullTextRef.current);
-    setCharIndex(fullTextRef.current.length);
+    setDisplayedParagraphs(fullTextRef.current);
+    setParagraphIndex(fullTextRef.current.length);
     setIsTyping(false);
-  };
-
-  const renderText = () => {
-    const displayParagraphs = displayedText.split('\n\n');
-    
-    return displayParagraphs.map((paragraph, index) => (
-      <p key={index} className={index < displayParagraphs.length - 1 ? "mb-4" : ""}>
-        {paragraph}
-        {index === displayParagraphs.length - 1 && isTyping && (
-          <span className="typing-cursor"></span>
-        )}
-      </p>
-    ));
   };
 
   return (
@@ -107,8 +94,19 @@ export default function AnswerDisplay({
             </Button>
           </div>
         </div>
-        <div className="text-sm space-y-0 mb-6">
-          {renderText()}
+        <div className="text-sm space-y-4 mb-6">
+          {displayedParagraphs.map((paragraph, index) => (
+            <p key={index} className="animate-fade-in">
+              {paragraph}
+            </p>
+          ))}
+          {isTyping && displayedParagraphs.length < paragraphs.length && (
+            <div className="flex items-center space-x-2 animate-pulse">
+              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+            </div>
+          )}
         </div>
       </div>
       <div className="border-t pt-4">
