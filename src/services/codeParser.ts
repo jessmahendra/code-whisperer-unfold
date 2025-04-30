@@ -1,6 +1,4 @@
 
-import { parseCodeStructure, CodeStructure } from './astParser';
-
 /**
  * Extracts JSDoc comments from code
  * @param {string} code - Source code to parse
@@ -95,32 +93,17 @@ export function extractExports(code: string): Record<string, string> {
 }
 
 /**
- * Extracts all knowledge from code using both regex and AST approaches
+ * Extracts all knowledge from code
  * @param {string} code - Source code to parse
  * @param {string} filePath - Path to the file
  * @returns {object} Extracted knowledge
  */
 export function extractKnowledge(code: string, filePath: string) {
-  // Get basic info from regex approach
-  const basicInfo = {
+  return {
     jsDocComments: extractJSDocComments(code),
     inlineComments: extractInlineComments(code),
     functions: extractFunctionDefs(code),
     exports: extractExports(code),
     filePath
-  };
-  
-  // Get detailed structure from AST parsing
-  let structure: CodeStructure | null = null;
-  
-  try {
-    structure = parseCodeStructure(code, filePath);
-  } catch (error) {
-    console.error(`Error parsing AST for ${filePath}:`, error);
-  }
-  
-  return {
-    ...basicInfo,
-    structure
   };
 }
