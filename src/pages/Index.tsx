@@ -54,8 +54,13 @@ export default function Index() {
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
+    // Reset answer when a new question is asked
+    setAnswer(null);
     
     try {
+      // Simulate a bit of processing time to show the animation
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       const result = await generateAnswer(query);
       if (result) {
         setAnswer(result);
@@ -128,7 +133,7 @@ export default function Index() {
                 timestamp={formatTimestamp()}
               />
             ) : (
-              <NoAnswerFallback question={question} />
+              question && !isProcessing && <NoAnswerFallback question={question} />
             )
           )}
         </main>
