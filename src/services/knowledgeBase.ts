@@ -3,7 +3,7 @@ import { getFileContent, getRepositoryContents } from './githubConnector';
 import { extractKnowledge } from './codeParser';
 
 // Interface for knowledge entries
-interface KnowledgeEntry {
+export interface KnowledgeEntry {
   type: 'comment' | 'function' | 'export';
   content: string;
   filePath: string;

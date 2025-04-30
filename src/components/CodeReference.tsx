@@ -1,15 +1,19 @@
 
 import { Button } from "@/components/ui/button";
-import { Code2, Copy, ExternalLink } from "lucide-react";
+import { Code2, Copy, ExternalLink, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface CodeReferenceProps {
   filePath: string;
   lineNumbers?: string;
   snippet?: string;
+  lastUpdated?: string;
 }
 
-export default function CodeReference({ filePath, lineNumbers, snippet }: CodeReferenceProps) {
+export default function CodeReference({ filePath, lineNumbers, snippet, lastUpdated }: CodeReferenceProps) {
+  const [showHistory, setShowHistory] = useState(false);
+  
   const handleCopyPath = () => {
     navigator.clipboard.writeText(filePath);
     toast.success("File path copied to clipboard");
@@ -18,6 +22,15 @@ export default function CodeReference({ filePath, lineNumbers, snippet }: CodeRe
   const getFileName = () => {
     const parts = filePath.split('/');
     return parts[parts.length - 1];
+  };
+
+  const formatLastUpdated = () => {
+    if (!lastUpdated || lastUpdated === 'Unknown') return 'Last updated: Unknown';
+    try {
+      return `Last updated: ${new Date(lastUpdated).toLocaleDateString()}`;
+    } catch (e) {
+      return `Last updated: ${lastUpdated}`;
+    }
   };
 
   return (
@@ -31,6 +44,17 @@ export default function CodeReference({ filePath, lineNumbers, snippet }: CodeRe
           )}
         </div>
         <div className="flex gap-1">
+          {lastUpdated && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 p-1 text-xs flex items-center gap-1"
+              onClick={() => setShowHistory(!showHistory)}
+            >
+              <Clock className="h-3 w-3" />
+              <span className="sr-only md:not-sr-only md:inline-block">History</span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -57,6 +81,13 @@ export default function CodeReference({ filePath, lineNumbers, snippet }: CodeRe
           </Button>
         </div>
       </div>
+      
+      {showHistory && lastUpdated && (
+        <div className="mb-2 text-xs text-muted-foreground bg-slate-100 p-2 rounded-md">
+          {formatLastUpdated()}
+        </div>
+      )}
+      
       <div className="text-xs overflow-auto bg-slate-100 p-3 rounded-md font-mono text-slate-700">
         <code>
           {snippet || `// File path: ${filePath}`}

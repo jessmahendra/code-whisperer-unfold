@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy } from "lucide-react";
+import { Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
@@ -10,6 +10,7 @@ interface Reference {
   filePath: string;
   lineNumbers?: string;
   snippet?: string;
+  lastUpdated?: string;
 }
 
 interface AnswerDisplayProps {
@@ -30,6 +31,7 @@ export default function AnswerDisplay({
   const [displayedParagraphs, setDisplayedParagraphs] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(true);
   const [paragraphIndex, setParagraphIndex] = useState(0);
+  const [showVersionInfo, setShowVersionInfo] = useState(false);
   const typingSpeed = 300; // milliseconds per paragraph
   const paragraphs = answer.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
@@ -66,6 +68,8 @@ export default function AnswerDisplay({
     setParagraphIndex(fullTextRef.current.length);
     setIsTyping(false);
   };
+  
+  const hasVersionInfo = references.some(ref => ref.lastUpdated);
 
   return (
     <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6">
@@ -81,6 +85,17 @@ export default function AnswerDisplay({
                 onClick={handleCompleteTyping}
               >
                 Complete
+              </Button>
+            )}
+            {hasVersionInfo && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-muted-foreground text-xs flex items-center gap-1"
+                onClick={() => setShowVersionInfo(!showVersionInfo)}
+              >
+                <Clock className="h-3 w-3" />
+                {showVersionInfo ? "Hide" : "Show"} Version Info
               </Button>
             )}
             <Button
@@ -121,6 +136,7 @@ export default function AnswerDisplay({
               filePath={reference.filePath}
               lineNumbers={reference.lineNumbers}
               snippet={reference.snippet}
+              lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
             />
           ))}
         </div>
