@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@babel/parser": "^7.27.1",
+    "@babel/traverse": "^7.27.1",
     "@babel/types": "^7.27.1",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
