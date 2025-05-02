@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import mermaid from "mermaid";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 
 export default function SharePage() {
   const { id } = useParams<{ id: string }>();
@@ -116,14 +117,63 @@ export default function SharePage() {
 
   if (!answer) {
     return (
-      <div className="container py-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">Answer Not Found</h2>
-        <p className="mb-8 text-muted-foreground">
-          The shared answer you're looking for does not exist or has been removed.
-        </p>
-        <Link to="/" className="text-unfold-purple hover:underline">
-          Return to Home
-        </Link>
+      <div className="min-h-screen flex flex-col bg-background">
+        <div className="border-b bg-white shadow-sm">
+          <div className="container flex h-16 items-center justify-between">
+            <Link to="/" className="flex items-center space-x-2">
+              <BookOpen className="h-6 w-6 text-unfold-purple" />
+              <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
+                Unfold
+              </span>
+            </Link>
+            <Link 
+              to="/"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Open App
+            </Link>
+          </div>
+        </div>
+
+        <main className="flex-1 container py-8">
+          <Card className="max-w-3xl mx-auto">
+            <CardHeader>
+              <CardTitle>Answer Not Found</CardTitle>
+              <CardDescription>
+                The shared answer you're looking for does not exist or is no longer available.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>This could be because:</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>The link is incorrect or incomplete</li>
+                <li>The answer was created in a different browser session</li>
+                <li>The browser's local storage was cleared</li>
+                <li>The answer has expired</li>
+              </ul>
+              <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> In this current demo version, shared answers are temporarily stored in your browser's local storage.
+                  This means shared links will only work in the same browser session where they were created.
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button asChild variant="default">
+                <Link to="/">Return to Home</Link>
+              </Button>
+            </CardFooter>
+          </Card>
+        </main>
+        
+        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+          <p>
+            <Link to="/" className="hover:underline">
+              Unfold Knowledge Tool
+            </Link> - Proof of Concept
+          </p>
+        </footer>
       </div>
     );
   }

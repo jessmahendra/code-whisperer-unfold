@@ -47,6 +47,12 @@ export default function ShareButton({ question, answer }: ShareButtonProps) {
       
       // Copy to clipboard
       copyToClipboard(shareableLink.fullUrl);
+      
+      // Show info toast about session limitation
+      toast.info(
+        "Note: This shared link will only work in this browser session. For permanent sharing, consider taking a screenshot.",
+        { duration: 5000 }
+      );
     } catch (error) {
       console.error('Error sharing answer:', error);
       toast.error("Failed to create shareable link");
