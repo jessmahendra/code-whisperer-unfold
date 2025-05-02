@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Clock, FlowIcon, Blocks, PieChart } from "lucide-react";
+import { Copy, Clock, GitBranch, Blocks, PieChart } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
@@ -118,7 +118,7 @@ export default function AnswerDisplay({
     
     switch (visualContext.type) {
       case 'flowchart':
-        return <FlowIcon className="h-4 w-4" />;
+        return <GitBranch className="h-4 w-4" />;
       case 'component':
         return <Blocks className="h-4 w-4" />;
       case 'state':
