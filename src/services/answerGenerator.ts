@@ -1,6 +1,7 @@
 
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
+import { generateVisualContext } from "./visualContextGenerator";
 
 interface Reference {
   filePath: string;
@@ -13,6 +14,10 @@ interface Answer {
   text: string;
   confidence: number;
   references: Reference[];
+  visualContext?: {
+    type: 'flowchart' | 'component' | 'state';
+    syntax: string;
+  };
 }
 
 /**
@@ -68,10 +73,23 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
       lastUpdated: result.lastUpdated
     };
   });
+
+  // Generate visual context if applicable
+  let visualContext = null;
+  if (query.toLowerCase().includes('flow') || 
+      query.toLowerCase().includes('process') ||
+      query.toLowerCase().includes('subscription') ||
+      query.toLowerCase().includes('post') ||
+      query.toLowerCase().includes('content') ||
+      query.toLowerCase().includes('component') ||
+      query.toLowerCase().includes('state')) {
+    visualContext = generateVisualContext(query, results);
+  }
   
   return {
     text: answerText,
     confidence: Math.min(0.3 + (results.length * 0.15), 0.95),
-    references
+    references,
+    visualContext: visualContext
   };
 }

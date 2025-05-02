@@ -26,7 +26,12 @@ interface Answer {
     filePath: string;
     lineNumbers?: string;
     snippet?: string;
+    lastUpdated?: string;
   }[];
+  visualContext?: {
+    type: 'flowchart' | 'component' | 'state';
+    syntax: string;
+  };
 }
 
 export default function Index() {
@@ -131,6 +136,7 @@ export default function Index() {
                 confidence={answer.confidence}
                 references={answer.references}
                 timestamp={formatTimestamp()}
+                visualContext={answer.visualContext}
               />
             ) : (
               question && !isProcessing && <NoAnswerFallback question={question} />
