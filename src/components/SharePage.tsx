@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
 import { Button } from "@/components/ui/button";
-import { Copy, Twitter, Linkedin, Mail, ExternalLink } from "lucide-react";
+import { Copy, Twitter, Linkedin, Mail, ExternalLink, GitBranch, Blocks, PieChart, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
