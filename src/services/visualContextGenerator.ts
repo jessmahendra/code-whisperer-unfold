@@ -267,7 +267,6 @@ export function generateVisualContext(
   switch (visualType) {
     case 'component':
       return generateComponentDiagram(feature, knowledgeItems);
-    case 'flow':
     case 'flowchart':
       return generateFlowchart(feature, knowledgeItems);
     case 'state':
