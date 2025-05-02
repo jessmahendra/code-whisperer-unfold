@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import SharePage from "./components/SharePage";
+import { BookOpen, GitBranch, Blocks, PieChart } from "lucide-react";
+
+// Make the icons available globally to ensure they're imported for SharePage
+// This is a workaround since we can't import them directly in the SharePage component
+const icons = { BookOpen, GitBranch, Blocks, PieChart };
 
 const queryClient = new QueryClient();
 
@@ -16,6 +23,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/share/:id" element={<SharePage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

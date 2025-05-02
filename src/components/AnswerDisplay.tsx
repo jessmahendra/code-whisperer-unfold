@@ -5,6 +5,7 @@ import { Copy, Clock, GitBranch, Blocks, PieChart } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
+import ShareButton from "./ShareButton";
 import mermaid from "mermaid";
 
 interface Reference {
@@ -155,6 +156,15 @@ export default function AnswerDisplay({
                 {showVersionInfo ? "Hide" : "Show"} Version Info
               </Button>
             )}
+            <ShareButton 
+              question={question} 
+              answer={{
+                text: answer,
+                confidence: confidence,
+                references: references,
+                visualContext: visualContext
+              }}
+            />
             <Button
               variant="ghost"
               size="sm"
