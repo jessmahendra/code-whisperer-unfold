@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -11,14 +10,7 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 
 // Sample suggested questions
-const suggestedQuestions = [
-  "How does the subscription payment process work in Ghost?",
-  "What happens when a member's subscription expires?",
-  "Can members access content after their subscription ends?",
-  "Is there a limit to how many posts a publication can have?",
-  "How does Ghost handle premium vs. free content?"
-];
-
+const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
 interface Answer {
   text: string;
   confidence: number;
@@ -33,7 +25,6 @@ interface Answer {
     syntax: string;
   };
 }
-
 export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -52,20 +43,16 @@ export default function Index() {
         setIsInitializing(false);
       }
     };
-    
     initialize();
   }, []);
-
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
     // Reset answer when a new question is asked
     setAnswer(null);
-    
     try {
       // Simulate a bit of processing time to show the animation
       await new Promise(resolve => setTimeout(resolve, 800));
-      
       const result = await generateAnswer(query);
       if (result) {
         setAnswer(result);
@@ -80,11 +67,9 @@ export default function Index() {
       setIsProcessing(false);
     }
   };
-
   const handleSelectQuestion = (query: string) => {
     handleAskQuestion(query);
   };
-
   const formatTimestamp = () => {
     const now = new Date();
     return new Intl.DateTimeFormat('en-US', {
@@ -92,9 +77,7 @@ export default function Index() {
       timeStyle: 'short'
     }).format(now);
   };
-
-  return (
-    <GradientBackground>
+  return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
         
@@ -107,47 +90,24 @@ export default function Index() {
               Instant answers to your Ghost product questions, extracted directly from code.
             </p>
             
-            <QuestionInput 
-              onAskQuestion={handleAskQuestion} 
-              isProcessing={isProcessing || isInitializing}
-            />
+            <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
             
-            <SuggestedQuestions 
-              questions={suggestedQuestions}
-              onSelectQuestion={handleSelectQuestion}
-              isProcessing={isProcessing || isInitializing}
-            />
+            <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
           </section>
           
-          {isProcessing && (
-            <div className="max-w-3xl mx-auto text-center">
+          {isProcessing && <div className="max-w-3xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
                 <div className="h-2 w-2 bg-unfold-purple rounded-full" />
                 Processing your question...
               </div>
-            </div>
-          )}
+            </div>}
           
-          {!isProcessing && question && (
-            answer ? (
-              <AnswerDisplay 
-                question={question}
-                answer={answer.text}
-                confidence={answer.confidence}
-                references={answer.references}
-                timestamp={formatTimestamp()}
-                visualContext={answer.visualContext}
-              />
-            ) : (
-              question && !isProcessing && <NoAnswerFallback question={question} />
-            )
-          )}
+          {!isProcessing && question && (answer ? <AnswerDisplay question={question} answer={answer.text} confidence={answer.confidence} references={answer.references} timestamp={formatTimestamp()} visualContext={answer.visualContext} /> : question && !isProcessing && <NoAnswerFallback question={question} />)}
         </main>
         
         <footer className="border-t py-6 text-center text-sm text-muted-foreground">
-          <p>Unfold Knowledge Tool - Proof of Concept</p>
+          
         </footer>
       </div>
-    </GradientBackground>
-  );
+    </GradientBackground>;
 }
