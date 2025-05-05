@@ -11,7 +11,7 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
+import { Slack } from "lucide-react";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
@@ -103,15 +103,6 @@ export default function Index() {
             <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
             
             <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
-            
-            <div className="mt-8">
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/slack-demo" className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4" />
-                  View Slack Integration Demo
-                </Link>
-              </Button>
-            </div>
           </section>
           
           {isProcessing && <div className="max-w-3xl mx-auto text-center">
@@ -125,7 +116,18 @@ export default function Index() {
         </main>
         
         <footer className="border-t py-6 text-center text-sm text-muted-foreground">
-          
+          <div className="container relative">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              asChild 
+              className="absolute bottom-0 right-0 hover:bg-slate-100"
+            >
+              <Link to="/slack-demo">
+                <Slack className="h-5 w-5 text-slate-600" />
+              </Link>
+            </Button>
+          </div>
         </footer>
       </div>
     </GradientBackground>;

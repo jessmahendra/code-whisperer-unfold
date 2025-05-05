@@ -8,11 +8,11 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SharePage from "./components/SharePage";
 import SlackDemo from "./pages/SlackDemo";
-import { BookOpen, GitBranch, Blocks, PieChart } from "lucide-react";
+import { BookOpen, GitBranch, Blocks, PieChart, Slack } from "lucide-react";
 
 // Make the icons available globally to ensure they're imported for SharePage
 // This is a workaround since we can't import them directly in the SharePage component
-const icons = { BookOpen, GitBranch, Blocks, PieChart };
+const icons = { BookOpen, GitBranch, Blocks, PieChart, Slack };
 
 const queryClient = new QueryClient();
 
