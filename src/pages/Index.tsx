@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -8,9 +9,13 @@ import GradientBackground from "@/components/GradientBackground";
 import { generateAnswer } from "@/services/answerGenerator";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
+
 interface Answer {
   text: string;
   confidence: number;
@@ -25,6 +30,7 @@ interface Answer {
     syntax: string;
   };
 }
+
 export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -45,6 +51,7 @@ export default function Index() {
     };
     initialize();
   }, []);
+
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
@@ -67,9 +74,11 @@ export default function Index() {
       setIsProcessing(false);
     }
   };
+
   const handleSelectQuestion = (query: string) => {
     handleAskQuestion(query);
   };
+
   const formatTimestamp = () => {
     const now = new Date();
     return new Intl.DateTimeFormat('en-US', {
@@ -77,6 +86,7 @@ export default function Index() {
       timeStyle: 'short'
     }).format(now);
   };
+
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -93,6 +103,15 @@ export default function Index() {
             <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
             
             <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
+            
+            <div className="mt-8">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/slack-demo" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  View Slack Integration Demo
+                </Link>
+              </Button>
+            </div>
           </section>
           
           {isProcessing && <div className="max-w-3xl mx-auto text-center">

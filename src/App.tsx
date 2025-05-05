@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import SharePage from "./components/SharePage";
+import SlackDemo from "./pages/SlackDemo";
 import { BookOpen, GitBranch, Blocks, PieChart } from "lucide-react";
 
 // Make the icons available globally to ensure they're imported for SharePage
@@ -24,6 +25,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/share/:id" element={<SharePage />} />
+          <Route path="/slack-demo" element={<SlackDemo />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
