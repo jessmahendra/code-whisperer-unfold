@@ -19,11 +19,6 @@ const DEMO_SCENARIOS = {
         time: "10:32 AM" 
       }
     ],
-    suggestedQuestions: [
-      "What happens when a subscription expires in Ghost?",
-      "Can members still access content after subscription ends?",
-      "How does Ghost handle expired subscriptions?",
-    ],
   },
   engineering: {
     channelName: "dev-ghost-integration",
@@ -34,11 +29,6 @@ const DEMO_SCENARIOS = {
         text: "We need to implement the new content limit feature. Do you know if Ghost has any built-in post limits we should be aware of?", 
         time: "2:15 PM" 
       }
-    ],
-    suggestedQuestions: [
-      "Are there limits to how many posts in Ghost?",
-      "How does Ghost handle premium vs free content?",
-      "What's the post access control flow?",
     ],
   }
 };
@@ -92,47 +82,51 @@ export default function SlackInterface({ scenario }: SlackInterfaceProps) {
     setMessages(prev => [...prev, userMessage]);
     setNewMessage("");
     
-    // Show typing indicator
-    setIsTyping(true);
+    // Check if message mentions @unfold
+    const mentionsUnfold = newMessage.toLowerCase().includes("@unfold");
     
-    // Simulate delay for typing
-    setTimeout(async () => {
-      try {
-        // Generate answer
-        const answer = await generateAnswer(userMessage.text);
-        
-        if (answer) {
-          // Add bot response
+    if (mentionsUnfold) {
+      // Show typing indicator
+      setIsTyping(true);
+      
+      // Extract the actual question by removing the @unfold mention
+      const actualQuestion = newMessage.replace(/@unfold/i, "").trim();
+      
+      // Simulate delay for typing
+      setTimeout(async () => {
+        try {
+          // Generate answer
+          const answer = await generateAnswer(actualQuestion);
+          
+          if (answer) {
+            // Add bot response
+            setMessages(prev => [...prev, {
+              sender: "Unfold",
+              text: "",
+              time: getCurrentTime(),
+              isAnswer: true,
+              answer: answer
+            }]);
+          } else {
+            // No answer found
+            setMessages(prev => [...prev, {
+              sender: "Unfold",
+              text: "I couldn't find specific information about that in the codebase. Would you like me to help with something else?",
+              time: getCurrentTime()
+            }]);
+          }
+        } catch (error) {
+          // Error handling
           setMessages(prev => [...prev, {
             sender: "Unfold",
-            text: "",
-            time: getCurrentTime(),
-            isAnswer: true,
-            answer: answer
-          }]);
-        } else {
-          // No answer found
-          setMessages(prev => [...prev, {
-            sender: "Unfold",
-            text: "I couldn't find specific information about that in the codebase. Would you like me to help with something else?",
+            text: "Sorry, I encountered an error trying to answer your question. Please try again.",
             time: getCurrentTime()
           }]);
+        } finally {
+          setIsTyping(false);
         }
-      } catch (error) {
-        // Error handling
-        setMessages(prev => [...prev, {
-          sender: "Unfold",
-          text: "Sorry, I encountered an error trying to answer your question. Please try again.",
-          time: getCurrentTime()
-        }]);
-      } finally {
-        setIsTyping(false);
-      }
-    }, 1500);
-  };
-
-  const handleSuggestedQuestion = (question: string) => {
-    setNewMessage(question);
+      }, 1500);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -193,31 +187,10 @@ export default function SlackInterface({ scenario }: SlackInterfaceProps) {
         </div>
       </div>
       
-      {/* Suggested questions */}
-      {messages.length <= 3 && (
-        <div className="border-t py-2 px-4 bg-white">
-          <p className="text-xs text-muted-foreground mb-2">Try asking Unfold:</p>
-          <div className="flex flex-wrap gap-2">
-            {scenarioData.suggestedQuestions.map((question, index) => (
-              <Button 
-                key={index} 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
-                onClick={() => handleSuggestedQuestion(question)}
-                disabled={isTyping}
-              >
-                {question}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-      
       {/* Input area */}
       <div className="border-t p-3 bg-white flex items-center gap-2">
         <Input
-          placeholder={`Message #${scenarioData.channelName}`}
+          placeholder={`Message #${scenarioData.channelName} (try mentioning @unfold with your question)`}
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           onKeyPress={handleKeyPress}
