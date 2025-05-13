@@ -11,7 +11,6 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
-
 interface Answer {
   text: string;
   confidence: number;
@@ -26,7 +25,6 @@ interface Answer {
     syntax: string;
   };
 }
-
 export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -47,7 +45,6 @@ export default function Index() {
     };
     initialize();
   }, []);
-
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
@@ -70,11 +67,9 @@ export default function Index() {
       setIsProcessing(false);
     }
   };
-
   const handleSelectQuestion = (query: string) => {
     handleAskQuestion(query);
   };
-
   const formatTimestamp = () => {
     const now = new Date();
     return new Intl.DateTimeFormat('en-US', {
@@ -82,18 +77,14 @@ export default function Index() {
       timeStyle: 'short'
     }).format(now);
   };
-
-  return (
-    <div className="min-h-screen flex flex-col bg-white">
+  return <div className="min-h-screen flex flex-col bg-white">
       <Header />
       
       <DashboardLayout>
         <div className="container py-8">
           <section className="max-w-3xl mx-auto mb-12">
             <div className="text-center mb-6">
-              <h1 className="text-3xl font-medium mb-1 text-gray-900">
-                Hey Jane! 👋
-              </h1>
+              <h1 className="text-3xl font-medium mb-1 text-gray-900">Hey Jess!</h1>
               <p className="text-gray-600">Start a conversation...</p>
             </div>
             
@@ -102,31 +93,15 @@ export default function Index() {
             <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
           </section>
           
-          {isProcessing && (
-            <div className="max-w-3xl mx-auto text-center">
+          {isProcessing && <div className="max-w-3xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 text-sm text-gray-600 bg-gray-100 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
                 <div className="h-2 w-2 bg-gray-400 rounded-full" />
                 Processing your question...
               </div>
-            </div>
-          )}
+            </div>}
           
-          {!isProcessing && question && (
-            answer ? (
-              <AnswerDisplay 
-                question={question} 
-                answer={answer.text} 
-                confidence={answer.confidence} 
-                references={answer.references}
-                timestamp={formatTimestamp()}
-                visualContext={answer.visualContext}
-              />
-            ) : (
-              question && !isProcessing && <NoAnswerFallback question={question} />
-            )
-          )}
+          {!isProcessing && question && (answer ? <AnswerDisplay question={question} answer={answer.text} confidence={answer.confidence} references={answer.references} timestamp={formatTimestamp()} visualContext={answer.visualContext} /> : question && !isProcessing && <NoAnswerFallback question={question} />)}
         </div>
       </DashboardLayout>
-    </div>
-  );
+    </div>;
 }
