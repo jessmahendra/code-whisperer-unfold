@@ -1,17 +1,16 @@
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import Header from "@/components/Header";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import QuestionInput from "@/components/QuestionInput";
 import SuggestedQuestions from "@/components/SuggestedQuestions";
 import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
+import EmptyState from "@/components/dashboard/EmptyState";
 import GradientBackground from "@/components/GradientBackground";
 import { generateAnswer } from "@/services/answerGenerator";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
-import { toast } from "sonner";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Slack } from "lucide-react";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
@@ -36,6 +35,7 @@ export default function Index() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showChat, setShowChat] = useState(false);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -55,6 +55,7 @@ export default function Index() {
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
+    setShowChat(true);
     // Reset answer when a new question is asked
     setAnswer(null);
     try {
@@ -87,48 +88,41 @@ export default function Index() {
     }).format(now);
   };
 
-  return <GradientBackground>
+  return (
+    <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
         
-        <main className="flex-1 container py-8">
-          <section className="max-w-3xl mx-auto text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
-              Unfold
-            </h1>
-            <p className="text-xl mb-8">
-              Instant answers to your Ghost product questions, extracted directly from code.
-            </p>
-            
-            <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
-            
-            <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
-          </section>
-          
-          {isProcessing && <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
-                <div className="h-2 w-2 bg-unfold-purple rounded-full" />
-                Processing your question...
-              </div>
-            </div>}
-          
-          {!isProcessing && question && (answer ? <AnswerDisplay question={question} answer={answer.text} confidence={answer.confidence} references={answer.references} timestamp={formatTimestamp()} visualContext={answer.visualContext} /> : question && !isProcessing && <NoAnswerFallback question={question} />)}
-        </main>
-        
-        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
-          <div className="container relative">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              asChild 
-              className="absolute bottom-0 right-0 hover:bg-slate-100"
-            >
-              <Link to="/slack-demo">
-                <Slack className="h-5 w-5 text-slate-600" />
-              </Link>
-            </Button>
-          </div>
-        </footer>
+        <DashboardLayout>
+          {!showChat ? (
+            <EmptyState onStartChat={() => setShowChat(true)} />
+          ) : (
+            <div className="container py-8">
+              <section className="max-w-3xl mx-auto text-center mb-12">
+                <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
+                  Unfold
+                </h1>
+                <p className="text-xl mb-8">
+                  Instant answers to your Ghost product questions, extracted directly from code.
+                </p>
+                
+                <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
+                
+                <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
+              </section>
+              
+              {isProcessing && <div className="max-w-3xl mx-auto text-center">
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
+                    <div className="h-2 w-2 bg-unfold-purple rounded-full" />
+                    Processing your question...
+                  </div>
+                </div>}
+              
+              {!isProcessing && question && (answer ? <AnswerDisplay question={question} answer={answer.text} confidence={answer.confidence} references={answer.references} timestamp={formatTimestamp()} visualContext={answer.visualContext} /> : question && !isProcessing && <NoAnswerFallback question={question} />)}
+            </div>
+          )}
+        </DashboardLayout>
       </div>
-    </GradientBackground>;
+    </GradientBackground>
+  );
 }
