@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
@@ -13,7 +12,6 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
-
 interface Answer {
   text: string;
   confidence: number;
@@ -28,7 +26,6 @@ interface Answer {
     syntax: string;
   };
 }
-
 export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -49,7 +46,6 @@ export default function Index() {
     };
     initialize();
   }, []);
-
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
@@ -72,11 +68,9 @@ export default function Index() {
       setIsProcessing(false);
     }
   };
-
   const handleSelectQuestion = (query: string) => {
     handleAskQuestion(query);
   };
-
   const formatTimestamp = () => {
     const now = new Date();
     return new Intl.DateTimeFormat('en-US', {
@@ -84,9 +78,7 @@ export default function Index() {
       timeStyle: 'short'
     }).format(now);
   };
-
-  return (
-    <GradientBackground>
+  return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
         
@@ -96,9 +88,7 @@ export default function Index() {
               <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
                 Unfold
               </h1>
-              <p className="text-xl mb-8">
-                Instant answers to your Ghost product questions, extracted directly from code.
-              </p>
+              
               
               <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
               
@@ -116,6 +106,5 @@ export default function Index() {
           </div>
         </DashboardLayout>
       </div>
-    </GradientBackground>
-  );
+    </GradientBackground>;
 }
