@@ -1,37 +1,25 @@
-
 import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle
-} from "@/components/ui/resizable";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BookOpen, MessageSquare, Pin, Star } from "lucide-react";
 import ChatHistory from "./ChatHistory";
 import PinnedTopics from "./PinnedTopics";
-
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
-
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({
+  children
+}: DashboardLayoutProps) {
   const [activeTab, setActiveTab] = useState("main");
-
-  return (
-    <div className="h-[calc(100vh-3.5rem)] flex">
+  return <div className="h-[calc(100vh-3.5rem)] flex">
       <ResizablePanelGroup direction="horizontal" className="w-full">
         {/* Sidebar */}
         <ResizablePanel defaultSize={25} minSize={20} maxSize={30} className="bg-slate-50 border-r">
           <div className="h-full flex flex-col">
-            <div className="p-4 border-b">
-              <h2 className="text-lg font-semibold flex items-center">
-                <BookOpen className="h-5 w-5 mr-2 text-unfold-purple" />
-                Unfold
-              </h2>
-            </div>
+            
             
             <ScrollArea className="flex-1">
               <Tabs defaultValue="pinned" className="w-full">
@@ -76,6 +64,5 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </ResizablePanel>
       </ResizablePanelGroup>
-    </div>
-  );
+    </div>;
 }
