@@ -41,8 +41,7 @@ export default function PinnedTopics() {
         topics.map((topic) => (
           <Card key={topic.id} className="cursor-pointer hover:border-unfold-purple transition-colors">
             <CardHeader className="py-2 px-3">
-              <CardTitle className="text-xs flex items-center">
-                <Star className="h-3 w-3 mr-1 fill-amber-500 text-amber-500" />
+              <CardTitle className="text-xs">
                 {topic.title}
               </CardTitle>
             </CardHeader>
@@ -50,7 +49,7 @@ export default function PinnedTopics() {
               <p className="text-xs text-muted-foreground mb-1">{topic.description}</p>
               <ul className="text-[10px] space-y-0.5">
                 {topic.items.map((item, i) => (
-                  <li key={i} className="truncate hover:text-unfold-purple">• {item}</li>
+                  <li key={i} className="truncate hover:text-unfold-purple">{item}</li>
                 ))}
               </ul>
             </CardContent>
