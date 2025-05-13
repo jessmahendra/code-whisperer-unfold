@@ -1,7 +1,7 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Star } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Sample pinned topics
 const SAMPLE_TOPICS = [
@@ -39,13 +39,13 @@ export default function PinnedTopics() {
         </div>
       ) : (
         topics.map((topic) => (
-          <Card key={topic.id} className="cursor-pointer hover:border-unfold-purple transition-colors">
-            <CardHeader className="py-2 px-3">
-              <CardTitle className="text-xs">
-                {topic.title}
-              </CardTitle>
-            </CardHeader>
-          </Card>
+          <div 
+            key={topic.id} 
+            className="p-3 rounded-md hover:bg-slate-100 cursor-pointer transition-colors"
+          >
+            <p className="text-sm font-medium">{topic.title}</p>
+            <p className="text-xs text-muted-foreground mt-1">{topic.description}</p>
+          </div>
         ))
       )}
     </div>
