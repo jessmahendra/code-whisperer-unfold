@@ -45,14 +45,6 @@ export default function PinnedTopics() {
                 {topic.title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="py-1 px-3 pb-2">
-              <p className="text-xs text-muted-foreground mb-1">{topic.description}</p>
-              <ul className="text-[10px] space-y-0.5">
-                {topic.items.map((item, i) => (
-                  <li key={i} className="truncate hover:text-unfold-purple">{item}</li>
-                ))}
-              </ul>
-            </CardContent>
           </Card>
         ))
       )}
