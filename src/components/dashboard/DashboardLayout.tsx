@@ -3,9 +3,8 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BookOpen, MessageSquare, Pin, Star } from "lucide-react";
+import { MessageSquare, Pin } from "lucide-react";
 import ChatHistory from "./ChatHistory";
 import PinnedTopics from "./PinnedTopics";
 
@@ -23,37 +22,39 @@ export default function DashboardLayout({
         {/* Sidebar */}
         <ResizablePanel defaultSize={25} minSize={20} maxSize={30} className="bg-slate-50 border-r">
           <div className="h-full flex flex-col">
-            
-            <ScrollArea className="flex-1">
-              <Tabs defaultValue="history" className="w-full">
-                <div className="px-4 pt-4">
-                  <TabsList className="w-full grid grid-cols-2">
-                    <TabsTrigger value="history">
-                      <MessageSquare className="h-4 w-4 mr-1" />
-                      History
-                    </TabsTrigger>
-                    <TabsTrigger value="pinned">
-                      <Pin className="h-4 w-4 mr-1" />
-                      Pinned
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                <TabsContent value="history" className="p-4">
-                  <ChatHistory />
-                </TabsContent>
-                
-                <TabsContent value="pinned" className="p-4">
-                  <PinnedTopics />
-                </TabsContent>
-              </Tabs>
-            </ScrollArea>
-            
-            <div className="p-4 border-t mt-auto">
+            {/* Moved New Chat button to the top */}
+            <div className="p-4 border-b">
               <Button variant="outline" className="w-full" onClick={() => setActiveTab("new")}>
                 New Chat
               </Button>
             </div>
+            
+            <ScrollArea className="flex-1">
+              <Tabs defaultValue="pinned" className="w-full">
+                <div className="px-4 pt-4">
+                  <TabsList className="w-full grid grid-cols-2">
+                    <TabsTrigger value="pinned">
+                      <Pin className="h-4 w-4 mr-1" />
+                      Pinned
+                    </TabsTrigger>
+                    <TabsTrigger value="history">
+                      <MessageSquare className="h-4 w-4 mr-1" />
+                      History
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
+                
+                <TabsContent value="pinned" className="p-4">
+                  <PinnedTopics />
+                </TabsContent>
+                
+                <TabsContent value="history" className="p-4">
+                  <ChatHistory />
+                </TabsContent>
+              </Tabs>
+            </ScrollArea>
+            
+            {/* Removed "New Chat" button from bottom */}
           </div>
         </ResizablePanel>
         
