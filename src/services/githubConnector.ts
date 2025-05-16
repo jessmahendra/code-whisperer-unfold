@@ -1,8 +1,9 @@
+
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
+import { toast } from "sonner";
 
-// This is a mock implementation for demo purposes
-// In a real application, this would connect to the GitHub API
+// This is a connector between the GitHub API and the knowledge base system
 
 export interface FileInfo {
   name: string;
@@ -11,7 +12,7 @@ export interface FileInfo {
   type: 'file' | 'dir';
 }
 
-// Mock data structure for Ghost repository
+// Mock data structure for repository exploration when no real data is available
 const mockGhostRepo = {
   "ghost/core/core/server/services/members": {
     "index.js": `
@@ -192,8 +193,19 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         type: contents.type as 'file' | 'dir'
       }];
     } catch (error) {
-      console.warn(`Failed to fetch from GitHub API, falling back to mock data: ${error}`);
+      if (error.status === 404) {
+        console.warn(`Path not found in repository: ${repoPath}`, error);
+      } else {
+        console.warn(`Failed to fetch from GitHub API, falling back to mock data: ${error.message || error}`);
+      }
       // Fall back to mock data on error
+    }
+  } else {
+    if (!isGithubClientInitialized()) {
+      console.warn('GitHub client not initialized, using mock data');
+    }
+    if (!config) {
+      console.warn('No repository configuration found, using mock data');
     }
   }
   
@@ -236,7 +248,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       }
       
       resolve(contents);
-    }, 500);
+    }, 100); // Reduced mock delay for better UX
   });
 }
 
@@ -257,7 +269,7 @@ export async function getFileContent(filePath: string): Promise<string> {
       
       return await fetchFileContent(owner, repo, filePath);
     } catch (error) {
-      console.warn(`Failed to fetch file content from GitHub API, falling back to mock data: ${error}`);
+      console.warn(`Failed to fetch file content from GitHub API, falling back to mock data: ${error.message || error}`);
       // Fall back to mock data on error
     }
   }
@@ -288,7 +300,7 @@ export async function getFileContent(filePath: string): Promise<string> {
       } else {
         reject(new Error(`File not found: ${filePath}`));
       }
-    }, 300);
+    }, 100); // Reduced mock delay
   });
 }
 

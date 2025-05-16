@@ -39,8 +39,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
         knowledgeBase = [...mockKnowledgeEntries];
       }
       
-      toast.warning('Using mock data - repository structure may not match expected paths.', {
-        description: 'Please verify the repository structure and update the configuration.',
+      toast.warning('Using mock data - could not access repository files.', {
+        description: 'Please check repository configuration, token permissions, and that the repository exists.',
         duration: 6000
       });
     } else {

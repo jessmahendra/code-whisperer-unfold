@@ -7,55 +7,48 @@ import { processModule, processFile } from './fileProcessor';
 let successfulPathPatterns: string[] = [];
 
 /**
- * Gets the default paths to try for Ghost repository structure
+ * Gets the default paths to try for a repository structure
  * @param {string|undefined} repoName - Repository name
  * @returns {string[]} Array of paths to try
  */
 export function getDefaultPathsToTry(repoName?: string): string[] {
+  // Basic repository structure for any repo, not just Ghost
   const basePaths = [
-    // Most likely paths based on common Ghost structures
     '', // Root directory
-    'core',
-    'packages',
     'src',
     'app',
+    'packages',
+    'lib',
+    'core',
     
-    // Server directories
-    'core/server',
-    'packages/core/server',
-    'packages/ghost-core/server',
-    'src/server',
-    'app/server',
+    // Common code organization patterns
+    'src/api',
+    'src/services',
+    'src/models',
+    'api',
+    'services',
+    'models',
+    'controllers',
+    'utils',
+    'helpers',
     
-    // API directories
-    'core/server/api',
-    'packages/core/server/api',
-    'core/server/services',
-    'packages/core/server/services',
-    
-    // API version paths
-    'core/server/api/v2',
-    'core/server/api/v3',
-    'core/server/api/canary',
-    
-    // Member-specific paths
-    'core/server/services/members',
-    'packages/members',
-    'packages/members-api',
-    
-    // Content paths
-    'core/server/api/v2/content',
-    'core/server/api/v3/content',
-    'core/server/api/canary/content',
+    // Common folder names for specific features
+    'src/auth',
+    'src/users',
+    'src/content',
+    'auth',
+    'users',
+    'content',
   ];
 
   // Add repo name prefix paths if a repo name is provided
   if (repoName) {
     return [
       ...basePaths,
-      `${repoName}/core/server`,
-      `${repoName}/core/server/services/members`,
-      `${repoName}/core/server/api`
+      `${repoName}/src`,
+      `${repoName}/app`,
+      `${repoName}/packages`,
+      `${repoName}/core`
     ];
   }
   
@@ -79,13 +72,28 @@ export async function exploreRepositoryPaths(
       return false;
     }
     
-    // Get paths to try
-    const pathsToTry = getDefaultPathsToTry(currentRepo.repo);
+    console.log(`Exploring repository: ${currentRepo.owner}/${currentRepo.repo}`);
     
-    // If we had successful patterns before, prioritize those
-    const allPathsToTry = [...successfulPathPatterns, ...pathsToTry];
+    // Try the root first to discover repository structure
+    try {
+      const rootContents = await getRepositoryContents('');
+      console.log(`Found ${rootContents.length} items in the root of the repository`);
+      
+      // Automatically discover main directories in the repo
+      const mainDirs = rootContents.filter(item => item.type === 'dir').map(dir => dir.path);
+      if (mainDirs.length > 0) {
+        console.log(`Discovered directories: ${mainDirs.join(', ')}`);
+        successfulPathPatterns.push(...mainDirs);
+      }
+    } catch (error) {
+      console.log(`Could not access root path: ${error.message}`);
+    }
     
-    console.log(`Attempting to scan ${allPathsToTry.length} possible paths in Ghost repository structure`);
+    // Get paths to try (use discovered paths first, then fall back to defaults)
+    const defaultPaths = getDefaultPathsToTry(currentRepo.repo);
+    const allPathsToTry = [...new Set([...successfulPathPatterns, ...defaultPaths])];
+    
+    console.log(`Attempting to scan ${allPathsToTry.length} possible paths in repository structure`);
     
     let processedAny = false;
     let successfulPaths = 0;
@@ -100,7 +108,12 @@ export async function exploreRepositoryPaths(
           
           // Process discovered files and directories
           for (const item of contents) {
-            if (item.type === 'file' && (item.name.endsWith('.js') || item.name.endsWith('.ts'))) {
+            if (item.type === 'file' && (
+              item.name.endsWith('.js') || 
+              item.name.endsWith('.ts') || 
+              item.name.endsWith('.tsx') || 
+              item.name.endsWith('.jsx')
+            )) {
               await processFile(item.path, knowledgeBase);
               processedAny = true;
               successfulPaths++;
@@ -110,16 +123,19 @@ export async function exploreRepositoryPaths(
                 successfulPathPatterns.push(path);
               }
               
-              // Process important-looking directories
-              if (
+              // Process important-looking directories or all directories if we haven't found much yet
+              const isImportantDir = 
                 item.name.includes('api') || 
                 item.name.includes('service') || 
                 item.name.includes('controller') ||
                 item.name.includes('model') ||
-                item.name.includes('member') ||
-                item.name.includes('content') ||
-                item.name.includes('subscription')
-              ) {
+                item.name.includes('util') ||
+                item.name.includes('helper') ||
+                item.name.includes('component') ||
+                item.name.includes('module') ||
+                successfulPaths < 5; // Process more aggressively if we haven't found much yet
+                
+              if (isImportantDir) {
                 try {
                   await processModule(item.path, knowledgeBase);
                   processedAny = true;
