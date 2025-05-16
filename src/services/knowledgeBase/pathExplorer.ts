@@ -1,4 +1,3 @@
-
 import { getRepositoryContents, getCurrentRepository, getFileContent } from '../githubConnector';
 import { KnowledgeEntry } from './types';
 import { processModule, processFile } from './fileProcessor';
@@ -24,6 +23,7 @@ export function getDefaultPathsToTry(repoName?: string): string[] {
       'core/server/models',
       'core/server/controllers',
       'core/server/api/v2',
+      'core/server/api/canary',
       'apps/ghost',
       'ghost/core',
       'ghost/core/core',
@@ -31,6 +31,21 @@ export function getDefaultPathsToTry(repoName?: string): string[] {
       'ghost/core/core/server/api',
       'ghost/core/core/server/services',
       'ghost/core/core/server/models',
+      'ghost/core/core/server/services/members',
+      'ghost/core/core/server/services/auth',
+      'ghost/core/core/server/api/v2/content',
+      'ghost/core/core/frontend',
+      'ghost/admin',
+      'ghost/admin/app',
+      'ghost/admin/app/controllers',
+      'ghost/admin/app/components',
+      // Add more specific paths
+      'packages/admin/app',
+      'packages/core',
+      'packages/core/server',
+      'ghost/admin/app/routes',
+      'ghost/admin/app/models',
+      'ghost/admin/app/services'
     ];
   }
   
@@ -136,7 +151,8 @@ export async function exploreRepositoryPaths(
                   (item.name.endsWith('.js') || 
                    item.name.endsWith('.ts') || 
                    item.name.endsWith('.tsx') || 
-                   item.name.endsWith('.jsx'))
+                   item.name.endsWith('.jsx') ||
+                   item.name.endsWith('.md'))
                 );
                 
                 for (const file of files) {
@@ -157,6 +173,52 @@ export async function exploreRepositoryPaths(
       console.error('Error exploring root directory:', error.message);
     }
     
+    // Special handling for Ghost repo
+    if (currentRepo.repo === "Ghost" && currentRepo.owner === "TryGhost") {
+      console.log("Using specialized path exploration for Ghost repository");
+      
+      // Try the most common Ghost paths directly
+      const ghostSpecificPaths = [
+        'ghost/core/core/server/services/members',
+        'ghost/core/core/server/services/auth',
+        'ghost/core/core/server/api/v2/content',
+        'ghost/core/core/server/api/canary/content',
+        'ghost/core/core/server/models',
+        'ghost/core/core/frontend/services'
+      ];
+      
+      for (const path of ghostSpecificPaths) {
+        try {
+          console.log(`Trying Ghost-specific path: ${path}`);
+          const contents = await getRepositoryContents(path);
+          
+          if (contents.length > 0) {
+            console.log(`Found ${contents.length} items in Ghost-specific path: ${path}`);
+            
+            // Process JavaScript files in this directory
+            const files = contents.filter(item => 
+              item.type === 'file' && 
+              (item.name.endsWith('.js') || item.name.endsWith('.ts'))
+            );
+            
+            for (const file of files) {
+              try {
+                await processFile(file.path, knowledgeBase);
+              } catch (fileError) {
+                console.log(`Could not process Ghost file ${file.path}: ${fileError.message}`);
+              }
+            }
+            
+            if (files.length > 0) {
+              console.log(`Processed ${files.length} files in Ghost-specific path: ${path}`);
+            }
+          }
+        } catch (error) {
+          console.log(`Could not access Ghost-specific path ${path}: ${error.message}`);
+        }
+      }
+    }
+    
     // Get paths to try (use discovered paths first, then fall back to defaults)
     const defaultPaths = getDefaultPathsToTry(currentRepo.repo);
     const allPathsToTry = [...new Set([...successfulPathPatterns, ...defaultPaths])];
@@ -165,7 +227,7 @@ export async function exploreRepositoryPaths(
     
     let processedAny = false;
     let successfulPaths = 0;
-    const maxPathsToTry = 20; // Limit to avoid excessive API calls
+    const maxPathsToTry = currentRepo.repo === "Ghost" ? 40 : 20; // Higher limit for Ghost repo
     let attemptedPaths = 0;
     
     for (const path of allPathsToTry) {

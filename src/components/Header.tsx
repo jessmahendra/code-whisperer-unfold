@@ -7,10 +7,16 @@ import { getCurrentRepository } from "@/services/githubConnector";
 import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isUsingMockData } from "@/services/knowledgeBase";
+import { Button } from "./ui/button";
+import { saveRepositoryConfig } from "@/services/repositoryConfig";
+import { initGithubClient } from "@/services/githubClient";
+import { initializeKnowledgeBase } from "@/services/knowledgeBase";
+import { toast } from "sonner";
 
 export default function Header() {
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
   const [usingMockData, setUsingMockData] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
@@ -20,6 +26,60 @@ export default function Header() {
   useEffect(() => {
     updateRepoInfo();
   }, []);
+
+  const connectToGhostRepo = async () => {
+    setIsConnecting(true);
+    
+    // Prompt for GitHub token if not already set
+    let token = prompt("Please enter your GitHub personal access token with 'repo' permissions:");
+    
+    if (!token) {
+      setIsConnecting(false);
+      toast.error("GitHub token required to connect to the repository");
+      return;
+    }
+    
+    try {
+      // Initialize GitHub client
+      const initialized = initGithubClient(token);
+      
+      if (!initialized) {
+        toast.error("Failed to initialize GitHub client");
+        setIsConnecting(false);
+        return;
+      }
+      
+      // Save Ghost repo configuration
+      saveRepositoryConfig({ 
+        owner: "TryGhost", 
+        repo: "Ghost", 
+        token 
+      });
+      
+      // Initialize knowledge base
+      await initializeKnowledgeBase(true);
+      
+      // Update UI
+      updateRepoInfo();
+      
+      if (isUsingMockData()) {
+        toast.warning("Still using mock data. Please check your token permissions.", {
+          description: "Make sure your token has 'repo' scope access to public repositories."
+        });
+      } else {
+        toast.success("Successfully connected to Ghost repository!", {
+          description: "Knowledge base has been populated with real repository data."
+        });
+      }
+    } catch (error) {
+      console.error("Error connecting to Ghost repository:", error);
+      toast.error("Failed to connect to Ghost repository", {
+        description: error instanceof Error ? error.message : "Unknown error"
+      });
+    } finally {
+      setIsConnecting(false);
+    }
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -44,6 +104,26 @@ export default function Header() {
                 )}
               </span>
             )}
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={connectToGhostRepo}
+                    disabled={isConnecting}
+                    className="flex items-center gap-1"
+                  >
+                    <GitHubLogoIcon className="h-4 w-4" />
+                    {isConnecting ? "Connecting..." : "Connect to Ghost"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Connect directly to the Ghost GitHub repository</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             <TooltipProvider>
               <Tooltip>

@@ -12,6 +12,11 @@ export interface FileInfo {
   type: 'file' | 'dir';
 }
 
+// Error tracking for repository operations
+let lastErrorMessage: string | null = null;
+let connectionAttempts = 0;
+const MAX_ERROR_DISPLAY_COUNT = 3;
+
 // Mock data structure for repository exploration when no real data is available
 const mockGhostRepo = {
   "ghost/core/core/server/services/members": {
@@ -180,6 +185,9 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       
       const contents = await fetchRepositoryContents(owner, repo, repoPath);
       
+      // Reset error state on successful call
+      lastErrorMessage = null;
+      
       // Convert GitHub API response to FileInfo format
       return Array.isArray(contents) ? contents.map(item => ({
         name: item.name,
@@ -193,11 +201,27 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         type: contents.type as 'file' | 'dir'
       }];
     } catch (error) {
+      // Track different error types
       if (error.status === 404) {
         console.warn(`Path not found in repository: ${repoPath}`, error);
+        lastErrorMessage = `Path not found: ${repoPath}`;
+      } else if (error.status === 401 || error.status === 403) {
+        console.error(`Authorization error (${error.status}): ${error.message}`, error);
+        lastErrorMessage = `Authorization error: ${error.message || 'Invalid token or insufficient permissions'}`;
+        
+        // Show toast only for the first few authorization errors to avoid spamming
+        if (connectionAttempts < MAX_ERROR_DISPLAY_COUNT) {
+          toast.error(`GitHub authentication failed: ${error.message || 'Check your token permissions'}`, {
+            description: "Make sure your token has 'repo' scope and is valid",
+            duration: 5000
+          });
+        }
       } else {
         console.warn(`Failed to fetch from GitHub API (${error.status || 'unknown error'}), falling back to mock data: ${error.message || error}`);
+        lastErrorMessage = `GitHub API error: ${error.message || 'Unknown error'}`;
       }
+      
+      connectionAttempts++;
       // Fall back to mock data on error
     }
   } else {
@@ -320,5 +344,41 @@ export function getCurrentRepository(): { owner: string; repo: string } | null {
   return {
     owner: config.owner,
     repo: config.repo
+  };
+}
+
+/**
+ * Gets the last error message from GitHub operations
+ * @returns {string|null} Last error message or null if no errors
+ */
+export function getLastErrorMessage(): string | null {
+  return lastErrorMessage;
+}
+
+/**
+ * Reset error tracking
+ */
+export function resetErrorTracking(): void {
+  lastErrorMessage = null;
+  connectionAttempts = 0;
+}
+
+/**
+ * Gets diagnostic information for GitHub connection
+ * @returns {object} Connection diagnostic information
+ */
+export function getConnectionDiagnostics(): {
+  initialized: boolean;
+  configured: boolean;
+  errorMessage: string | null;
+  connectionAttempts: number;
+} {
+  const config = getRepositoryConfig();
+  
+  return {
+    initialized: isGithubClientInitialized(),
+    configured: !!config,
+    errorMessage: lastErrorMessage,
+    connectionAttempts
   };
 }
