@@ -39,7 +39,7 @@ export function getDefaultPathsToTry(repoName?: string): string[] {
       'ghost/admin/app',
       'ghost/admin/app/controllers',
       'ghost/admin/app/components',
-      // Add more specific paths
+      // Additional paths for Ghost repository structure
       'packages/admin/app',
       'packages/core',
       'packages/core/server',
@@ -184,7 +184,12 @@ export async function exploreRepositoryPaths(
         'ghost/core/core/server/api/v2/content',
         'ghost/core/core/server/api/canary/content',
         'ghost/core/core/server/models',
-        'ghost/core/core/frontend/services'
+        'ghost/core/core/frontend/services',
+        // Add more specific paths based on the actual Ghost structure
+        'ghost/core/server/api/v2/content',
+        'ghost/core/server/services/members',
+        'core/server/services/members',
+        'core/server/api/v2/content'
       ];
       
       for (const path of ghostSpecificPaths) {
@@ -192,10 +197,11 @@ export async function exploreRepositoryPaths(
           console.log(`Trying Ghost-specific path: ${path}`);
           const contents = await getRepositoryContents(path);
           
-          if (contents.length > 0) {
+          if (contents && contents.length > 0) {
             console.log(`Found ${contents.length} items in Ghost-specific path: ${path}`);
+            successfulPathPatterns.push(path);
             
-            // Process JavaScript files in this directory
+            // Process JavaScript/TypeScript files in this directory
             const files = contents.filter(item => 
               item.type === 'file' && 
               (item.name.endsWith('.js') || item.name.endsWith('.ts'))
@@ -212,6 +218,8 @@ export async function exploreRepositoryPaths(
             if (files.length > 0) {
               console.log(`Processed ${files.length} files in Ghost-specific path: ${path}`);
             }
+          } else {
+            console.log(`No contents found for ${path}`);
           }
         } catch (error) {
           console.log(`Could not access Ghost-specific path ${path}: ${error.message}`);

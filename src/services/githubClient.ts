@@ -12,12 +12,21 @@ let octokitInstance: Octokit | null = null;
  */
 export function initGithubClient(token: string): boolean {
   try {
+    // Clear any previous instance
+    octokitInstance = null;
+    
+    // Create a new Octokit instance with the token
     octokitInstance = new Octokit({
       auth: token
     });
+    
+    console.log("GitHub client initialized successfully");
     return true;
   } catch (error) {
     console.error("Failed to initialize GitHub client:", error);
+    toast.error("Failed to initialize GitHub client", {
+      description: error instanceof Error ? error.message : "Unknown error occurred"
+    });
     return false;
   }
 }
@@ -50,6 +59,8 @@ export async function fetchRepositoryContents(owner: string, repo: string, path:
   }
 
   try {
+    console.log(`Fetching repository contents for ${owner}/${repo}/${path}`);
+    
     const response = await octokitInstance.repos.getContent({
       owner,
       repo,
@@ -76,6 +87,8 @@ export async function fetchFileContent(owner: string, repo: string, path: string
   }
 
   try {
+    console.log(`Fetching file content for ${owner}/${repo}/${path}`);
+    
     const response = await octokitInstance.repos.getContent({
       owner,
       repo,
@@ -95,10 +108,13 @@ export async function fetchFileContent(owner: string, repo: string, path: string
     }
 
     // GitHub API returns content as base64
-    // Fix: Use browser-compatible base64 decoding instead of Node's Buffer
+    // Use browser-compatible base64 decoding
     try {
+      // Remove whitespace and line breaks from the base64 string
+      const cleanBase64 = fileData.content.replace(/\s/g, '');
+      
       // Decode base64 string using browser-compatible approach
-      const binary = atob(fileData.content.replace(/\s/g, ''));
+      const binary = atob(cleanBase64);
       
       // Handle Unicode characters properly
       const bytes = new Uint8Array(binary.length);
@@ -158,11 +174,16 @@ export async function fetchCommitHistory(owner: string, repo: string, path: stri
  */
 export async function validateGithubToken(token: string) {
   try {
+    console.log("Validating GitHub token...");
     const tempClient = new Octokit({ auth: token });
     const response = await tempClient.users.getAuthenticated();
+    console.log("Token validation successful:", response.data.login);
     return response.data;
   } catch (error) {
     console.error("Token validation failed:", error);
+    toast.error("Invalid GitHub token", {
+      description: "Make sure your token has the 'repo' scope and is valid."
+    });
     return null;
   }
 }

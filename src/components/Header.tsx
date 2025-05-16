@@ -56,6 +56,8 @@ export default function Header() {
     }
     
     try {
+      console.log("Starting Ghost repo connection process...");
+      
       // Initialize GitHub client
       const initialized = initGithubClient(token);
       
@@ -65,6 +67,8 @@ export default function Header() {
         return;
       }
       
+      console.log("GitHub client initialized successfully, saving configuration...");
+      
       // Save Ghost repo configuration
       saveRepositoryConfig({ 
         owner: "TryGhost", 
@@ -72,11 +76,15 @@ export default function Header() {
         token 
       });
       
-      // Initialize knowledge base
+      console.log("Configuration saved, initializing knowledge base...");
+      
+      // Initialize knowledge base with force refresh
       await initializeKnowledgeBase(true);
       
       // Update UI
       updateRepoInfo();
+      
+      console.log("Knowledge base initialized, checking data source...");
       
       if (isUsingMockData()) {
         toast.warning("Still using mock data. Please check your token permissions.", {

@@ -1,4 +1,3 @@
-
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
 import { toast } from "sonner";
@@ -187,6 +186,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       
       // Reset error state on successful call
       lastErrorMessage = null;
+      connectionAttempts = 0;
       
       // Convert GitHub API response to FileInfo format
       return Array.isArray(contents) ? contents.map(item => ({
@@ -201,36 +201,33 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         type: contents.type as 'file' | 'dir'
       }];
     } catch (error) {
+      const errorObj = error as any;
       // Track different error types
-      if (error.status === 404) {
-        console.warn(`Path not found in repository: ${repoPath}`, error);
+      if (errorObj.status === 404) {
+        console.warn(`Path not found in repository: ${repoPath}`, errorObj);
         lastErrorMessage = `Path not found: ${repoPath}`;
-      } else if (error.status === 401 || error.status === 403) {
-        console.error(`Authorization error (${error.status}): ${error.message}`, error);
-        lastErrorMessage = `Authorization error: ${error.message || 'Invalid token or insufficient permissions'}`;
+      } else if (errorObj.status === 401 || errorObj.status === 403) {
+        console.error(`Authorization error (${errorObj.status}): ${errorObj.message}`, errorObj);
+        lastErrorMessage = `Authorization error: ${errorObj.message || 'Invalid token or insufficient permissions'}`;
         
         // Show toast only for the first few authorization errors to avoid spamming
         if (connectionAttempts < MAX_ERROR_DISPLAY_COUNT) {
-          toast.error(`GitHub authentication failed: ${error.message || 'Check your token permissions'}`, {
+          toast.error(`GitHub authentication failed: ${errorObj.message || 'Check your token permissions'}`, {
             description: "Make sure your token has 'repo' scope and is valid",
             duration: 5000
           });
+          connectionAttempts++;
         }
       } else {
-        console.warn(`Failed to fetch from GitHub API (${error.status || 'unknown error'}), falling back to mock data: ${error.message || error}`);
-        lastErrorMessage = `GitHub API error: ${error.message || 'Unknown error'}`;
+        console.warn(`Failed to fetch from GitHub API (${errorObj.status || 'unknown error'}), falling back to mock data: ${errorObj.message || errorObj}`);
+        lastErrorMessage = `GitHub API error: ${errorObj.message || 'Unknown error'}`;
+        connectionAttempts++;
       }
       
-      connectionAttempts++;
       // Fall back to mock data on error
     }
   } else {
-    if (!isGithubClientInitialized()) {
-      console.warn('GitHub client not initialized, using mock data');
-    }
-    if (!config) {
-      console.warn('No repository configuration found, using mock data');
-    }
+    console.warn('Using mock data:', isGithubClientInitialized() ? 'No repository config' : 'GitHub client not initialized');
   }
   
   // Use mock data as fallback
@@ -244,7 +241,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       for (const part of pathParts) {
         if (part && currentPath[part]) {
           currentPath = currentPath[part];
-        } else {
+        } else if (part) {
           console.log(`Mock data path not found: ${repoPath}`);
           resolve([]);
           return;
@@ -258,14 +255,14 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         if (typeof content === 'string') {
           contents.push({
             name,
-            path: `${repoPath}/${name}`,
+            path: repoPath ? `${repoPath}/${name}` : name,
             content,
             type: 'file'
           });
         } else {
           contents.push({
             name,
-            path: `${repoPath}/${name}`,
+            path: repoPath ? `${repoPath}/${name}` : name,
             content: '',
             type: 'dir'
           });
