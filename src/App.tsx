@@ -9,7 +9,6 @@ import NotFound from "./pages/NotFound";
 import SharePage from "./components/SharePage";
 import SlackDemo from "./pages/SlackDemo";
 import { BookOpen, GitBranch, Blocks, PieChart, Slack } from "lucide-react";
-import { SidebarProvider } from "@/components/ui/sidebar";
 
 // Make the icons available globally to ensure they're imported for SharePage
 // This is a workaround since we can't import them directly in the SharePage component
@@ -20,19 +19,17 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <SidebarProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/share/:id" element={<SharePage />} />
-            <Route path="/slack-demo" element={<SlackDemo />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </SidebarProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/share/:id" element={<SharePage />} />
+          <Route path="/slack-demo" element={<SlackDemo />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );
