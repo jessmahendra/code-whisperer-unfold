@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -6,11 +7,11 @@ import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
 import GradientBackground from "@/components/GradientBackground";
 import { generateAnswer } from "@/services/answerGenerator";
-import { initializeKnowledgeBase } from "@/services/knowledgeBase";
+import { initializeKnowledgeBase, isUsingMockData } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, CheckCircle, Slack } from "lucide-react";
+import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
 import { hasRepositoryConfig } from "@/services/repositoryConfig";
 import { isGithubClientInitialized } from "@/services/githubClient";
 
@@ -39,6 +40,7 @@ export default function Index() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasRepo, setHasRepo] = useState(hasRepositoryConfig());
   const [isConnected, setIsConnected] = useState(false);
+  const [usingMockData, setUsingMockData] = useState(true);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -49,6 +51,7 @@ export default function Index() {
         const hasConfig = hasRepositoryConfig();
         setHasRepo(hasConfig);
         setIsConnected(hasConfig && isGithubClientInitialized());
+        setUsingMockData(isUsingMockData());
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
@@ -94,6 +97,14 @@ export default function Index() {
     }).format(now);
   };
 
+  const openConfigModal = () => {
+    // Find and click the config button in the header
+    const configButton = document.querySelector('header button') as HTMLButtonElement;
+    if (configButton) {
+      configButton.click();
+    }
+  };
+
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -114,9 +125,48 @@ export default function Index() {
                   <div>
                     <h3 className="font-medium text-yellow-800">Using mock data</h3>
                     <p className="text-sm text-yellow-700 mt-1">
-                      You're currently using mock data. To connect to a real GitHub repository, 
-                      click the repository icon in the header.
+                      You're currently using mock data. To connect to the Ghost GitHub repository,
+                      click the button below.
                     </p>
+                    <div className="mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-white" 
+                        onClick={openConfigModal}
+                      >
+                        <CodeIcon className="h-4 w-4 mr-1" />
+                        Configure GitHub Connection
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : usingMockData ? (
+              <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
+                  <div>
+                    <h3 className="font-medium text-yellow-800">Connected but using mock data</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      You've connected to GitHub but we're still using mock data. This might happen if:
+                    </p>
+                    <ul className="list-disc pl-5 text-sm text-yellow-700 mt-1">
+                      <li>The repository structure doesn't match our expectations</li>
+                      <li>Your token lacks permissions to access the repository</li>
+                      <li>There was a network issue during the connection</li>
+                    </ul>
+                    <div className="mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="bg-white" 
+                        onClick={openConfigModal}
+                      >
+                        <CodeIcon className="h-4 w-4 mr-1" />
+                        Check GitHub Connection
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -127,7 +177,7 @@ export default function Index() {
                   <div>
                     <h3 className="font-medium text-green-800">Connected to GitHub</h3>
                     <p className="text-sm text-green-700 mt-1">
-                      You're using real data from GitHub. The knowledge base will be populated as you ask questions.
+                      You're using real data from the Ghost GitHub repository. The knowledge base has been populated with code insights.
                     </p>
                   </div>
                 </div>
@@ -151,6 +201,9 @@ export default function Index() {
         
         <footer className="border-t py-6 text-center text-sm text-muted-foreground">
           <div className="container relative">
+            <div className="text-center">
+              <p>Currently using {usingMockData ? 'mock' : 'repository'} data for knowledge base</p>
+            </div>
             <Button 
               variant="ghost" 
               size="icon" 

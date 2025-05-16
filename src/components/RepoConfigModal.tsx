@@ -10,12 +10,14 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetFooter,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { CodeIcon, CheckIcon, XIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
+import { CodeIcon, CheckIcon, XIcon, InfoIcon, RefreshCwIcon, GithubIcon } from "lucide-react";
 import { getRepositoryConfig, saveRepositoryConfig, clearRepositoryConfig } from "@/services/repositoryConfig";
 import { initGithubClient, validateGithubToken, clearGithubClient } from "@/services/githubClient";
-import { clearKnowledgeBase, initializeKnowledgeBase, getKnowledgeBaseStats } from "@/services/knowledgeBase";
+import { clearKnowledgeBase, initializeKnowledgeBase, getKnowledgeBaseStats, isUsingMockData } from "@/services/knowledgeBase";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 interface RepoConfigModalProps {
   onConfigChange: () => void;
@@ -30,6 +32,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
   const [isInitializing, setIsInitializing] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [stats, setStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
+  const [isMockData, setIsMockData] = useState(true);
 
   useEffect(() => {
     const config = getRepositoryConfig();
@@ -46,6 +49,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
 
   const updateStats = () => {
     setStats(getKnowledgeBaseStats());
+    setIsMockData(isUsingMockData());
   };
 
   const handleValidateToken = async () => {
@@ -97,10 +101,16 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       await initializeKnowledgeBase(true);
       updateStats();
       
-      if (getKnowledgeBaseStats().totalEntries > 0) {
-        toast.success("Knowledge base initialized successfully");
+      // Check if we're still using mock data after initialization
+      const usingMockData = isUsingMockData();
+      setIsMockData(usingMockData);
+      
+      if (!usingMockData) {
+        toast.success("Knowledge base initialized successfully with repository data");
       } else {
-        toast.warning("Knowledge base initialized with 0 entries. Check if the repository exists and your token has access permissions.");
+        toast.warning("Could not access repository data, using mock data instead", {
+          description: "Please check your repository configuration and token permissions."
+        });
       }
 
       // Notify parent component
@@ -123,6 +133,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
     setIsConfigured(false);
     setValidationMessage("");
     setStats(null);
+    setIsMockData(true);
     toast.success("Repository configuration cleared");
     onConfigChange();
   };
@@ -134,7 +145,13 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
     try {
       await initializeKnowledgeBase(true); // Force refresh
       updateStats();
-      toast.success("Knowledge base refreshed");
+      
+      // Check if we're still using mock data after refresh
+      if (isUsingMockData()) {
+        toast.warning("Still using mock data after refresh. Could not access repository data.");
+      } else {
+        toast.success("Knowledge base refreshed with repository data");
+      }
     } catch (error) {
       console.error("Error refreshing knowledge base:", error);
       toast.error("Failed to refresh knowledge base");
@@ -159,24 +176,61 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
         </SheetHeader>
 
         <div className="py-4 space-y-4">
+          {isConfigured && isMockData && (
+            <Alert variant="warning" className="mb-4">
+              <AlertTitle className="flex items-center">
+                <InfoIcon className="h-4 w-4 mr-2" />
+                Using Mock Data
+              </AlertTitle>
+              <AlertDescription>
+                Unable to access repository data. You're currently using mock Ghost data. 
+                Please check your token permissions and repository details.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="owner">Repository Owner</Label>
-            <Input
-              id="owner"
-              placeholder="e.g., TryGhost"
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-            />
+            <div className="flex space-x-2">
+              <Input
+                id="owner"
+                placeholder="e.g., TryGhost"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+              />
+              {owner === "TryGhost" && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => window.open("https://github.com/TryGhost", "_blank")}
+                >
+                  <GithubIcon className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="repo">Repository Name</Label>
-            <Input
-              id="repo"
-              placeholder="e.g., Ghost"
-              value={repo}
-              onChange={(e) => setRepo(e.target.value)}
-            />
+            <div className="flex space-x-2">
+              <Input
+                id="repo"
+                placeholder="e.g., Ghost"
+                value={repo}
+                onChange={(e) => setRepo(e.target.value)}
+              />
+              {repo === "Ghost" && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => window.open("https://github.com/TryGhost/Ghost", "_blank")}
+                >
+                  <GithubIcon className="h-5 w-5" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -215,9 +269,10 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
               </p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Make sure the token has 'repo' scope permissions</li>
-                <li>Verify that the repository owner and name are correct</li>
-                <li>Check that your token has access to the repository</li>
-                <li>For private repos, ensure your account has access</li>
+                <li>For the Ghost repo, use owner "TryGhost" and repo "Ghost"</li>
+                <li>Check if the repository exists and is public</li>
+                <li>For private repos, ensure your token has access</li>
+                <li>Try refreshing if data doesn't appear immediately</li>
               </ul>
             </div>
           </div>
@@ -243,11 +298,14 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
                 <p>Functions: {stats.byType.function}</p>
                 <p>Exports: {stats.byType.export}</p>
                 <p>Processed files: {stats.processedFiles}</p>
+                <p className={`font-medium ${isMockData ? 'text-amber-500' : 'text-green-600'}`}>
+                  {isMockData ? '⚠️ Using mock data' : '✓ Using repository data'}
+                </p>
               </div>
             </div>
           )}
 
-          <div className="flex justify-between pt-4">
+          <SheetFooter className="flex justify-between gap-2 pt-4">
             <Button
               variant="outline"
               onClick={handleClearConfig}
@@ -266,11 +324,11 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
               ) : (
                 <>
                   <CheckIcon className="h-4 w-4 mr-1" />
-                  {isConfigured ? "Update" : "Save Configuration"}
+                  {isConfigured ? "Update & Reload" : "Save Configuration"}
                 </>
               )}
             </Button>
-          </div>
+          </SheetFooter>
         </div>
       </SheetContent>
     </Sheet>

@@ -196,7 +196,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       if (error.status === 404) {
         console.warn(`Path not found in repository: ${repoPath}`, error);
       } else {
-        console.warn(`Failed to fetch from GitHub API, falling back to mock data: ${error.message || error}`);
+        console.warn(`Failed to fetch from GitHub API (${error.status || 'unknown error'}), falling back to mock data: ${error.message || error}`);
       }
       // Fall back to mock data on error
     }
@@ -221,6 +221,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         if (part && currentPath[part]) {
           currentPath = currentPath[part];
         } else {
+          console.log(`Mock data path not found: ${repoPath}`);
           resolve([]);
           return;
         }
@@ -247,6 +248,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         }
       }
       
+      console.log(`Returning mock data for path: ${repoPath} with ${contents.length} items`);
       resolve(contents);
     }, 100); // Reduced mock delay for better UX
   });
@@ -289,6 +291,7 @@ export async function getFileContent(filePath: string): Promise<string> {
         if (part && currentPath[part]) {
           currentPath = currentPath[part];
         } else {
+          console.log(`Mock file not found: ${filePath} (directory not found)`);
           reject(new Error(`File not found: ${filePath}`));
           return;
         }
@@ -296,8 +299,10 @@ export async function getFileContent(filePath: string): Promise<string> {
       
       // Get the file content
       if (currentPath[fileName]) {
+        console.log(`Returning mock content for file: ${filePath}`);
         resolve(currentPath[fileName]);
       } else {
+        console.log(`Mock file not found: ${filePath} (file not found in directory)`);
         reject(new Error(`File not found: ${filePath}`));
       }
     }, 100); // Reduced mock delay

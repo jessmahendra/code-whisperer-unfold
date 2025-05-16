@@ -1,5 +1,5 @@
 
-import { getRepositoryContents, getCurrentRepository } from '../githubConnector';
+import { getRepositoryContents, getCurrentRepository, getFileContent } from '../githubConnector';
 import { KnowledgeEntry } from './types';
 import { processModule, processFile } from './fileProcessor';
 
@@ -12,7 +12,29 @@ let successfulPathPatterns: string[] = [];
  * @returns {string[]} Array of paths to try
  */
 export function getDefaultPathsToTry(repoName?: string): string[] {
-  // Basic repository structure for any repo, not just Ghost
+  // For Ghost specifically, try these paths
+  if (repoName === 'Ghost') {
+    return [
+      '', // Root directory
+      'ghost',
+      'core',
+      'core/server',
+      'core/server/api',
+      'core/server/services',
+      'core/server/models',
+      'core/server/controllers',
+      'core/server/api/v2',
+      'apps/ghost',
+      'ghost/core',
+      'ghost/core/core',
+      'ghost/core/core/server',
+      'ghost/core/core/server/api',
+      'ghost/core/core/server/services',
+      'ghost/core/core/server/models',
+    ];
+  }
+  
+  // Basic repository structure for any repo
   const basePaths = [
     '', // Root directory
     'src',
@@ -25,6 +47,7 @@ export function getDefaultPathsToTry(repoName?: string): string[] {
     'src/api',
     'src/services',
     'src/models',
+    'src/components',
     'api',
     'services',
     'models',
@@ -74,19 +97,64 @@ export async function exploreRepositoryPaths(
     
     console.log(`Exploring repository: ${currentRepo.owner}/${currentRepo.repo}`);
     
-    // Try the root first to discover repository structure
+    // First, try to get the root contents to better understand the repository structure
+    let rootContents = [];
     try {
-      const rootContents = await getRepositoryContents('');
-      console.log(`Found ${rootContents.length} items in the root of the repository`);
-      
-      // Automatically discover main directories in the repo
-      const mainDirs = rootContents.filter(item => item.type === 'dir').map(dir => dir.path);
-      if (mainDirs.length > 0) {
-        console.log(`Discovered directories: ${mainDirs.join(', ')}`);
-        successfulPathPatterns.push(...mainDirs);
+      rootContents = await getRepositoryContents('');
+      console.log(`Found ${rootContents.length} items in the root of the repository:`, 
+        rootContents.map(item => item.name).join(', '));
+        
+      if (rootContents.length > 0) {
+        // Check if this is a monorepo by looking for directories like "ghost" or "core" or "packages"
+        const mainDirs = rootContents
+          .filter(item => item.type === 'dir')
+          .map(dir => dir.path);
+          
+        if (mainDirs.length > 0) {
+          console.log(`Discovered directories: ${mainDirs.join(', ')}`);
+          successfulPathPatterns.push(...mainDirs);
+          
+          // If it's a GitHub monorepo, first try to explore those main dirs
+          for (const dir of mainDirs) {
+            try {
+              const dirContents = await getRepositoryContents(dir);
+              if (dirContents.length > 0) {
+                console.log(`Found ${dirContents.length} items in ${dir} directory`);
+                // Add subdirectories to successful patterns
+                const subDirs = dirContents
+                  .filter(item => item.type === 'dir')
+                  .map(subDir => `${dir}/${subDir.name}`);
+                  
+                if (subDirs.length > 0) {
+                  console.log(`Adding subdirectories: ${subDirs.join(', ')}`);
+                  successfulPathPatterns.push(...subDirs);
+                }
+                
+                // Process JS/TS files in this directory
+                const files = dirContents.filter(item => 
+                  item.type === 'file' && 
+                  (item.name.endsWith('.js') || 
+                   item.name.endsWith('.ts') || 
+                   item.name.endsWith('.tsx') || 
+                   item.name.endsWith('.jsx'))
+                );
+                
+                for (const file of files) {
+                  await processFile(file.path, knowledgeBase);
+                }
+                
+                if (files.length > 0) {
+                  console.log(`Processed ${files.length} files in ${dir} directory`);
+                }
+              }
+            } catch (error) {
+              console.log(`Error exploring ${dir} directory:`, error.message);
+            }
+          }
+        }
       }
     } catch (error) {
-      console.log(`Could not access root path: ${error.message}`);
+      console.error('Error exploring root directory:', error.message);
     }
     
     // Get paths to try (use discovered paths first, then fall back to defaults)
@@ -97,8 +165,16 @@ export async function exploreRepositoryPaths(
     
     let processedAny = false;
     let successfulPaths = 0;
+    const maxPathsToTry = 20; // Limit to avoid excessive API calls
+    let attemptedPaths = 0;
     
     for (const path of allPathsToTry) {
+      if (attemptedPaths >= maxPathsToTry) {
+        console.log(`Reached maximum path attempt limit (${maxPathsToTry})`);
+        break;
+      }
+      
+      attemptedPaths++;
       try {
         console.log(`Trying path: ${path}`);
         const contents = await getRepositoryContents(path);
@@ -112,11 +188,18 @@ export async function exploreRepositoryPaths(
               item.name.endsWith('.js') || 
               item.name.endsWith('.ts') || 
               item.name.endsWith('.tsx') || 
-              item.name.endsWith('.jsx')
+              item.name.endsWith('.jsx') ||
+              item.name.endsWith('.md')  // Include markdown files for documentation
             )) {
-              await processFile(item.path, knowledgeBase);
-              processedAny = true;
-              successfulPaths++;
+              try {
+                // Try to load file content first to verify access
+                await getFileContent(item.path);
+                await processFile(item.path, knowledgeBase);
+                processedAny = true;
+                successfulPaths++;
+              } catch (fileError) {
+                console.log(`Could not process file ${item.path}: ${fileError.message}`);
+              }
             } else if (item.type === 'dir') {
               // Save successful paths for future reference
               if (!successfulPathPatterns.includes(path)) {

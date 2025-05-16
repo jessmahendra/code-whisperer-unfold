@@ -55,7 +55,7 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   } catch (error) {
     console.error('Error initializing knowledge base:', error);
     toast.error('Error initializing knowledge base', {
-      description: error.message,
+      description: error instanceof Error ? error.message : 'Unknown error',
       duration: 5000
     });
   }
@@ -119,6 +119,17 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
     },
     processedFiles: getProcessedFileCount()
   };
+}
+
+/**
+ * Check if we're using mock data or real data
+ * @returns {boolean} True if using mock data
+ */
+export function isUsingMockData(): boolean {
+  // If the knowledge base only contains the exact same number of entries as mock data
+  // and the processed file count is 0, we're using mock data
+  return knowledgeBase.length === mockKnowledgeEntries.length && 
+         getProcessedFileCount() === 0;
 }
 
 // Re-export types for external use - fix the isolatedModules issue by using 'export type'
