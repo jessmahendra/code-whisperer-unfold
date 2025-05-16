@@ -1,7 +1,7 @@
 
 import { getRepositoryContents, getCurrentRepository } from '../githubConnector';
 import { KnowledgeEntry } from './types';
-import { processModule } from './fileProcessor';
+import { processModule, processFile } from './fileProcessor';
 
 // Tracks successful path patterns for future reference
 let successfulPathPatterns: string[] = [];

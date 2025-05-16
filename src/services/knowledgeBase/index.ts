@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -121,5 +120,5 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
   };
 }
 
-// Re-export types for external use
-export { KnowledgeEntry, KnowledgeBaseStats } from './types';
+// Re-export types for external use - fix the isolatedModules issue by using 'export type'
+export type { KnowledgeEntry, KnowledgeBaseStats } from './types';
