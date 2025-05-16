@@ -1,3 +1,4 @@
+
 // AI Analysis Service to enhance repository search with OpenAI
 import { toast } from "sonner";
 
@@ -51,14 +52,43 @@ export async function analyzeCodeWithAI(code: string, prompt: string): Promise<s
   }
 
   try {
-    // This is a placeholder for actual OpenAI API integration
-    // In a real implementation, we would call the OpenAI API here
     console.log("Analyzing code with OpenAI:", code.substring(0, 100) + "...");
     
-    // Return a placeholder response for now
-    return "This is a placeholder for AI analysis. To implement actual AI analysis, we would need to call the OpenAI API here.";
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini", // Using smaller model to reduce costs
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful code analysis assistant. Analyze the code below and provide insights based on the user's prompt."
+          },
+          {
+            role: "user", 
+            content: `${prompt}\n\n\`\`\`\n${code}\n\`\`\``
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || "OpenAI API request failed");
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
   } catch (error) {
     console.error("Error analyzing code with OpenAI:", error);
+    toast.error("Error analyzing code with AI", {
+      description: error instanceof Error ? error.message : "Unknown error occurred"
+    });
     return null;
   }
 }
@@ -76,14 +106,49 @@ export async function generateAnswerWithAI(question: string, codeContext: string
   }
 
   try {
-    // This is a placeholder for actual OpenAI API integration
     console.log("Generating answer for question:", question);
     console.log("Using code context of", codeContext.length, "items");
     
-    // Return a placeholder response for now
-    return "This is a placeholder for AI-generated answers. With a real OpenAI integration, we would send the question and code context to the API and return a helpful response.";
+    // Format the context to be more readable
+    const formattedContext = codeContext.map((item, index) => 
+      `Context Item ${index + 1}:\n${item}`
+    ).join('\n\n');
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openaiApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini", // Using smaller model to reduce costs
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI assistant specialized in understanding the Ghost CMS codebase. Use the provided context to answer questions about the codebase accurately. If the context doesn't contain enough information to answer confidently, acknowledge the limitations."
+          },
+          {
+            role: "user", 
+            content: `Based on the following codebase context, please answer this question: ${question}\n\nContext:\n${formattedContext}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1000
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || "OpenAI API request failed");
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
   } catch (error) {
     console.error("Error generating answer with OpenAI:", error);
+    toast.error("Error generating answer with AI", {
+      description: error instanceof Error ? error.message : "Unknown error occurred"
+    });
     return null;
   }
 }

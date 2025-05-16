@@ -1,3 +1,4 @@
+
 import { getRepositoryContents, getCurrentRepository, getFileContent } from '../githubConnector';
 import { KnowledgeEntry } from './types';
 import { processModule, processFile } from './fileProcessor';
@@ -11,41 +12,46 @@ let successfulPathPatterns: string[] = [];
  * @returns {string[]} Array of paths to try
  */
 export function getDefaultPathsToTry(repoName?: string): string[] {
-  // For Ghost specifically, try these paths
+  // For Ghost specifically, try these paths for current repository structure
   if (repoName === 'Ghost') {
     return [
       '', // Root directory
       'ghost',
-      'core',
-      'core/server',
-      'core/server/api',
-      'core/server/services',
-      'core/server/models',
-      'core/server/controllers',
-      'core/server/api/v2',
-      'core/server/api/canary',
+      'packages', // Modern Ghost uses a packages structure
+      'packages/ghost',
+      'apps',
       'apps/ghost',
+      'apps/admin',
+      'core',
       'ghost/core',
+      'ghost/admin',
+      
+      // Current structure paths (Ghost 5.x+)
       'ghost/core/core',
       'ghost/core/core/server',
+      'ghost/core/core/frontend',
+      'ghost/core/core/shared',
+      'ghost/admin/app',
+      
+      // Current API structure paths
       'ghost/core/core/server/api',
-      'ghost/core/core/server/services',
+      'ghost/core/core/server/api/endpoints',
+      'ghost/core/core/server/api/endpoints/content',
+      'ghost/core/core/server/api/endpoints/admin',
+      'ghost/core/core/server/api/versions',
+      'ghost/core/core/server/api/canary',
+      'ghost/core/core/server/api/canary/endpoints',
+      
+      // Current models and services
       'ghost/core/core/server/models',
+      'ghost/core/core/server/services',
       'ghost/core/core/server/services/members',
       'ghost/core/core/server/services/auth',
-      'ghost/core/core/server/api/v2/content',
-      'ghost/core/core/frontend',
-      'ghost/admin',
-      'ghost/admin/app',
-      'ghost/admin/app/controllers',
-      'ghost/admin/app/components',
-      // Additional paths for Ghost repository structure
-      'packages/admin/app',
-      'packages/core',
-      'packages/core/server',
-      'ghost/admin/app/routes',
-      'ghost/admin/app/models',
-      'ghost/admin/app/services'
+      'ghost/core/core/server/data',
+      
+      // Documentation
+      'content',
+      'docs',
     ];
   }
   
@@ -132,6 +138,7 @@ export async function exploreRepositoryPaths(
           // If it's a GitHub monorepo, first try to explore those main dirs
           for (const dir of mainDirs) {
             try {
+              console.log(`Exploring main directory: ${dir}`);
               const dirContents = await getRepositoryContents(dir);
               if (dirContents.length > 0) {
                 console.log(`Found ${dirContents.length} items in ${dir} directory`);
@@ -143,6 +150,25 @@ export async function exploreRepositoryPaths(
                 if (subDirs.length > 0) {
                   console.log(`Adding subdirectories: ${subDirs.join(', ')}`);
                   successfulPathPatterns.push(...subDirs);
+                  
+                  // For Ghost, try to go one level deeper since structure is complex
+                  if (currentRepo.repo === "Ghost") {
+                    for (const subDir of subDirs) {
+                      try {
+                        const subContents = await getRepositoryContents(subDir);
+                        const subSubDirs = subContents
+                          .filter(item => item.type === 'dir')
+                          .map(subSubDir => `${subDir}/${subSubDir.name}`);
+                        
+                        if (subSubDirs.length > 0) {
+                          console.log(`Adding nested subdirectories: ${subSubDirs.join(', ')}`);
+                          successfulPathPatterns.push(...subSubDirs);
+                        }
+                      } catch (error) {
+                        console.log(`Error exploring subdirectory ${subDir}:`, error.message);
+                      }
+                    }
+                  }
                 }
                 
                 // Process JS/TS files in this directory
@@ -173,23 +199,24 @@ export async function exploreRepositoryPaths(
       console.error('Error exploring root directory:', error.message);
     }
     
-    // Special handling for Ghost repo
+    // Special handling for Ghost repo - use updated paths based on current Ghost structure
     if (currentRepo.repo === "Ghost" && currentRepo.owner === "TryGhost") {
       console.log("Using specialized path exploration for Ghost repository");
       
-      // Try the most common Ghost paths directly
+      // Try the most current Ghost paths directly
       const ghostSpecificPaths = [
+        // Current structure (Ghost 5.x+)
         'ghost/core/core/server/services/members',
         'ghost/core/core/server/services/auth',
-        'ghost/core/core/server/api/v2/content',
         'ghost/core/core/server/api/canary/content',
+        'ghost/core/core/server/api/canary/endpoints',
         'ghost/core/core/server/models',
         'ghost/core/core/frontend/services',
-        // Add more specific paths based on the actual Ghost structure
-        'ghost/core/server/api/v2/content',
-        'ghost/core/server/services/members',
-        'core/server/services/members',
-        'core/server/api/v2/content'
+        'ghost/core/core/server/data/schema',
+        'ghost/core/core/server/data/migrations',
+        'ghost/admin/app/routes',
+        'ghost/admin/app/components',
+        'ghost/admin/app/templates'
       ];
       
       for (const path of ghostSpecificPaths) {

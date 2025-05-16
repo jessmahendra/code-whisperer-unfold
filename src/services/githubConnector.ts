@@ -15,6 +15,7 @@ export interface FileInfo {
 let lastErrorMessage: string | null = null;
 let connectionAttempts = 0;
 const MAX_ERROR_DISPLAY_COUNT = 3;
+let pathNotFoundErrors = new Set<string>();
 
 // Mock data structure for repository exploration when no real data is available
 const mockGhostRepo = {
@@ -180,7 +181,10 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       // Extract owner and repo from the path or use the configured ones
       const { owner, repo } = config;
       
-      console.log(`Fetching repo contents: ${owner}/${repo}/${repoPath}`);
+      // Don't log paths we've already found don't exist
+      if (!pathNotFoundErrors.has(repoPath)) {
+        console.log(`Fetching repo contents: ${owner}/${repo}/${repoPath}`);
+      }
       
       const contents = await fetchRepositoryContents(owner, repo, repoPath);
       
@@ -204,7 +208,11 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       const errorObj = error as any;
       // Track different error types
       if (errorObj.status === 404) {
-        console.warn(`Path not found in repository: ${repoPath}`, errorObj);
+        // Only log first time we find a path doesn't exist
+        if (!pathNotFoundErrors.has(repoPath)) {
+          console.warn(`Path not found in repository: ${repoPath}`, errorObj);
+          pathNotFoundErrors.add(repoPath);
+        }
         lastErrorMessage = `Path not found: ${repoPath}`;
       } else if (errorObj.status === 401 || errorObj.status === 403) {
         console.error(`Authorization error (${errorObj.status}): ${errorObj.message}`, errorObj);
@@ -358,6 +366,7 @@ export function getLastErrorMessage(): string | null {
 export function resetErrorTracking(): void {
   lastErrorMessage = null;
   connectionAttempts = 0;
+  pathNotFoundErrors.clear();
 }
 
 /**

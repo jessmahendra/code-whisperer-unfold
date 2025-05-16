@@ -1,6 +1,6 @@
 
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { BookOpen, Code2, Info, KeyRound } from "lucide-react";
+import { BookOpen, Code2, Info, KeyRound, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
 import { getCurrentRepository } from "@/services/githubConnector";
@@ -9,7 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { isUsingMockData } from "@/services/knowledgeBase";
 import { Button } from "./ui/button";
 import { saveRepositoryConfig } from "@/services/repositoryConfig";
-import { initGithubClient } from "@/services/githubClient";
+import { initGithubClient, validateGithubToken } from "@/services/githubClient";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { hasAICapabilities, setOpenAIApiKey } from "@/services/aiAnalysis";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 export default function Header() {
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
@@ -32,6 +33,7 @@ export default function Header() {
   const [openaiKey, setOpenaiKey] = useState("");
   const [isAIEnabled, setIsAIEnabled] = useState(false);
   const [openaiDialogOpen, setOpenaiDialogOpen] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
@@ -45,6 +47,7 @@ export default function Header() {
 
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
+    setConnectionError(null);
     
     // Prompt for GitHub token if not already set
     let token = prompt("Please enter your GitHub personal access token with 'repo' permissions:");
@@ -58,16 +61,26 @@ export default function Header() {
     try {
       console.log("Starting Ghost repo connection process...");
       
+      // Validate token first
+      const user = await validateGithubToken(token);
+      if (!user) {
+        setIsConnecting(false);
+        setConnectionError("Invalid GitHub token. Please check your token and try again.");
+        return;
+      }
+      
       // Initialize GitHub client
       const initialized = initGithubClient(token);
       
       if (!initialized) {
         toast.error("Failed to initialize GitHub client");
+        setConnectionError("Failed to initialize GitHub client");
         setIsConnecting(false);
         return;
       }
       
       console.log("GitHub client initialized successfully, saving configuration...");
+      toast.success(`Authenticated as ${user.login}`);
       
       // Save Ghost repo configuration
       saveRepositoryConfig({ 
@@ -77,6 +90,9 @@ export default function Header() {
       });
       
       console.log("Configuration saved, initializing knowledge base...");
+      toast.loading("Connecting to Ghost repository and building knowledge base...", {
+        duration: 10000
+      });
       
       // Initialize knowledge base with force refresh
       await initializeKnowledgeBase(true);
@@ -87,18 +103,23 @@ export default function Header() {
       console.log("Knowledge base initialized, checking data source...");
       
       if (isUsingMockData()) {
-        toast.warning("Still using mock data. Please check your token permissions.", {
-          description: "Make sure your token has 'repo' scope access to public repositories."
+        const errorMsg = "Connected to GitHub, but could not access repository data. Using mock data instead.";
+        setConnectionError(errorMsg);
+        toast.warning(errorMsg, {
+          description: "The repository structure might have changed. Please check console for details."
         });
       } else {
         toast.success("Successfully connected to Ghost repository!", {
           description: "Knowledge base has been populated with real repository data."
         });
+        setConnectionError(null);
       }
     } catch (error) {
       console.error("Error connecting to Ghost repository:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setConnectionError(`Error: ${errorMessage}`);
       toast.error("Failed to connect to Ghost repository", {
-        description: error instanceof Error ? error.message : "Unknown error"
+        description: errorMessage
       });
     } finally {
       setIsConnecting(false);
@@ -127,16 +148,29 @@ export default function Header() {
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <nav className="flex items-center space-x-4">
             {currentRepo && (
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                usingMockData 
-                  ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                  : 'bg-green-100 text-green-700 border border-green-200'
-              }`}>
-                {currentRepo.owner}/{currentRepo.repo}
-                {usingMockData && (
-                  <span className="ml-1 text-amber-600">(mock)</span>
+              <div className="flex items-center">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  usingMockData 
+                    ? 'bg-amber-100 text-amber-700 border border-amber-200' 
+                    : 'bg-green-100 text-green-700 border border-green-200'
+                }`}>
+                  {currentRepo.owner}/{currentRepo.repo}
+                  {usingMockData && (
+                    <span className="ml-1 text-amber-600">(mock)</span>
+                  )}
+                </span>
+                
+                {connectionError && (
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <AlertCircle className="ml-2 h-4 w-4 text-amber-500" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-md">
+                      <p>{connectionError}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
-              </span>
+              </div>
             )}
             
             <TooltipProvider>
@@ -202,6 +236,16 @@ export default function Header() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            
+            {/* Connection troubleshooting alert */}
+            {connectionError && (
+              <Alert variant="warning" className="hidden md:flex max-w-xs items-center">
+                <AlertTitle className="text-sm">Connection Issue</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Check GitHub token permissions and try again.
+                </AlertDescription>
+              </Alert>
+            )}
             
             <TooltipProvider>
               <Tooltip>
