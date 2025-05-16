@@ -1,3 +1,4 @@
+
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
 import { toast } from "sonner";
@@ -378,6 +379,7 @@ export function getConnectionDiagnostics(): {
   configured: boolean;
   errorMessage: string | null;
   connectionAttempts: number;
+  pathErrors: number;
 } {
   const config = getRepositoryConfig();
   
@@ -385,6 +387,7 @@ export function getConnectionDiagnostics(): {
     initialized: isGithubClientInitialized(),
     configured: !!config,
     errorMessage: lastErrorMessage,
-    connectionAttempts
+    connectionAttempts,
+    pathErrors: pathNotFoundErrors.size
   };
 }

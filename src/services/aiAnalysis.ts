@@ -10,7 +10,21 @@ let openaiApiKey: string | null = null;
  * @param key - The OpenAI API key
  */
 export function setOpenAIApiKey(key: string): void {
+  if (!key.trim()) {
+    toast.error("API key cannot be empty");
+    return;
+  }
+  
   openaiApiKey = key;
+  
+  // Save a masked version to localStorage just to indicate that a key is set
+  // We don't save the actual key for security reasons
+  try {
+    localStorage.setItem('openai_key_set', 'true');
+  } catch (e) {
+    console.error("Could not save API key status to localStorage");
+  }
+  
   toast.success("OpenAI API key has been set successfully", {
     description: "AI-powered analysis is now available."
   });
@@ -22,6 +36,18 @@ export function setOpenAIApiKey(key: string): void {
  */
 export function hasAICapabilities(): boolean {
   return openaiApiKey !== null;
+}
+
+/**
+ * Check if an API key has been previously set
+ * @returns Boolean indicating if a key was previously set
+ */
+export function wasAPIKeyPreviouslySet(): boolean {
+  try {
+    return localStorage.getItem('openai_key_set') === 'true';
+  } catch (e) {
+    return false;
+  }
 }
 
 /**
@@ -37,6 +63,14 @@ export function getOpenAIApiKey(): string | null {
  */
 export function clearOpenAIApiKey(): void {
   openaiApiKey = null;
+  try {
+    localStorage.removeItem('openai_key_set');
+  } catch (e) {
+    console.error("Could not clear API key status from localStorage");
+  }
+  toast.info("OpenAI API key has been cleared", {
+    description: "AI-powered features are now disabled."
+  });
 }
 
 /**

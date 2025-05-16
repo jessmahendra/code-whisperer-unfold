@@ -36,5 +36,27 @@ export const mockKnowledgeEntries: KnowledgeEntry[] = [
     content: '/** Premium content restricted to paid members via visibility settings */',
     filePath: 'ghost/core/core/server/api/v2/content/posts.js',
     keywords: ['premium', 'content', 'paid', 'members', 'visibility'],
-  }
-];
+  },
+  {
+    type: 'comment',
+    content: '/** Ghost subscription management handles tier upgrades and downgrades */',
+    filePath: 'ghost/core/core/server/services/members/subscriptions.js',
+    keywords: ['subscription', 'upgrade', 'downgrade', 'tier', 'management'],
+  },
+  {
+    type: 'function',
+    content: 'function processMemberTierChange(memberId, fromTierId, toTierId) { ... }',
+    filePath: 'ghost/core/core/server/services/members/api/index.js',
+    metadata: {
+      name: 'processMemberTierChange',
+      params: 'memberId, fromTierId, toTierId',
+    },
+    keywords: ['tier', 'change', 'process', 'member'],
+  },
+  {
+    type: 'comment',
+    content: '/** Email features require newsletter subscription status to be active */',
+    filePath: 'ghost/core/core/server/services/mail/index.js',
+    keywords: ['email', 'newsletter', 'subscription', 'active'],
+  },
+]

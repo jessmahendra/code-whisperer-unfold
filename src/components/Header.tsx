@@ -1,9 +1,9 @@
 
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { BookOpen, Code2, Info, KeyRound, AlertCircle } from "lucide-react";
+import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
-import { getCurrentRepository } from "@/services/githubConnector";
+import { getCurrentRepository, getConnectionDiagnostics } from "@/services/githubConnector";
 import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isUsingMockData } from "@/services/knowledgeBase";
@@ -12,7 +12,11 @@ import { saveRepositoryConfig } from "@/services/repositoryConfig";
 import { initGithubClient, validateGithubToken } from "@/services/githubClient";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
-import { hasAICapabilities, setOpenAIApiKey } from "@/services/aiAnalysis";
+import { 
+  hasAICapabilities, 
+  setOpenAIApiKey, 
+  wasAPIKeyPreviouslySet 
+} from "@/services/aiAnalysis";
 import {
   Dialog,
   DialogContent,
@@ -34,20 +38,39 @@ export default function Header() {
   const [isAIEnabled, setIsAIEnabled] = useState(false);
   const [openaiDialogOpen, setOpenaiDialogOpen] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
 
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
     setIsAIEnabled(hasAICapabilities());
+
+    // Get connection diagnostics to set accurate status
+    const diagnostics = getConnectionDiagnostics();
+    if (!diagnostics.initialized || !diagnostics.configured) {
+      setConnectionStatus('disconnected');
+    } else if (isUsingMockData()) {
+      setConnectionStatus('partial');
+      setConnectionError(diagnostics.errorMessage);
+    } else {
+      setConnectionStatus('connected');
+      setConnectionError(null);
+    }
   };
 
   useEffect(() => {
     updateRepoInfo();
+    
+    // Check if API key was previously set
+    if (wasAPIKeyPreviouslySet()) {
+      setIsAIEnabled(true);
+    }
   }, []);
 
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
     setConnectionError(null);
+    setConnectionStatus('connecting');
     
     // Prompt for GitHub token if not already set
     let token = prompt("Please enter your GitHub personal access token with 'repo' permissions:");
@@ -55,6 +78,7 @@ export default function Header() {
     if (!token) {
       setIsConnecting(false);
       toast.error("GitHub token required to connect to the repository");
+      setConnectionStatus('disconnected');
       return;
     }
     
@@ -66,6 +90,7 @@ export default function Header() {
       if (!user) {
         setIsConnecting(false);
         setConnectionError("Invalid GitHub token. Please check your token and try again.");
+        setConnectionStatus('disconnected');
         return;
       }
       
@@ -76,6 +101,7 @@ export default function Header() {
         toast.error("Failed to initialize GitHub client");
         setConnectionError("Failed to initialize GitHub client");
         setIsConnecting(false);
+        setConnectionStatus('disconnected');
         return;
       }
       
@@ -105,6 +131,7 @@ export default function Header() {
       if (isUsingMockData()) {
         const errorMsg = "Connected to GitHub, but could not access repository data. Using mock data instead.";
         setConnectionError(errorMsg);
+        setConnectionStatus('partial');
         toast.warning(errorMsg, {
           description: "The repository structure might have changed. Please check console for details."
         });
@@ -113,11 +140,13 @@ export default function Header() {
           description: "Knowledge base has been populated with real repository data."
         });
         setConnectionError(null);
+        setConnectionStatus('connected');
       }
     } catch (error) {
       console.error("Error connecting to Ghost repository:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       setConnectionError(`Error: ${errorMessage}`);
+      setConnectionStatus('disconnected');
       toast.error("Failed to connect to Ghost repository", {
         description: errorMessage
       });
@@ -136,6 +165,37 @@ export default function Header() {
     }
   };
 
+  const getConnectionStatusInfo = () => {
+    switch (connectionStatus) {
+      case 'disconnected':
+        return {
+          icon: <AlertCircle className="h-4 w-4 text-red-500" />,
+          text: 'Not connected',
+          color: 'text-red-500'
+        };
+      case 'connecting':
+        return {
+          icon: <AlertCircle className="h-4 w-4 text-amber-500 animate-pulse" />,
+          text: 'Connecting...',
+          color: 'text-amber-500'
+        };
+      case 'partial':
+        return {
+          icon: <AlertCircle className="h-4 w-4 text-amber-500" />,
+          text: 'Partial connection',
+          color: 'text-amber-500'
+        };
+      case 'connected':
+        return {
+          icon: <CheckCircle className="h-4 w-4 text-green-500" />,
+          text: 'Connected',
+          color: 'text-green-500'
+        };
+    }
+  };
+
+  const statusInfo = getConnectionStatusInfo();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -149,12 +209,13 @@ export default function Header() {
           <nav className="flex items-center space-x-4">
             {currentRepo && (
               <div className="flex items-center">
-                <span className={`text-xs px-2 py-1 rounded-full ${
+                <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
                   usingMockData 
                     ? 'bg-amber-100 text-amber-700 border border-amber-200' 
                     : 'bg-green-100 text-green-700 border border-green-200'
                 }`}>
-                  {currentRepo.owner}/{currentRepo.repo}
+                  {statusInfo.icon}
+                  <span>{currentRepo.owner}/{currentRepo.repo}</span>
                   {usingMockData && (
                     <span className="ml-1 text-amber-600">(mock)</span>
                   )}
@@ -181,7 +242,9 @@ export default function Header() {
                     size="sm" 
                     onClick={connectToGhostRepo}
                     disabled={isConnecting}
-                    className="flex items-center gap-1"
+                    className={`flex items-center gap-1 ${
+                      connectionStatus === 'connected' ? 'bg-green-50 border-green-200' : ''
+                    }`}
                   >
                     <GitHubLogoIcon className="h-4 w-4" />
                     {isConnecting ? "Connecting..." : "Connect to Ghost"}
