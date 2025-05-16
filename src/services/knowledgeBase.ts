@@ -52,6 +52,9 @@ let knowledgeBase: KnowledgeEntry[] = [
 // Cache for processed files to avoid redundant processing
 const processedFilesCache: Set<string> = new Set();
 
+// Tracks successful path patterns for future reference
+let successfulPathPatterns: string[] = [];
+
 /**
  * Initializes the knowledge base by extracting information from repository files
  * @param {boolean} forceRefresh - Whether to force refresh the knowledge base
@@ -63,6 +66,7 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   // Clear cache if forced refresh
   if (forceRefresh) {
     processedFilesCache.clear();
+    successfulPathPatterns = [];
   }
   
   try {
@@ -74,42 +78,124 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       return;
     }
     
-    // Try multiple potential path patterns for Ghost
+    // Common Ghost repo path patterns to try
     const pathsToTry = [
-      // Main repo paths
-      `core/server/services/members`,
-      `core/server/api/v2/content`,
+      // Most likely paths based on common Ghost structures
+      '', // Root directory
+      'core',
+      'packages',
+      'src',
+      'app',
+      
+      // Server directories
+      'core/server',
+      'packages/core/server',
+      'packages/ghost-core/server',
+      'src/server',
+      'app/server',
+      
+      // API directories
+      'core/server/api',
+      'packages/core/server/api',
+      'core/server/services',
+      'packages/core/server/services',
+      
+      // API version paths
+      'core/server/api/v2',
+      'core/server/api/v3',
+      'core/server/api/canary',
+      
+      // Member-specific paths
+      'core/server/services/members',
+      'packages/members',
+      'packages/members-api',
+      
+      // Content paths
+      'core/server/api/v2/content',
+      'core/server/api/v3/content',
+      'core/server/api/canary/content',
+      
       // With repo name prefix
+      `${currentRepo.repo}/core/server`,
       `${currentRepo.repo}/core/server/services/members`,
-      `${currentRepo.repo}/core/server/api/v2/content`,
-      // Ghost monorepo style
-      `packages/core/server/services/members`,
-      `packages/core/server/api/v2/content`,
+      `${currentRepo.repo}/core/server/api`,
     ];
     
-    let processedAny = false;
+    // If we had successful patterns before, prioritize those
+    const allPathsToTry = [...successfulPathPatterns, ...pathsToTry];
     
-    for (const path of pathsToTry) {
+    console.log(`Attempting to scan ${allPathsToTry.length} possible paths in Ghost repository structure`);
+    
+    let processedAny = false;
+    let successfulPaths = 0;
+    
+    for (const path of allPathsToTry) {
       try {
-        await processModule(path);
-        processedAny = true;
-        console.log(`Successfully processed path: ${path}`);
+        console.log(`Trying path: ${path}`);
+        const contents = await getRepositoryContents(path);
+        
+        if (contents.length > 0) {
+          console.log(`Found ${contents.length} items in path: ${path}`);
+          
+          // Process discovered files and directories
+          for (const item of contents) {
+            if (item.type === 'file' && (item.name.endsWith('.js') || item.name.endsWith('.ts'))) {
+              await processFile(item.path);
+              processedAny = true;
+              successfulPaths++;
+            } else if (item.type === 'dir') {
+              // Save successful paths for future reference
+              if (!successfulPathPatterns.includes(path)) {
+                successfulPathPatterns.push(path);
+              }
+              
+              // Process important-looking directories
+              if (
+                item.name.includes('api') || 
+                item.name.includes('service') || 
+                item.name.includes('controller') ||
+                item.name.includes('model') ||
+                item.name.includes('member') ||
+                item.name.includes('content') ||
+                item.name.includes('subscription')
+              ) {
+                try {
+                  await processModule(item.path);
+                  processedAny = true;
+                  successfulPaths++;
+                } catch (dirError) {
+                  console.log(`Could not process directory ${item.path}: ${dirError.message}`);
+                }
+              }
+            }
+          }
+        }
       } catch (error) {
-        console.log(`Could not process path ${path}: ${error.message}`);
+        console.log(`Could not access path ${path}: ${error.message}`);
         // Continue trying other paths
       }
     }
     
     if (!processedAny) {
       console.log('Could not process any paths, falling back to mock data');
-      toast.warning('Using mock data - repository structure may not match expected paths');
+      toast.warning('Using mock data - repository structure may not match expected paths.', {
+        description: 'Please verify the repository structure and update the configuration.',
+        duration: 6000
+      });
     } else {
-      toast.success(`Knowledge base initialized with ${knowledgeBase.length} entries`);
-      console.log(`Knowledge base initialized with ${knowledgeBase.length} entries`);
+      const successMsg = `Knowledge base initialized with ${knowledgeBase.length} entries from ${successfulPaths} paths.`;
+      toast.success(successMsg, {
+        description: 'Using real repository data.',
+        duration: 4000
+      });
+      console.log(successMsg);
     }
   } catch (error) {
     console.error('Error initializing knowledge base:', error);
-    toast.error('Error initializing knowledge base');
+    toast.error('Error initializing knowledge base', {
+      description: error.message,
+      duration: 5000
+    });
   }
 }
 
@@ -125,17 +211,21 @@ async function processModule(modulePath: string): Promise<void> {
     // Process each item (file or directory)
     for (const item of contents) {
       if (item.type === 'file') {
-        // Process JavaScript files
-        if (item.name.endsWith('.js')) {
+        // Process JavaScript/TypeScript files
+        if (item.name.endsWith('.js') || item.name.endsWith('.ts')) {
           await processFile(item.path);
         }
       } else if (item.type === 'dir') {
-        // Recursively process directories
-        await processModule(item.path);
+        // Recursively process directories, but limit depth to avoid excessive API calls
+        const depth = modulePath.split('/').length;
+        if (depth < 8) {  // Limit directory recursion depth
+          await processModule(item.path);
+        }
       }
     }
   } catch (error) {
     console.error(`Error processing module ${modulePath}:`, error);
+    throw error; // Propagate error to allow for proper path exploration
   }
 }
 
@@ -190,6 +280,9 @@ async function processFile(filePath: string): Promise<void> {
         keywords: extractKeywords(key + ' ' + value),
       });
     }
+    
+    // Log successful file processing
+    console.log(`Successfully processed file: ${filePath}`);
   } catch (error) {
     console.error(`Error processing file ${filePath}:`, error);
   }
