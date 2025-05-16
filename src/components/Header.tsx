@@ -1,6 +1,6 @@
 
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { BookOpen, Code2, Info } from "lucide-react";
+import { BookOpen, Code2, Info, KeyRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
 import { getCurrentRepository } from "@/services/githubConnector";
@@ -12,15 +12,31 @@ import { saveRepositoryConfig } from "@/services/repositoryConfig";
 import { initGithubClient } from "@/services/githubClient";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
+import { hasAICapabilities, setOpenAIApiKey } from "@/services/aiAnalysis";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
 
 export default function Header() {
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
   const [usingMockData, setUsingMockData] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [openaiKey, setOpenaiKey] = useState("");
+  const [isAIEnabled, setIsAIEnabled] = useState(false);
+  const [openaiDialogOpen, setOpenaiDialogOpen] = useState(false);
 
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
+    setIsAIEnabled(hasAICapabilities());
   };
 
   useEffect(() => {
@@ -81,6 +97,16 @@ export default function Header() {
     }
   };
 
+  const handleOpenAIKeySave = () => {
+    if (openaiKey.trim()) {
+      setOpenAIApiKey(openaiKey.trim());
+      setOpenaiDialogOpen(false);
+      setIsAIEnabled(true);
+    } else {
+      toast.error("Please enter a valid OpenAI API key");
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -124,6 +150,50 @@ export default function Header() {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            
+            {/* OpenAI API Key Dialog */}
+            <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant={isAIEnabled ? "default" : "outline"}
+                  size="sm"
+                  className="flex items-center gap-1"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  {isAIEnabled ? "AI Enabled" : "Set OpenAI Key"}
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>OpenAI API Configuration</DialogTitle>
+                  <DialogDescription>
+                    Add your OpenAI API key to enable AI-powered code analysis and answers.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="openai-key" className="col-span-4">
+                      API Key
+                    </Label>
+                    <Input
+                      id="openai-key"
+                      type="password"
+                      placeholder="sk-..."
+                      value={openaiKey}
+                      onChange={(e) => setOpenaiKey(e.target.value)}
+                      className="col-span-4"
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Your API key is not stored permanently and will be lost when you refresh the page.
+                    For real applications, use a secure backend to handle API keys.
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleOpenAIKeySave}>Save API Key</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             
             <TooltipProvider>
               <Tooltip>

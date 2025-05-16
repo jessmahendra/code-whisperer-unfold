@@ -95,7 +95,23 @@ export async function fetchFileContent(owner: string, repo: string, path: string
     }
 
     // GitHub API returns content as base64
-    return Buffer.from(fileData.content, 'base64').toString('utf-8');
+    // Fix: Use browser-compatible base64 decoding instead of Node's Buffer
+    try {
+      // Decode base64 string using browser-compatible approach
+      const binary = atob(fileData.content.replace(/\s/g, ''));
+      
+      // Handle Unicode characters properly
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+      }
+      
+      // Convert bytes to string using TextDecoder
+      return new TextDecoder('utf-8').decode(bytes);
+    } catch (decodeError) {
+      console.error("Failed to decode file content:", decodeError);
+      throw new Error(`Failed to decode content for ${path}: ${decodeError.message}`);
+    }
   } catch (error) {
     console.error(`Error fetching file content for ${owner}/${repo}/${path}:`, error);
     throw error;
