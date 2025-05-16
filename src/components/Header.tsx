@@ -1,13 +1,14 @@
 
 import { Github } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
       <div className="container flex h-14 items-center justify-between">
-        <div className="flex items-center space-x-6">
-          {/* Removed "Chat" and "Spaces" text */}
+        <div className="flex items-center space-x-3">
+          <SidebarTrigger />
         </div>
 
         <div className="flex items-center gap-3">
