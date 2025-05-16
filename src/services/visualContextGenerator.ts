@@ -1,277 +1,212 @@
 
 /**
- * Service for generating visual representations of code processes
- */
-
-interface ProcessStep {
-  id: string;
-  description: string;
-  conditions?: Array<{
-    description: string;
-    action: string;
-    targetId?: string;
-  }>;
-  nextId?: string;
-}
-
-interface VisualContext {
-  type: 'flowchart' | 'component' | 'state';
-  syntax: string;
-}
-
-/**
- * Determines what type of visual representation is most appropriate
- * @param feature - Feature name or description
- * @param knowledgeItems - Related knowledge items
- * @returns The appropriate visual type
- */
-export function determineVisualType(
-  feature: string,
-  knowledgeItems: any[]
-): 'flowchart' | 'component' | 'state' {
-  // Simple heuristic - could be improved with more sophisticated analysis
-  if (feature.toLowerCase().includes('process') || 
-      feature.toLowerCase().includes('flow') ||
-      knowledgeItems.some(item => item.content?.toLowerCase().includes('step'))) {
-    return 'flowchart';
-  }
-  
-  if (feature.toLowerCase().includes('component') || 
-      feature.toLowerCase().includes('ui')) {
-    return 'component';
-  }
-  
-  if (feature.toLowerCase().includes('state') || 
-      feature.toLowerCase().includes('status')) {
-    return 'state';
-  }
-  
-  // Default to flowchart
-  return 'flowchart';
-}
-
-/**
- * Extracts process steps from knowledge items
- * @param feature - Feature name or description
- * @param knowledgeItems - Related knowledge items
- * @returns Array of process steps
- */
-export function extractProcessSteps(
-  feature: string,
-  knowledgeItems: any[]
-): ProcessStep[] {
-  // This is a simplified implementation
-  // In a real implementation, this would use more sophisticated NLP
-  
-  // For demo purposes, create some example steps based on the feature
-  
-  if (feature.toLowerCase().includes('subscription')) {
-    return [
-      {
-        id: 'start',
-        description: 'User selects subscription plan',
-        nextId: 'payment'
-      },
-      {
-        id: 'payment',
-        description: 'Process payment through Stripe',
-        conditions: [
-          {
-            description: 'Payment successful',
-            action: 'Create subscription',
-            targetId: 'activate'
-          },
-          {
-            description: 'Payment failed',
-            action: 'Show error message',
-            targetId: 'start'
-          }
-        ]
-      },
-      {
-        id: 'activate',
-        description: 'Activate member subscription',
-        nextId: 'access'
-      },
-      {
-        id: 'access',
-        description: 'Grant access to premium content'
-      }
-    ];
-  }
-  
-  if (feature.toLowerCase().includes('post') || feature.toLowerCase().includes('content')) {
-    return [
-      {
-        id: 'create',
-        description: 'Author creates post content',
-        nextId: 'visibility'
-      },
-      {
-        id: 'visibility',
-        description: 'Set post visibility',
-        conditions: [
-          {
-            description: 'Public',
-            action: 'Available to all visitors',
-            targetId: 'publish'
-          },
-          {
-            description: 'Members-only',
-            action: 'Available to registered members',
-            targetId: 'publish'
-          },
-          {
-            description: 'Paid members',
-            action: 'Available to paid subscribers only',
-            targetId: 'publish'
-          }
-        ]
-      },
-      {
-        id: 'publish',
-        description: 'Publish post',
-        nextId: 'access'
-      },
-      {
-        id: 'access',
-        description: 'Reader accesses content based on membership status'
-      }
-    ];
-  }
-  
-  // Generic process if no specific feature recognized
-  return [
-    {
-      id: 'step1',
-      description: 'Start process',
-      nextId: 'step2'
-    },
-    {
-      id: 'step2',
-      description: 'Process data',
-      conditions: [
-        {
-          description: 'Valid data',
-          action: 'Continue processing',
-          targetId: 'step3'
-        },
-        {
-          description: 'Invalid data',
-          action: 'Error handling',
-          targetId: 'step1'
-        }
-      ]
-    },
-    {
-      id: 'step3',
-      description: 'Complete process'
-    }
-  ];
-}
-
-/**
- * Generates a flowchart in mermaid syntax
- * @param feature - Feature name or description
- * @param knowledgeItems - Related knowledge items
- * @returns Visual context with mermaid syntax
- */
-export function generateFlowchart(
-  feature: string,
-  knowledgeItems: any[]
-): VisualContext {
-  // Extract process steps
-  const steps = extractProcessSteps(feature, knowledgeItems);
-  
-  // Generate mermaid flowchart
-  let mermaidSyntax = 'graph TD\n';
-  
-  // Add all nodes
-  steps.forEach(step => {
-    mermaidSyntax += `  ${step.id}["${step.description}"]\n`;
-  });
-  
-  // Add connections
-  steps.forEach(step => {
-    // Add direct next step connection
-    if (step.nextId) {
-      mermaidSyntax += `  ${step.id} --> ${step.nextId}\n`;
-    }
-    
-    // Add conditional branches
-    if (step.conditions) {
-      step.conditions.forEach((condition, index) => {
-        const conditionId = `${step.id}_cond${index}`;
-        mermaidSyntax += `  ${step.id} -- "${condition.description}" --> ${conditionId}\n`;
-        mermaidSyntax += `  ${conditionId}["${condition.action}"]\n`;
-        
-        // Connect to target if specified
-        if (condition.targetId) {
-          mermaidSyntax += `  ${conditionId} --> ${condition.targetId}\n`;
-        }
-      });
-    }
-  });
-  
-  return {
-    type: 'flowchart',
-    syntax: mermaidSyntax
-  };
-}
-
-/**
- * Creates a component diagram (placeholder implementation)
- * @param feature - Feature name
- * @param knowledgeItems - Related knowledge items
- */
-export function generateComponentDiagram(
-  feature: string,
-  knowledgeItems: any[]
-): VisualContext {
-  // Simplified placeholder implementation
-  return {
-    type: 'component',
-    syntax: 'graph LR\n  A[Component A] --> B[Component B]\n  B --> C[Component C]'
-  };
-}
-
-/**
- * Creates a state diagram (placeholder implementation)
- * @param feature - Feature name
- * @param knowledgeItems - Related knowledge items
- */
-export function generateStateDiagram(
-  feature: string,
-  knowledgeItems: any[]
-): VisualContext {
-  // Simplified placeholder implementation
-  return {
-    type: 'state',
-    syntax: 'stateDiagram-v2\n  [*] --> Active\n  Active --> Inactive\n  Inactive --> [*]'
-  };
-}
-
-/**
- * Main entry point for generating visual representations
- * @param feature - Feature name or description
- * @param knowledgeItems - Related knowledge items
- * @returns Visual representation or null if not applicable
+ * Generates visual context diagrams based on query and knowledge results
+ * @param {string} query - User query
+ * @param {Array} results - Knowledge base search results
+ * @returns {object|null} Visual context object for rendering diagrams
  */
 export function generateVisualContext(
-  feature: string,
-  knowledgeItems: any[]
-): VisualContext | null {
-  // Determine the type of visual needed
-  const visualType = determineVisualType(feature, knowledgeItems);
+  query: string,
+  results: any[]
+): { type: 'flowchart' | 'component' | 'state'; syntax: string } | null {
   
-  switch (visualType) {
-    case 'component':
-      return generateComponentDiagram(feature, knowledgeItems);
-    case 'flowchart':
-      return generateFlowchart(feature, knowledgeItems);
-    case 'state':
-      return generateStateDiagram(feature, knowledgeItems);
-    default:
-      return null;
+  // Determine the most appropriate visualization type based on query
+  let visualizationType: 'flowchart' | 'component' | 'state' = 'flowchart';
+  
+  if (query.toLowerCase().includes('component') || 
+      query.toLowerCase().includes('architecture') ||
+      query.toLowerCase().includes('structure')) {
+    visualizationType = 'component';
+  } else if (query.toLowerCase().includes('state') || 
+             query.toLowerCase().includes('status')) {
+    visualizationType = 'state';
   }
+  
+  // Subscription flow diagram
+  if (query.toLowerCase().includes('subscription') || 
+      query.toLowerCase().includes('payment')) {
+    return {
+      type: 'flowchart',
+      syntax: `
+flowchart TB
+    subgraph Member
+      Start[Member visits site] --> Free[Views free content]
+      Free --> Subscribe[Clicks subscribe]
+    end
+    Subscribe --> CheckoutFlow
+    subgraph CheckoutFlow
+      SelectPlan[Select plan] --> EnterCard[Enter card details]
+      EnterCard --> ProcessPayment[Process payment with Stripe]
+    end
+    ProcessPayment -->|Success| GrantAccess[Grant premium access]
+    ProcessPayment -->|Failure| RetryPayment[Retry payment]
+    RetryPayment -->|Success| GrantAccess
+    RetryPayment -->|Failure| NotifyFailure[Notify member & admin]
+    GrantAccess --> AccessContent[Access premium content]
+    
+    subgraph Expiration
+      MonthlyCheck[Monthly check] --> CheckValid[Check if subscription valid]
+      CheckValid -->|Valid| MaintainAccess[Maintain premium access]
+      CheckValid -->|Invalid| DowngradeAccess[Downgrade to free access]
+    end
+`
+    };
+  }
+  
+  // Content publishing flow
+  if (query.toLowerCase().includes('post') || 
+      query.toLowerCase().includes('content') ||
+      query.toLowerCase().includes('publish')) {
+    return {
+      type: 'flowchart',
+      syntax: `
+flowchart TD
+    Start[Author creates post] --> Draft[Save as draft]
+    Draft --> Edit[Edit content]
+    Edit --> SetVisibility[Set visibility]
+    SetVisibility -->|Public| AllAccess[Available to everyone]
+    SetVisibility -->|Members-only| MembersAccess[Available to all members]
+    SetVisibility -->|Paid members| PaidAccess[Available to paid members only]
+    SetVisibility --> Schedule[Schedule publication]
+    SetVisibility --> PublishNow[Publish immediately]
+    Schedule --> AutoPublish[Auto-publish at scheduled time]
+    PublishNow --> Live[Post goes live]
+    AutoPublish --> Live
+`
+    };
+  }
+  
+  // Authentication flow
+  if (query.toLowerCase().includes('auth') || 
+      query.toLowerCase().includes('login') ||
+      query.toLowerCase().includes('signup')) {
+    return {
+      type: 'flowchart',
+      syntax: `
+flowchart TD
+    Start[User visits site] --> LoginChoice[Login/Signup choice]
+    LoginChoice -->|New user| Signup[Sign up form]
+    LoginChoice -->|Existing user| Login[Login form]
+    Signup --> EnterDetails[Enter email & password]
+    EnterDetails --> VerifyEmail[Verify email]
+    VerifyEmail -->|Verified| SetupAccount[Complete account setup]
+    Login --> EnterCreds[Enter credentials]
+    Login -->|Magic link| RequestMagic[Request magic link]
+    RequestMagic --> ReceiveEmail[Receive email]
+    ReceiveEmail --> ClickLink[Click magic link]
+    EnterCreds --> Validate[Validate credentials]
+    ClickLink --> GenerateSession[Generate user session]
+    Validate -->|Valid| GenerateSession
+    Validate -->|Invalid| RetryLogin[Retry login]
+    SetupAccount --> GenerateSession
+    GenerateSession --> Authorized[User authorized]
+`
+    };
+  }
+  
+  // Ghost component architecture
+  if (query.toLowerCase().includes('architecture') || 
+      query.toLowerCase().includes('component') ||
+      query.toLowerCase().includes('structure')) {
+    return {
+      type: 'component',
+      syntax: `
+flowchart TD
+    subgraph Frontend
+      Theme[Themes] --> Handlebars[Handlebars Templates]
+      Admin[Admin Interface] --> Ember[Ember.js]
+    end
+    
+    subgraph API
+      ContentAPI[Content API] --> PublicContent[Public Content Access]
+      AdminAPI[Admin API] --> Management[Site Management]
+    end
+    
+    subgraph Core
+      Router[Routing] --> Controllers[Controllers]
+      Controllers --> Models[Models]
+      Models --> Database[(Database)]
+      Services[Services] --> Models
+      Auth[Authentication] --> Services
+      Members[Members System] --> Services
+      Payments[Payment Processing] --> Stripe[(Stripe API)]
+      Email[Email Service] --> EmailProviders[(Email Providers)]
+    end
+    
+    Frontend --> API
+    API --> Core
+`
+    };
+  }
+  
+  // Member states diagram
+  if (query.toLowerCase().includes('member') && 
+     (query.toLowerCase().includes('status') || 
+      query.toLowerCase().includes('state'))) {
+    return {
+      type: 'state',
+      syntax: `
+stateDiagram-v2
+    [*] --> Free: Sign up
+    Free --> Paid: Subscribe
+    Paid --> Free: Subscription expires
+    Free --> Deleted: Delete account
+    Paid --> Deleted: Delete account
+    Paid --> Comped: Admin comps account
+    Comped --> Free: Comp expires
+    Paid --> PaidOtherTier: Change tier
+`
+    };
+  }
+  
+  // Generate a custom diagram based on the results if no predefined diagram matches
+  if (results.length > 0) {
+    // Extract entities and relationships from results
+    const entities = new Set<string>();
+    const relationships: [string, string, string][] = [];
+    
+    results.forEach(result => {
+      if (result.type === 'function' && result.metadata?.name) {
+        entities.add(result.metadata.name);
+      }
+      
+      if (result.type === 'export') {
+        const exportName = Object.keys(result.exports || {})[0];
+        if (exportName) entities.add(exportName);
+      }
+      
+      // Detect potential relationships from content
+      const content = result.content.toLowerCase();
+      if (content.includes('require(') || content.includes('import ')) {
+        for (const entity of entities) {
+          if (content.includes(entity.toLowerCase())) {
+            relationships.push([result.filePath.split('/').pop()?.split('.')[0] || 'Unknown', 'uses', entity]);
+          }
+        }
+      }
+    });
+    
+    // If we found interesting relationships, create a custom diagram
+    if (relationships.length > 0) {
+      let syntax = 'flowchart LR\n';
+      
+      // Add nodes
+      entities.forEach(entity => {
+        syntax += `    ${entity}[${entity}]\n`;
+      });
+      
+      // Add relationships
+      relationships.slice(0, 10).forEach(([source, relation, target]) => {
+        syntax += `    ${source} -->|${relation}| ${target}\n`;
+      });
+      
+      return {
+        type: 'flowchart',
+        syntax
+      };
+    }
+  }
+  
+  // Default return null if we couldn't generate anything relevant
+  return null;
 }

@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';

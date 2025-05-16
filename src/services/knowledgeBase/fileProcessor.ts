@@ -64,6 +64,45 @@ export async function processFile(
       });
     }
     
+    // Add API routes if available
+    if (knowledge.apiRoutes) {
+      for (const route of knowledge.apiRoutes) {
+        knowledgeBase.push({
+          type: 'export',
+          content: `API Route: ${route.method} ${route.path} => ${route.handler}`,
+          filePath,
+          metadata: route,
+          keywords: extractKeywords(`api route ${route.method} ${route.path} ${route.handler}`),
+        });
+      }
+    }
+    
+    // Add database schemas if available
+    if (knowledge.databaseSchemas) {
+      for (const [modelName, schema] of Object.entries(knowledge.databaseSchemas)) {
+        knowledgeBase.push({
+          type: 'export',
+          content: `Database Model: ${modelName} with fields: ${schema.fields.join(', ')}`,
+          filePath,
+          metadata: { modelName, schema },
+          keywords: extractKeywords(`database model ${modelName} ${schema.fields.join(' ')}`),
+        });
+      }
+    }
+    
+    // Add class definitions if available
+    if (knowledge.classes) {
+      for (const classInfo of knowledge.classes) {
+        knowledgeBase.push({
+          type: 'export',
+          content: `Class: ${classInfo.name}${classInfo.extends ? ` extends ${classInfo.extends}` : ''} with methods: ${classInfo.methods.join(', ')}`,
+          filePath,
+          metadata: classInfo,
+          keywords: extractKeywords(`class ${classInfo.name} ${classInfo.methods.join(' ')}`),
+        });
+      }
+    }
+    
     // Log successful file processing
     console.log(`Successfully processed file: ${filePath}`);
   } catch (error) {
