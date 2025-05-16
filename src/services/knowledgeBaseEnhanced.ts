@@ -1,7 +1,5 @@
-
-import { searchKnowledge as originalSearchKnowledge } from './knowledgeBase';
+import { searchKnowledge as originalSearchKnowledge, KnowledgeEntry } from './knowledgeBase/index';
 import { enrichKnowledgeItem, getHistoryForFiles } from './gitHistoryService';
-import { KnowledgeEntry } from './knowledgeBase';
 
 interface EnhancedKnowledgeEntry extends KnowledgeEntry {
   lastUpdated?: string;
