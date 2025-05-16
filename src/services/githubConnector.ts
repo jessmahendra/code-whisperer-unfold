@@ -1,4 +1,3 @@
-
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
 import { toast } from "sonner";
@@ -12,11 +11,29 @@ export interface FileInfo {
   type: 'file' | 'dir';
 }
 
-// Error tracking for repository operations
-let lastErrorMessage: string | null = null;
+// Detailed error tracking for repository operations
+interface ErrorRecord {
+  message: string;
+  status?: number;
+  path?: string;
+  timestamp: number;
+  count: number;
+}
+
+let connectionErrors = {
+  auth: null as ErrorRecord | null,
+  notFound: new Set<string>(),
+  rateLimit: null as ErrorRecord | null,
+  network: null as ErrorRecord | null,
+  other: [] as ErrorRecord[]
+};
+
 let connectionAttempts = 0;
 const MAX_ERROR_DISPLAY_COUNT = 3;
-let pathNotFoundErrors = new Set<string>();
+
+// Track API rate limits
+let rateLimitRemaining: number | null = null;
+let rateLimitReset: number | null = null;
 
 // Mock data structure for repository exploration when no real data is available
 const mockGhostRepo = {
@@ -169,6 +186,88 @@ module.exports = {
 };
 
 /**
+ * Record a connection error
+ * @param type Error type
+ * @param error Error details
+ * @param path Optional path that caused the error
+ */
+function recordError(
+  type: keyof typeof connectionErrors, 
+  error: any, 
+  path?: string
+): void {
+  const errorMessage = error?.message || String(error);
+  const status = error?.status || undefined;
+  const timestamp = Date.now();
+  
+  if (type === 'notFound' && path) {
+    connectionErrors.notFound.add(path);
+    return;
+  }
+  
+  if (type === 'auth' || type === 'rateLimit' || type === 'network') {
+    connectionErrors[type] = {
+      message: errorMessage,
+      status,
+      path,
+      timestamp,
+      count: connectionErrors[type] ? connectionErrors[type]!.count + 1 : 1
+    };
+  } else {
+    connectionErrors.other.push({
+      message: errorMessage,
+      status,
+      path,
+      timestamp,
+      count: 1
+    });
+    
+    // Keep only the last 5 "other" errors
+    if (connectionErrors.other.length > 5) {
+      connectionErrors.other.shift();
+    }
+  }
+  
+  console.error(`GitHub connector ${type} error:`, errorMessage, status, path);
+}
+
+/**
+ * Check if we're experiencing API rate limiting
+ */
+function checkRateLimit(headers: Headers | null): void {
+  if (!headers) return;
+  
+  const remaining = headers.get('x-ratelimit-remaining');
+  const reset = headers.get('x-ratelimit-reset');
+  
+  if (remaining !== null) {
+    rateLimitRemaining = parseInt(remaining, 10);
+  }
+  
+  if (reset !== null) {
+    rateLimitReset = parseInt(reset, 10);
+  }
+  
+  if (rateLimitRemaining !== null && rateLimitRemaining < 10) {
+    const resetDate = rateLimitReset ? new Date(rateLimitReset * 1000) : new Date();
+    const minutes = Math.ceil((resetDate.getTime() - Date.now()) / (60 * 1000));
+    
+    console.warn(`GitHub API rate limit low: ${rateLimitRemaining} requests remaining, resets in ${minutes} minutes`);
+    
+    if (rateLimitRemaining === 0) {
+      toast.error(`GitHub API rate limit exceeded`, {
+        description: `Rate limit will reset in approximately ${minutes} minutes. Some features may be unavailable.`
+      });
+      
+      recordError('rateLimit', {
+        message: `Rate limit exceeded, resets in ${minutes} minutes`,
+        status: 429
+      });
+    }
+  }
+}
+
+/**
  * Fetches repository contents from GitHub API or falls back to mock data
  * @param {string} repoPath - Path within the repository
  * @returns {Promise<FileInfo[]>} List of files and directories
@@ -183,15 +282,18 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       const { owner, repo } = config;
       
       // Don't log paths we've already found don't exist
-      if (!pathNotFoundErrors.has(repoPath)) {
+      if (!connectionErrors.notFound.has(repoPath)) {
         console.log(`Fetching repo contents: ${owner}/${repo}/${repoPath}`);
       }
       
       const contents = await fetchRepositoryContents(owner, repo, repoPath);
       
-      // Reset error state on successful call
-      lastErrorMessage = null;
-      connectionAttempts = 0;
+      // Check rate limit after successful API call
+      if (typeof contents === 'object' && 'headers' in contents) {
+        checkRateLimit(contents.headers as Headers);
+      }
+      
+      connectionAttempts++;
       
       // Convert GitHub API response to FileInfo format
       return Array.isArray(contents) ? contents.map(item => ({
@@ -210,29 +312,44 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       // Track different error types
       if (errorObj.status === 404) {
         // Only log first time we find a path doesn't exist
-        if (!pathNotFoundErrors.has(repoPath)) {
+        if (!connectionErrors.notFound.has(repoPath)) {
           console.warn(`Path not found in repository: ${repoPath}`, errorObj);
-          pathNotFoundErrors.add(repoPath);
+          recordError('notFound', errorObj, repoPath);
         }
-        lastErrorMessage = `Path not found: ${repoPath}`;
       } else if (errorObj.status === 401 || errorObj.status === 403) {
         console.error(`Authorization error (${errorObj.status}): ${errorObj.message}`, errorObj);
-        lastErrorMessage = `Authorization error: ${errorObj.message || 'Invalid token or insufficient permissions'}`;
+        recordError('auth', errorObj);
         
         // Show toast only for the first few authorization errors to avoid spamming
-        if (connectionAttempts < MAX_ERROR_DISPLAY_COUNT) {
+        if (connectionErrors.auth && connectionErrors.auth.count <= MAX_ERROR_DISPLAY_COUNT) {
           toast.error(`GitHub authentication failed: ${errorObj.message || 'Check your token permissions'}`, {
             description: "Make sure your token has 'repo' scope and is valid",
             duration: 5000
           });
-          connectionAttempts++;
         }
+      } else if (errorObj.status === 429) {
+        // Rate limit exceeded
+        console.error(`Rate limit exceeded: ${errorObj.message}`, errorObj);
+        recordError('rateLimit', errorObj);
+        
+        // Try to extract reset time from headers if available
+        const resetTime = errorObj.headers?.['x-ratelimit-reset'];
+        if (resetTime) {
+          const resetDate = new Date(parseInt(resetTime, 10) * 1000);
+          const minutes = Math.ceil((resetDate.getTime() - Date.now()) / (60 * 1000));
+          toast.error(`GitHub API rate limit exceeded`, {
+            description: `Rate limit will reset in approximately ${minutes} minutes`
+          });
+        }
+      } else if (errorObj.message && errorObj.message.includes('network')) {
+        console.error(`Network error: ${errorObj.message}`, errorObj);
+        recordError('network', errorObj);
       } else {
         console.warn(`Failed to fetch from GitHub API (${errorObj.status || 'unknown error'}), falling back to mock data: ${errorObj.message || errorObj}`);
-        lastErrorMessage = `GitHub API error: ${errorObj.message || 'Unknown error'}`;
-        connectionAttempts++;
+        recordError('other', errorObj, repoPath);
       }
       
+      connectionAttempts++;
       // Fall back to mock data on error
     }
   } else {
@@ -358,16 +475,23 @@ export function getCurrentRepository(): { owner: string; repo: string } | null {
  * @returns {string|null} Last error message or null if no errors
  */
 export function getLastErrorMessage(): string | null {
-  return lastErrorMessage;
+  return connectionErrors.auth ? connectionErrors.auth.message : null;
 }
 
 /**
  * Reset error tracking
  */
 export function resetErrorTracking(): void {
-  lastErrorMessage = null;
+  connectionErrors = {
+    auth: null,
+    notFound: new Set<string>(),
+    rateLimit: null,
+    network: null,
+    other: []
+  };
   connectionAttempts = 0;
-  pathNotFoundErrors.clear();
+  rateLimitRemaining = null;
+  rateLimitReset = null;
 }
 
 /**
@@ -377,17 +501,63 @@ export function resetErrorTracking(): void {
 export function getConnectionDiagnostics(): {
   initialized: boolean;
   configured: boolean;
-  errorMessage: string | null;
+  errors: typeof connectionErrors;
   connectionAttempts: number;
   pathErrors: number;
+  rateLimitRemaining: number | null;
+  rateLimitReset: number | null;
 } {
   const config = getRepositoryConfig();
   
   return {
     initialized: isGithubClientInitialized(),
     configured: !!config,
-    errorMessage: lastErrorMessage,
+    errors: connectionErrors,
     connectionAttempts,
-    pathErrors: pathNotFoundErrors.size
+    pathErrors: connectionErrors.notFound.size,
+    rateLimitRemaining,
+    rateLimitReset
   };
+}
+
+/**
+ * Check if the connection is likely having permission issues
+ */
+export function hasPermissionIssues(): boolean {
+  return connectionErrors.auth !== null;
+}
+
+/**
+ * Check if the connection is likely having rate limit issues
+ */
+export function hasRateLimitIssues(): boolean {
+  return connectionErrors.rateLimit !== null || 
+         (rateLimitRemaining !== null && rateLimitRemaining < 5);
+}
+
+/**
+ * Get the most relevant error message for user display
+ */
+export function getMostRelevantErrorMessage(): string | null {
+  if (connectionErrors.auth) {
+    return `Authentication error: ${connectionErrors.auth.message}`;
+  }
+  
+  if (connectionErrors.rateLimit) {
+    return `Rate limit exceeded: ${connectionErrors.rateLimit.message}`;
+  }
+  
+  if (connectionErrors.network) {
+    return `Network error: ${connectionErrors.network.message}`;
+  }
+  
+  if (connectionErrors.other.length > 0) {
+    return `API error: ${connectionErrors.other[connectionErrors.other.length - 1].message}`;
+  }
+  
+  if (connectionErrors.notFound.size > 10) {
+    return `Multiple paths not found (${connectionErrors.notFound.size} total)`;
+  }
+  
+  return null;
 }

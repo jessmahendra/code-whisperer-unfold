@@ -13,11 +13,24 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
-import { CodeIcon, CheckIcon, XIcon, InfoIcon, RefreshCwIcon, GithubIcon } from "lucide-react";
+import { CodeIcon, CheckIcon, XIcon, InfoIcon, RefreshCwIcon, GithubIcon, AlertCircle } from "lucide-react";
 import { getRepositoryConfig, saveRepositoryConfig, clearRepositoryConfig } from "@/services/repositoryConfig";
-import { initGithubClient, validateGithubToken, clearGithubClient } from "@/services/githubClient";
-import { clearKnowledgeBase, initializeKnowledgeBase, getKnowledgeBaseStats, isUsingMockData } from "@/services/knowledgeBase";
+import { 
+  initGithubClient, 
+  validateGithubToken, 
+  clearGithubClient 
+} from "@/services/githubClient";
+import { 
+  clearKnowledgeBase, 
+  initializeKnowledgeBase, 
+  getKnowledgeBaseStats, 
+  isUsingMockData,
+  isInitializing,
+  getInitializationState
+} from "@/services/knowledgeBase";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
+import { getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
 
 interface RepoConfigModalProps {
   onConfigChange: () => void;
@@ -29,10 +42,12 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
   const [token, setToken] = useState("");
   const [isConfigured, setIsConfigured] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
+  const [isInitializingRepo, setIsInitializingRepo] = useState(false);
   const [validationMessage, setValidationMessage] = useState("");
   const [stats, setStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
   const [isMockData, setIsMockData] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [connectionDiagnostics, setConnectionDiagnostics] = useState<ReturnType<typeof getConnectionDiagnostics> | null>(null);
 
   useEffect(() => {
     const config = getRepositoryConfig();
@@ -44,12 +59,37 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       // Don't show the actual token, but indicate it's saved
       setValidationMessage("Token saved and validated");
       updateStats();
+      updateDiagnostics();
     }
-  }, []);
+    
+    // Check initialization status periodically
+    const intervalId = setInterval(() => {
+      // If we're initializing, check the status
+      if (isInitializing()) {
+        setIsInitializingRepo(true);
+      } else if (isInitializingRepo) {
+        // If we were initializing but now we're not, update stats
+        setIsInitializingRepo(false);
+        updateStats();
+        updateDiagnostics();
+      }
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
+  }, [isInitializingRepo]);
 
   const updateStats = () => {
     setStats(getKnowledgeBaseStats());
     setIsMockData(isUsingMockData());
+  };
+  
+  const updateDiagnostics = () => {
+    const diagnostics = getConnectionDiagnostics();
+    setConnectionDiagnostics(diagnostics);
+    
+    // Get the most relevant error message
+    const relevantError = getMostRelevantErrorMessage();
+    setErrorMessage(relevantError);
   };
 
   const handleValidateToken = async () => {
@@ -97,9 +137,10 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       toast.success("Repository configuration saved");
 
       // Initialize knowledge base
-      setIsInitializing(true);
+      setIsInitializingRepo(true);
       await initializeKnowledgeBase(true);
       updateStats();
+      updateDiagnostics();
       
       // Check if we're still using mock data after initialization
       const usingMockData = isUsingMockData();
@@ -108,7 +149,8 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       if (!usingMockData) {
         toast.success("Knowledge base initialized successfully with repository data");
       } else {
-        toast.warning("Could not access repository data, using mock data instead", {
+        const error = getMostRelevantErrorMessage() || "Unknown error";
+        toast.warning(`Using mock data: ${error}`, {
           description: "Please check your repository configuration and token permissions."
         });
       }
@@ -118,8 +160,9 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
     } catch (error) {
       console.error("Error saving configuration:", error);
       toast.error("Failed to save configuration");
+      updateDiagnostics();
     } finally {
-      setIsInitializing(false);
+      setIsInitializingRepo(false);
     }
   };
 
@@ -134,6 +177,8 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
     setValidationMessage("");
     setStats(null);
     setIsMockData(true);
+    setErrorMessage(null);
+    setConnectionDiagnostics(null);
     toast.success("Repository configuration cleared");
     onConfigChange();
   };
@@ -141,22 +186,25 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
   const handleRefreshKnowledgeBase = async () => {
     if (!isConfigured) return;
     
-    setIsInitializing(true);
+    setIsInitializingRepo(true);
     try {
       await initializeKnowledgeBase(true); // Force refresh
       updateStats();
+      updateDiagnostics();
       
       // Check if we're still using mock data after refresh
       if (isUsingMockData()) {
-        toast.warning("Still using mock data after refresh. Could not access repository data.");
+        const error = getMostRelevantErrorMessage() || "Unknown error";
+        toast.warning(`Still using mock data after refresh: ${error}`);
       } else {
         toast.success("Knowledge base refreshed with repository data");
       }
     } catch (error) {
       console.error("Error refreshing knowledge base:", error);
       toast.error("Failed to refresh knowledge base");
+      updateDiagnostics();
     } finally {
-      setIsInitializing(false);
+      setIsInitializingRepo(false);
     }
   };
 
@@ -176,15 +224,28 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
         </SheetHeader>
 
         <div className="py-4 space-y-4">
+          {isInitializingRepo && (
+            <RepositoryProgressIndicator />
+          )}
+        
           {isConfigured && isMockData && (
             <Alert variant="warning" className="mb-4">
               <AlertTitle className="flex items-center">
-                <InfoIcon className="h-4 w-4 mr-2" />
+                <AlertCircle className="h-4 w-4 mr-2" />
                 Using Mock Data
               </AlertTitle>
               <AlertDescription>
-                Unable to access repository data. You're currently using mock Ghost data. 
-                Please check your token permissions and repository details.
+                {errorMessage ? (
+                  <span>
+                    Unable to access repository data: <strong>{errorMessage}</strong>. 
+                    You're currently using mock Ghost data.
+                  </span>
+                ) : (
+                  <span>
+                    Unable to access repository data. Please check your token permissions 
+                    and repository details.
+                  </span>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -262,6 +323,24 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
               </p>
             )}
             
+            {connectionDiagnostics && connectionDiagnostics.errors.auth && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertTitle className="text-sm">Authentication Error</AlertTitle>
+                <AlertDescription className="text-xs">
+                  {connectionDiagnostics.errors.auth.message}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {connectionDiagnostics && connectionDiagnostics.errors.rateLimit && (
+              <Alert variant="warning" className="mt-2">
+                <AlertTitle className="text-sm">Rate Limit Reached</AlertTitle>
+                <AlertDescription className="text-xs">
+                  {connectionDiagnostics.errors.rateLimit.message}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <div className="mt-2 text-sm text-muted-foreground border-l-4 border-amber-500 pl-4 py-2 bg-amber-50 rounded">
               <p className="flex items-center mb-1">
                 <InfoIcon className="h-4 w-4 mr-1 inline" />
@@ -273,6 +352,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
                 <li>Check if the repository exists and is public</li>
                 <li>For private repos, ensure your token has access</li>
                 <li>Try refreshing if data doesn't appear immediately</li>
+                <li>If you hit rate limits, wait a few minutes and try again</li>
               </ul>
             </div>
           </div>
@@ -285,7 +365,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
                   variant="ghost" 
                   size="sm" 
                   onClick={handleRefreshKnowledgeBase}
-                  disabled={isInitializing}
+                  disabled={isInitializingRepo}
                   className="h-8 px-2"
                 >
                   <RefreshCwIcon className="h-4 w-4 mr-1" />
@@ -309,7 +389,7 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
             <Button
               variant="outline"
               onClick={handleClearConfig}
-              disabled={!isConfigured || isInitializing}
+              disabled={!isConfigured || isInitializingRepo}
             >
               <XIcon className="h-4 w-4 mr-1" />
               Clear Configuration
@@ -317,9 +397,9 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
             
             <Button
               onClick={handleSaveConfig}
-              disabled={isInitializing || !owner.trim() || !repo.trim() || !token.trim()}
+              disabled={isInitializingRepo || !owner.trim() || !repo.trim() || !token.trim()}
             >
-              {isInitializing ? (
+              {isInitializingRepo ? (
                 "Initializing..."
               ) : (
                 <>

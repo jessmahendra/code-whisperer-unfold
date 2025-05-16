@@ -4,6 +4,11 @@ import { toast } from "sonner";
 
 // Store the OpenAI API key in memory (not persisted for security reasons)
 let openaiApiKey: string | null = null;
+let apiKeyState = {
+  lastError: null as string | null,
+  lastUsed: 0 as number,
+  failedAttempts: 0 as number
+};
 
 /**
  * Set the OpenAI API key
@@ -15,7 +20,17 @@ export function setOpenAIApiKey(key: string): void {
     return;
   }
   
+  // Basic validation check for OpenAI key format
+  if (!key.startsWith('sk-')) {
+    toast.warning("API key doesn't match expected OpenAI key format", {
+      description: "OpenAI keys usually start with 'sk-'. Check your API key."
+    });
+    // Still save it since we don't want to block users with special cases
+  }
+  
   openaiApiKey = key;
+  apiKeyState.lastError = null;
+  apiKeyState.failedAttempts = 0;
   
   // Save a masked version to localStorage just to indicate that a key is set
   // We don't save the actual key for security reasons
@@ -59,15 +74,30 @@ export function getOpenAIApiKey(): string | null {
 }
 
 /**
+ * Get the current API key state
+ * @returns Information about API key usage and errors
+ */
+export function getAPIKeyState(): typeof apiKeyState {
+  return { ...apiKeyState };
+}
+
+/**
  * Clear the OpenAI API key
  */
 export function clearOpenAIApiKey(): void {
   openaiApiKey = null;
+  apiKeyState = {
+    lastError: null,
+    lastUsed: 0,
+    failedAttempts: 0
+  };
+  
   try {
     localStorage.removeItem('openai_key_set');
   } catch (e) {
     console.error("Could not clear API key status from localStorage");
   }
+  
   toast.info("OpenAI API key has been cleared", {
     description: "AI-powered features are now disabled."
   });
@@ -82,11 +112,15 @@ export function clearOpenAIApiKey(): void {
 export async function analyzeCodeWithAI(code: string, prompt: string): Promise<string | null> {
   if (!openaiApiKey) {
     console.warn("OpenAI API key not set");
+    toast.error("OpenAI API key not set", {
+      description: "Please set your API key to use AI-powered code analysis."
+    });
     return null;
   }
 
   try {
     console.log("Analyzing code with OpenAI:", code.substring(0, 100) + "...");
+    apiKeyState.lastUsed = Date.now();
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -113,16 +147,48 @@ export async function analyzeCodeWithAI(code: string, prompt: string): Promise<s
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || "OpenAI API request failed");
+      const errorMessage = error.error?.message || "OpenAI API request failed";
+      apiKeyState.lastError = errorMessage;
+      apiKeyState.failedAttempts++;
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
     console.error("Error analyzing code with OpenAI:", error);
-    toast.error("Error analyzing code with AI", {
-      description: error instanceof Error ? error.message : "Unknown error occurred"
-    });
+    
+    // Handle specific API key errors
+    if (error instanceof Error) {
+      if (error.message.includes("invalid_api_key") || 
+          error.message.includes("Invalid authentication") ||
+          error.message.includes("Incorrect API key")) {
+        apiKeyState.lastError = "Invalid API key";
+        toast.error("Invalid OpenAI API key", {
+          description: "Please check your API key and try again."
+        });
+      } else if (error.message.includes("exceeded your current quota")) {
+        apiKeyState.lastError = "API quota exceeded";
+        toast.error("OpenAI API quota exceeded", {
+          description: "Your API key has reached its usage limit."
+        });
+      } else if (error.message.includes("rate limit")) {
+        apiKeyState.lastError = "Rate limit exceeded";
+        toast.error("OpenAI API rate limit exceeded", {
+          description: "Please wait a moment before trying again."
+        });
+      } else {
+        toast.error("Error analyzing code with AI", {
+          description: error.message
+        });
+        apiKeyState.lastError = error.message;
+      }
+    } else {
+      toast.error("Unknown error analyzing code with AI");
+      apiKeyState.lastError = "Unknown error";
+    }
+    
     return null;
   }
 }
@@ -136,12 +202,16 @@ export async function analyzeCodeWithAI(code: string, prompt: string): Promise<s
 export async function generateAnswerWithAI(question: string, codeContext: string[]): Promise<string | null> {
   if (!openaiApiKey) {
     console.warn("OpenAI API key not set, cannot generate answer with AI");
+    toast.error("OpenAI API key not set", {
+      description: "Please set your API key to use AI-powered answers."
+    });
     return null;
   }
 
   try {
     console.log("Generating answer for question:", question);
     console.log("Using code context of", codeContext.length, "items");
+    apiKeyState.lastUsed = Date.now();
     
     // Format the context to be more readable
     const formattedContext = codeContext.map((item, index) => 
@@ -173,16 +243,49 @@ export async function generateAnswerWithAI(question: string, codeContext: string
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error?.message || "OpenAI API request failed");
+      const errorMessage = error.error?.message || "OpenAI API request failed";
+      apiKeyState.lastError = errorMessage;
+      apiKeyState.failedAttempts++;
+      
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
     console.error("Error generating answer with OpenAI:", error);
-    toast.error("Error generating answer with AI", {
-      description: error instanceof Error ? error.message : "Unknown error occurred"
-    });
+    
+    // Handle specific API key errors (same as in analyzeCodeWithAI)
+    if (error instanceof Error) {
+      if (error.message.includes("invalid_api_key") || 
+          error.message.includes("Invalid authentication") ||
+          error.message.includes("Incorrect API key")) {
+        apiKeyState.lastError = "Invalid API key";
+        toast.error("Invalid OpenAI API key", {
+          description: "Please check your API key and try again."
+        });
+      } else if (error.message.includes("exceeded your current quota")) {
+        apiKeyState.lastError = "API quota exceeded";
+        toast.error("OpenAI API quota exceeded", {
+          description: "Your API key has reached its usage limit."
+        });
+      } else if (error.message.includes("rate limit")) {
+        apiKeyState.lastError = "Rate limit exceeded";
+        toast.error("OpenAI API rate limit exceeded", {
+          description: "Please wait a moment before trying again."
+        });
+      } else {
+        toast.error("Error generating answer with AI", {
+          description: error.message
+        });
+        apiKeyState.lastError = error.message;
+      }
+    } else {
+      toast.error("Unknown error generating answer with AI");
+      apiKeyState.lastError = "Unknown error";
+    }
+    
     return null;
   }
 }
+

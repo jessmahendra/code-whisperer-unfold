@@ -3,19 +3,19 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
-import { getCurrentRepository, getConnectionDiagnostics } from "@/services/githubConnector";
+import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
 import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { isUsingMockData } from "@/services/knowledgeBase";
+import { isUsingMockData, isInitializing, initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { Button } from "./ui/button";
 import { saveRepositoryConfig } from "@/services/repositoryConfig";
 import { initGithubClient, validateGithubToken } from "@/services/githubClient";
-import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { 
   hasAICapabilities, 
   setOpenAIApiKey, 
-  wasAPIKeyPreviouslySet 
+  wasAPIKeyPreviouslySet,
+  getAPIKeyState
 } from "@/services/aiAnalysis";
 import {
   Dialog,
@@ -29,6 +29,10 @@ import {
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Card, CardContent } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Progress } from "./ui/progress";
+import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
 
 export default function Header() {
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
@@ -39,11 +43,14 @@ export default function Header() {
   const [openaiDialogOpen, setOpenaiDialogOpen] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
+  const [showProgressIndicator, setShowProgressIndicator] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
 
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
     setIsAIEnabled(hasAICapabilities());
+    setApiKeyStatus(getAPIKeyState());
 
     // Get connection diagnostics to set accurate status
     const diagnostics = getConnectionDiagnostics();
@@ -51,10 +58,18 @@ export default function Header() {
       setConnectionStatus('disconnected');
     } else if (isUsingMockData()) {
       setConnectionStatus('partial');
-      setConnectionError(diagnostics.errorMessage);
+      setConnectionError(getMostRelevantErrorMessage());
     } else {
       setConnectionStatus('connected');
       setConnectionError(null);
+    }
+    
+    // Check if we're initializing
+    if (isInitializing()) {
+      setConnectionStatus('connecting');
+      setShowProgressIndicator(true);
+    } else {
+      setShowProgressIndicator(false);
     }
   };
 
@@ -65,20 +80,29 @@ export default function Header() {
     if (wasAPIKeyPreviouslySet()) {
       setIsAIEnabled(true);
     }
+    
+    // Poll for changes to connection status
+    const intervalId = setInterval(() => {
+      updateRepoInfo();
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
     setConnectionError(null);
     setConnectionStatus('connecting');
+    setShowProgressIndicator(true);
     
     // Prompt for GitHub token if not already set
     let token = prompt("Please enter your GitHub personal access token with 'repo' permissions:");
     
     if (!token) {
       setIsConnecting(false);
-      toast.error("GitHub token required to connect to the repository");
       setConnectionStatus('disconnected');
+      setShowProgressIndicator(false);
+      toast.error("GitHub token required to connect to the repository");
       return;
     }
     
@@ -91,6 +115,7 @@ export default function Header() {
         setIsConnecting(false);
         setConnectionError("Invalid GitHub token. Please check your token and try again.");
         setConnectionStatus('disconnected');
+        setShowProgressIndicator(false);
         return;
       }
       
@@ -102,6 +127,7 @@ export default function Header() {
         setConnectionError("Failed to initialize GitHub client");
         setIsConnecting(false);
         setConnectionStatus('disconnected');
+        setShowProgressIndicator(false);
         return;
       }
       
@@ -129,11 +155,11 @@ export default function Header() {
       console.log("Knowledge base initialized, checking data source...");
       
       if (isUsingMockData()) {
-        const errorMsg = "Connected to GitHub, but could not access repository data. Using mock data instead.";
+        const errorMsg = getMostRelevantErrorMessage() || "Could not access repository data";
         setConnectionError(errorMsg);
         setConnectionStatus('partial');
-        toast.warning(errorMsg, {
-          description: "The repository structure might have changed. Please check console for details."
+        toast.warning(`Connected to GitHub, but ${errorMsg}`, {
+          description: "Using mock data instead. Check console for details."
         });
       } else {
         toast.success("Successfully connected to Ghost repository!", {
@@ -152,6 +178,7 @@ export default function Header() {
       });
     } finally {
       setIsConnecting(false);
+      setShowProgressIndicator(false);
     }
   };
 
@@ -205,31 +232,45 @@ export default function Header() {
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">Unfold</span>
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
+        
+        {showProgressIndicator && (
+          <div className="flex-1 max-w-md px-2">
+            <RepositoryProgressIndicator />
+          </div>
+        )}
+        
+        <div className={`flex ${showProgressIndicator ? '' : 'flex-1'} items-center justify-between space-x-2 md:justify-end`}>
           <nav className="flex items-center space-x-4">
             {currentRepo && (
               <div className="flex items-center">
-                <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 ${
-                  usingMockData 
-                    ? 'bg-amber-100 text-amber-700 border border-amber-200' 
-                    : 'bg-green-100 text-green-700 border border-green-200'
-                }`}>
-                  {statusInfo.icon}
-                  <span>{currentRepo.owner}/{currentRepo.repo}</span>
-                  {usingMockData && (
-                    <span className="ml-1 text-amber-600">(mock)</span>
-                  )}
-                </span>
+                <Badge variant={usingMockData ? "outline" : "default"} className={`
+                  ${usingMockData 
+                    ? 'bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200' 
+                    : 'bg-green-100 text-green-700 hover:bg-green-100 border-green-200'}
+                `}>
+                  <span className="flex items-center gap-1">
+                    {statusInfo.icon}
+                    <span>{currentRepo.owner}/{currentRepo.repo}</span>
+                    {usingMockData && (
+                      <span className="ml-1 text-amber-600">(mock)</span>
+                    )}
+                  </span>
+                </Badge>
                 
                 {connectionError && (
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <AlertCircle className="ml-2 h-4 w-4 text-amber-500" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-md">
-                      <p>{connectionError}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <AlertCircle className="ml-2 h-4 w-4 text-amber-500" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">{connectionError}</p>
+                        <p className="text-xs mt-1 text-muted-foreground">
+                          Try reconnecting or check your token permissions
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             )}
@@ -262,10 +303,14 @@ export default function Header() {
                 <Button
                   variant={isAIEnabled ? "default" : "outline"}
                   size="sm"
-                  className="flex items-center gap-1"
+                  className={`flex items-center gap-1 ${
+                    apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : ''
+                  }`}
                 >
                   <KeyRound className="h-4 w-4" />
-                  {isAIEnabled ? "AI Enabled" : "Set OpenAI Key"}
+                  {isAIEnabled ? 
+                    (apiKeyStatus?.lastError ? "AI Error" : "AI Enabled") : 
+                    "Set OpenAI Key"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
@@ -276,6 +321,18 @@ export default function Header() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                  {apiKeyStatus?.lastError && (
+                    <Alert variant="destructive" className="mb-2">
+                      <AlertTitle className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4" />
+                        API Key Error
+                      </AlertTitle>
+                      <AlertDescription>
+                        {apiKeyStatus.lastError}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="openai-key" className="col-span-4">
                       API Key
@@ -301,11 +358,13 @@ export default function Header() {
             </Dialog>
             
             {/* Connection troubleshooting alert */}
-            {connectionError && (
-              <Alert variant="warning" className="hidden md:flex max-w-xs items-center">
-                <AlertTitle className="text-sm">Connection Issue</AlertTitle>
-                <AlertDescription className="text-xs">
-                  Check GitHub token permissions and try again.
+            {connectionError && !showProgressIndicator && (
+              <Alert variant="warning" className="hidden lg:flex max-w-xs items-center py-1 h-9">
+                <AlertDescription className="text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  {connectionError.length > 60 ? 
+                    `${connectionError.substring(0, 60)}...` : 
+                    connectionError}
                 </AlertDescription>
               </Alert>
             )}
@@ -362,3 +421,4 @@ export default function Header() {
     </header>
   );
 }
+

@@ -1,13 +1,26 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
 import { extractKeywords } from './keywordUtils';
 import { getProcessedFileCount, clearProcessedFilesCache } from './fileProcessor';
-import { exploreRepositoryPaths, clearSuccessfulPathPatterns } from './pathExplorer';
+import { 
+  exploreRepositoryPaths, 
+  clearSuccessfulPathPatterns, 
+  getExplorationProgress,
+  resetExplorationProgress 
+} from './pathExplorer';
 
 // Knowledge base - initialized with mock data but will be populated with real data
 let knowledgeBase: KnowledgeEntry[] = [...mockKnowledgeEntries];
+
+// Track initialization state
+let initializationState = {
+  inProgress: false,
+  lastInitTime: 0,
+  usingMockData: true,
+  initialized: false,
+  error: null as string | null
+};
 
 /**
  * Initializes the knowledge base by extracting information from repository files
@@ -16,6 +29,19 @@ let knowledgeBase: KnowledgeEntry[] = [...mockKnowledgeEntries];
  */
 export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
   console.log('Initializing knowledge base...');
+  
+  // Prevent multiple simultaneous initializations
+  if (initializationState.inProgress) {
+    console.log('Knowledge base initialization already in progress');
+    toast.info('Knowledge base initialization already in progress');
+    return;
+  }
+  
+  initializationState.inProgress = true;
+  initializationState.error = null;
+  
+  // Reset exploration progress
+  resetExplorationProgress();
   
   // Clear cache if forced refresh
   if (forceRefresh) {
@@ -31,6 +57,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     
     // Try to process repository files
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
+    initializationState.lastInitTime = Date.now();
+    initializationState.initialized = true;
     
     if (!processedAny) {
       console.log('Could not process any paths, falling back to mock data');
@@ -39,11 +67,15 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
         knowledgeBase = [...mockKnowledgeEntries];
       }
       
+      initializationState.usingMockData = true;
+      
       toast.warning('Using mock data - could not access repository files.', {
         description: 'Please check repository configuration, token permissions, and that the repository exists.',
         duration: 6000
       });
     } else {
+      initializationState.usingMockData = false;
+      
       const stats = getKnowledgeBaseStats();
       const successMsg = `Knowledge base initialized with ${stats.totalEntries} entries from ${stats.processedFiles} files.`;
       toast.success(successMsg, {
@@ -54,10 +86,15 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     }
   } catch (error) {
     console.error('Error initializing knowledge base:', error);
+    initializationState.error = error instanceof Error ? error.message : 'Unknown error';
+    initializationState.usingMockData = true;
+    
     toast.error('Error initializing knowledge base', {
-      description: error instanceof Error ? error.message : 'Unknown error',
+      description: initializationState.error,
       duration: 5000
     });
+  } finally {
+    initializationState.inProgress = false;
   }
 }
 
@@ -103,6 +140,14 @@ export function clearKnowledgeBase(): void {
   knowledgeBase = [];
   clearProcessedFilesCache();
   clearSuccessfulPathPatterns();
+  resetExplorationProgress();
+  initializationState = {
+    inProgress: false,
+    lastInitTime: 0,
+    usingMockData: true,
+    initialized: false,
+    error: null
+  };
 }
 
 /**
@@ -126,10 +171,23 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
  * @returns {boolean} True if using mock data
  */
 export function isUsingMockData(): boolean {
-  // If the knowledge base only contains the exact same number of entries as mock data
-  // and the processed file count is 0, we're using mock data
-  return knowledgeBase.length === mockKnowledgeEntries.length && 
-         getProcessedFileCount() === 0;
+  return initializationState.usingMockData;
+}
+
+/**
+ * Get the initialization state
+ * @returns Current initialization state
+ */
+export function getInitializationState(): typeof initializationState {
+  return { ...initializationState };
+}
+
+/**
+ * Check if initialization is in progress
+ * @returns {boolean} True if initialization is in progress
+ */
+export function isInitializing(): boolean {
+  return initializationState.inProgress;
 }
 
 // Re-export types for external use - fix the isolatedModules issue by using 'export type'

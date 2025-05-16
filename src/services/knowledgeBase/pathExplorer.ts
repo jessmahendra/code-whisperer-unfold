@@ -2,9 +2,47 @@
 import { getRepositoryContents, getCurrentRepository, getFileContent } from '../githubConnector';
 import { KnowledgeEntry } from './types';
 import { processModule, processFile } from './fileProcessor';
+import { toast } from "sonner";
+import { Progress } from "@/components/ui/progress";
 
 // Tracks successful path patterns for future reference
 let successfulPathPatterns: string[] = [];
+// Track exploration progress
+let explorationProgress = {
+  totalAttempts: 0,
+  successfulPaths: 0,
+  progress: 0,
+  status: "idle" as "idle" | "exploring" | "complete" | "error",
+  error: null as string | null,
+  onProgressUpdate: null as ((progress: number) => void) | null
+};
+
+/**
+ * Sets a callback for progress updates
+ * @param callback Function to call with progress updates
+ */
+export function setProgressUpdateCallback(callback: (progress: number) => void): void {
+  explorationProgress.onProgressUpdate = callback;
+}
+
+/**
+ * Gets the current exploration progress
+ * @returns Current progress object
+ */
+export function getExplorationProgress(): typeof explorationProgress {
+  return { ...explorationProgress };
+}
+
+/**
+ * Updates exploration progress and triggers callback
+ * @param value New progress value (0-100)
+ */
+function updateProgress(value: number): void {
+  explorationProgress.progress = Math.min(Math.max(0, value), 100);
+  if (explorationProgress.onProgressUpdate) {
+    explorationProgress.onProgressUpdate(explorationProgress.progress);
+  }
+}
 
 /**
  * Gets the default paths to try for a repository structure
@@ -17,39 +55,36 @@ export function getDefaultPathsToTry(repoName?: string): string[] {
     return [
       '', // Root directory
       'ghost',
-      'packages', // Modern Ghost uses a packages structure
-      'packages/ghost',
-      'apps',
-      'apps/ghost',
-      'apps/admin',
-      'core',
+      
+      // Most current Ghost 5.x+ paths - these are most likely to work
       'ghost/core',
       'ghost/admin',
-      
-      // Current structure paths (Ghost 5.x+)
       'ghost/core/core',
       'ghost/core/core/server',
-      'ghost/core/core/frontend',
-      'ghost/core/core/shared',
-      'ghost/admin/app',
-      
-      // Current API structure paths
       'ghost/core/core/server/api',
-      'ghost/core/core/server/api/endpoints',
-      'ghost/core/core/server/api/endpoints/content',
-      'ghost/core/core/server/api/endpoints/admin',
-      'ghost/core/core/server/api/versions',
-      'ghost/core/core/server/api/canary',
-      'ghost/core/core/server/api/canary/endpoints',
-      
-      // Current models and services
-      'ghost/core/core/server/models',
       'ghost/core/core/server/services',
       'ghost/core/core/server/services/members',
       'ghost/core/core/server/services/auth',
-      'ghost/core/core/server/data',
+      'ghost/core/core/server/models',
       
-      // Documentation
+      // More specific paths for services and API endpoints
+      'ghost/core/core/server/api/canary',
+      'ghost/core/core/server/api/canary/endpoints',
+      'ghost/core/core/server/api/v3',
+      'ghost/core/core/server/services/settings',
+      'ghost/core/core/server/services/url',
+      'ghost/core/core/server/services/mail',
+      
+      // Some specific areas known to be important
+      'ghost/core/core/server/data/schema',
+      'ghost/core/core/server/web',
+      'ghost/core/core/shared',
+      'ghost/admin/app',
+      
+      // Fallback to older paths
+      'core',
+      'packages',
+      'apps',
       'content',
       'docs',
     ];
@@ -108,11 +143,25 @@ export async function exploreRepositoryPaths(
   knowledgeBase: KnowledgeEntry[]
 ): Promise<boolean> {
   try {
+    // Reset and initialize exploration progress
+    explorationProgress = {
+      totalAttempts: 0,
+      successfulPaths: 0,
+      progress: 0,
+      status: "exploring",
+      error: null,
+      onProgressUpdate: explorationProgress.onProgressUpdate
+    };
+    updateProgress(5); // Start at 5%
+    
     // Get current repository configuration
     const currentRepo = getCurrentRepository();
     
     if (!currentRepo) {
       console.log('No repository configuration found, using mock data');
+      explorationProgress.status = "error";
+      explorationProgress.error = "No repository configuration found";
+      updateProgress(100);
       return false;
     }
     
@@ -121,11 +170,14 @@ export async function exploreRepositoryPaths(
     // First, try to get the root contents to better understand the repository structure
     let rootContents = [];
     try {
+      updateProgress(10);
+      toast.loading("Exploring repository structure...", { duration: 3000 });
       rootContents = await getRepositoryContents('');
       console.log(`Found ${rootContents.length} items in the root of the repository:`, 
         rootContents.map(item => item.name).join(', '));
         
       if (rootContents.length > 0) {
+        updateProgress(20);
         // Check if this is a monorepo by looking for directories like "ghost" or "core" or "packages"
         const mainDirs = rootContents
           .filter(item => item.type === 'dir')
@@ -136,8 +188,13 @@ export async function exploreRepositoryPaths(
           successfulPathPatterns.push(...mainDirs);
           
           // If it's a GitHub monorepo, first try to explore those main dirs
+          let dirCounter = 0;
           for (const dir of mainDirs) {
             try {
+              // Update progress as we process directories
+              updateProgress(20 + Math.floor((dirCounter / mainDirs.length) * 30));
+              dirCounter++;
+              
               console.log(`Exploring main directory: ${dir}`);
               const dirContents = await getRepositoryContents(dir);
               if (dirContents.length > 0) {
@@ -153,7 +210,11 @@ export async function exploreRepositoryPaths(
                   
                   // For Ghost, try to go one level deeper since structure is complex
                   if (currentRepo.repo === "Ghost") {
+                    let subDirCounter = 0;
                     for (const subDir of subDirs) {
+                      updateProgress(50 + Math.floor((subDirCounter / subDirs.length) * 10));
+                      subDirCounter++;
+                      
                       try {
                         const subContents = await getRepositoryContents(subDir);
                         const subSubDirs = subContents
@@ -183,6 +244,7 @@ export async function exploreRepositoryPaths(
                 
                 for (const file of files) {
                   await processFile(file.path, knowledgeBase);
+                  explorationProgress.successfulPaths++;
                 }
                 
                 if (files.length > 0) {
@@ -196,12 +258,16 @@ export async function exploreRepositoryPaths(
         }
       }
     } catch (error) {
-      console.error('Error exploring root directory:', error.message);
+      console.error('Error exploring root directory:', error);
+      updateProgress(30); // Continue despite error
     }
+    
+    updateProgress(60);
     
     // Special handling for Ghost repo - use updated paths based on current Ghost structure
     if (currentRepo.repo === "Ghost" && currentRepo.owner === "TryGhost") {
       console.log("Using specialized path exploration for Ghost repository");
+      toast.loading("Exploring Ghost code structure...", { duration: 3000 });
       
       // Try the most current Ghost paths directly
       const ghostSpecificPaths = [
@@ -219,7 +285,11 @@ export async function exploreRepositoryPaths(
         'ghost/admin/app/templates'
       ];
       
+      let ghostPathCounter = 0;
       for (const path of ghostSpecificPaths) {
+        updateProgress(60 + Math.floor((ghostPathCounter / ghostSpecificPaths.length) * 20));
+        ghostPathCounter++;
+        
         try {
           console.log(`Trying Ghost-specific path: ${path}`);
           const contents = await getRepositoryContents(path);
@@ -237,6 +307,7 @@ export async function exploreRepositoryPaths(
             for (const file of files) {
               try {
                 await processFile(file.path, knowledgeBase);
+                explorationProgress.successfulPaths++;
               } catch (fileError) {
                 console.log(`Could not process Ghost file ${file.path}: ${fileError.message}`);
               }
@@ -254,6 +325,9 @@ export async function exploreRepositoryPaths(
       }
     }
     
+    updateProgress(80);
+    toast.loading("Finalizing repository exploration...", { duration: 3000 });
+    
     // Get paths to try (use discovered paths first, then fall back to defaults)
     const defaultPaths = getDefaultPathsToTry(currentRepo.repo);
     const allPathsToTry = [...new Set([...successfulPathPatterns, ...defaultPaths])];
@@ -262,16 +336,20 @@ export async function exploreRepositoryPaths(
     
     let processedAny = false;
     let successfulPaths = 0;
-    const maxPathsToTry = currentRepo.repo === "Ghost" ? 40 : 20; // Higher limit for Ghost repo
+    const maxPathsToTry = currentRepo.repo === "Ghost" ? 30 : 20; // Higher limit for Ghost repo
     let attemptedPaths = 0;
     
     for (const path of allPathsToTry) {
+      updateProgress(80 + Math.floor((attemptedPaths / maxPathsToTry) * 20));
+      
       if (attemptedPaths >= maxPathsToTry) {
         console.log(`Reached maximum path attempt limit (${maxPathsToTry})`);
         break;
       }
       
       attemptedPaths++;
+      explorationProgress.totalAttempts++;
+      
       try {
         console.log(`Trying path: ${path}`);
         const contents = await getRepositoryContents(path);
@@ -294,6 +372,7 @@ export async function exploreRepositoryPaths(
                 await processFile(item.path, knowledgeBase);
                 processedAny = true;
                 successfulPaths++;
+                explorationProgress.successfulPaths++;
               } catch (fileError) {
                 console.log(`Could not process file ${item.path}: ${fileError.message}`);
               }
@@ -320,6 +399,7 @@ export async function exploreRepositoryPaths(
                   await processModule(item.path, knowledgeBase);
                   processedAny = true;
                   successfulPaths++;
+                  explorationProgress.successfulPaths++;
                 } catch (dirError) {
                   console.log(`Could not process directory ${item.path}: ${dirError.message}`);
                 }
@@ -333,10 +413,19 @@ export async function exploreRepositoryPaths(
       }
     }
     
-    console.log(`Processed ${successfulPaths} paths successfully`);
+    updateProgress(100);
+    explorationProgress.status = processedAny ? "complete" : "error";
+    if (!processedAny) {
+      explorationProgress.error = "Could not process any repository paths";
+    }
+    
+    console.log(`Processed ${successfulPaths} paths successfully out of ${attemptedPaths} attempts`);
     return processedAny;
   } catch (error) {
     console.error('Error exploring repository paths:', error);
+    explorationProgress.status = "error";
+    explorationProgress.error = error instanceof Error ? error.message : "Unknown error occurred";
+    updateProgress(100);
     return false;
   }
 }
@@ -347,3 +436,18 @@ export async function exploreRepositoryPaths(
 export function clearSuccessfulPathPatterns(): void {
   successfulPathPatterns = [];
 }
+
+/**
+ * Reset the exploration progress
+ */
+export function resetExplorationProgress(): void {
+  explorationProgress = {
+    totalAttempts: 0,
+    successfulPaths: 0,
+    progress: 0,
+    status: "idle",
+    error: null,
+    onProgressUpdate: null
+  };
+}
+
