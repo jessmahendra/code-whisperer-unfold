@@ -1,7 +1,6 @@
 
-/**
- * Service for interacting with Git repository history
- */
+import { fetchCommitHistory, isGithubClientInitialized } from './githubClient';
+import { getRepositoryConfig } from './repositoryConfig';
 
 interface CommitInfo {
   sha: string;
@@ -29,9 +28,18 @@ export async function getFileHistory(
   repoName: string, 
   filePath: string
 ): Promise<CommitInfo[]> {
+  // If GitHub client is initialized, use the real API
+  if (isGithubClientInitialized()) {
+    try {
+      return await fetchCommitHistory(repoOwner, repoName, filePath);
+    } catch (error) {
+      console.warn(`Failed to fetch commit history from GitHub API, falling back to mock data: ${error}`);
+      // Fall back to mock data on error
+    }
+  }
+  
   try {
     // For demo purposes, we'll mock the GitHub API response
-    // In a real implementation, this would call the GitHub API
     console.log(`Fetching history for ${filePath}`);
     
     // Simulate API delay
@@ -162,9 +170,12 @@ export async function getHistoryForFiles(
   filePaths: string[]
 ): Promise<Record<string, FileHistory>> {
   const result: Record<string, FileHistory> = {};
+  const config = getRepositoryConfig();
+  const repoOwner = config?.owner || 'TryGhost';
+  const repoName = config?.repo || 'Ghost';
   
   for (const filePath of filePaths) {
-    const commits = await getFileHistory('TryGhost', 'Ghost', filePath);
+    const commits = await getFileHistory(repoOwner, repoName, filePath);
     
     result[filePath] = {
       filePath,

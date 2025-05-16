@@ -1,4 +1,7 @@
 
+import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
+import { getRepositoryConfig } from './repositoryConfig';
+
 // This is a mock implementation for demo purposes
 // In a real application, this would connect to the GitHub API
 
@@ -160,11 +163,40 @@ module.exports = {
 };
 
 /**
- * Simulates fetching repository contents from GitHub API
+ * Fetches repository contents from GitHub API or falls back to mock data
  * @param {string} repoPath - Path within the repository
  * @returns {Promise<FileInfo[]>} List of files and directories
  */
 export async function getRepositoryContents(repoPath: string): Promise<FileInfo[]> {
+  const config = getRepositoryConfig();
+  
+  // If GitHub client is initialized and we have a config, use the real API
+  if (isGithubClientInitialized() && config) {
+    try {
+      // Extract owner and repo from the path or use the configured ones
+      const { owner, repo } = config;
+      
+      const contents = await fetchRepositoryContents(owner, repo, repoPath);
+      
+      // Convert GitHub API response to FileInfo format
+      return Array.isArray(contents) ? contents.map(item => ({
+        name: item.name,
+        path: item.path,
+        content: '',
+        type: item.type as 'file' | 'dir'
+      })) : [{
+        name: contents.name,
+        path: contents.path,
+        content: '',
+        type: contents.type as 'file' | 'dir'
+      }];
+    } catch (error) {
+      console.warn(`Failed to fetch from GitHub API, falling back to mock data: ${error}`);
+      // Fall back to mock data on error
+    }
+  }
+  
+  // Use mock data as fallback
   return new Promise((resolve) => {
     // Simulate API delay
     setTimeout(() => {
@@ -208,11 +240,25 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
 }
 
 /**
- * Simulates fetching file content from GitHub API
+ * Fetches file content from GitHub API or falls back to mock data
  * @param {string} filePath - Path to the file
  * @returns {Promise<string>} File content
  */
 export async function getFileContent(filePath: string): Promise<string> {
+  const config = getRepositoryConfig();
+  
+  // If GitHub client is initialized and we have a config, use the real API
+  if (isGithubClientInitialized() && config) {
+    try {
+      const { owner, repo } = config;
+      return await fetchFileContent(owner, repo, filePath);
+    } catch (error) {
+      console.warn(`Failed to fetch file content from GitHub API, falling back to mock data: ${error}`);
+      // Fall back to mock data on error
+    }
+  }
+  
+  // Use mock data as fallback
   return new Promise((resolve, reject) => {
     // Simulate API delay
     setTimeout(() => {
@@ -240,4 +286,18 @@ export async function getFileContent(filePath: string): Promise<string> {
       }
     }, 300);
   });
+}
+
+/**
+ * Returns the current repository information
+ * @returns {Object|null} Repository information
+ */
+export function getCurrentRepository(): { owner: string; repo: string } | null {
+  const config = getRepositoryConfig();
+  if (!config) return null;
+  
+  return {
+    owner: config.owner,
+    repo: config.repo
+  };
 }

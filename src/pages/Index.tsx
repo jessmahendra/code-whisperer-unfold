@@ -11,7 +11,8 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Slack } from "lucide-react";
+import { Slack, AlertTriangle } from "lucide-react";
+import { hasRepositoryConfig } from "@/services/repositoryConfig";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
@@ -36,12 +37,15 @@ export default function Index() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasRepo, setHasRepo] = useState(hasRepositoryConfig());
 
   // Initialize knowledge base on component mount
   useEffect(() => {
     const initialize = async () => {
       try {
         await initializeKnowledgeBase();
+        // Check if repository configuration exists
+        setHasRepo(hasRepositoryConfig());
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
@@ -99,6 +103,21 @@ export default function Index() {
             <p className="text-xl mb-8">
               Instant answers to your Ghost product questions, extracted directly from code.
             </p>
+            
+            {!hasRepo && (
+              <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
+                  <div>
+                    <h3 className="font-medium text-yellow-800">Using mock data</h3>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      You're currently using mock data. To connect to a real GitHub repository, 
+                      click the repository icon in the header.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
             

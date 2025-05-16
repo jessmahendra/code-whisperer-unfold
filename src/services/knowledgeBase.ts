@@ -1,6 +1,6 @@
-
-import { getFileContent, getRepositoryContents } from './githubConnector';
+import { getFileContent, getRepositoryContents, getCurrentRepository } from './githubConnector';
 import { extractKnowledge } from './codeParser';
+import { toast } from "sonner";
 
 // Interface for knowledge entries
 export interface KnowledgeEntry {
@@ -49,21 +49,30 @@ let knowledgeBase: KnowledgeEntry[] = [
   }
 ];
 
+// Cache for processed files to avoid redundant processing
+const processedFilesCache: Set<string> = new Set();
+
 /**
  * Initializes the knowledge base by extracting information from repository files
+ * @param {boolean} forceRefresh - Whether to force refresh the knowledge base
+ * @returns {Promise<void>}
  */
-export async function initializeKnowledgeBase(): Promise<void> {
+export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
   console.log('Initializing knowledge base...');
   
+  // Clear cache if forced refresh
+  if (forceRefresh) {
+    processedFilesCache.clear();
+  }
+  
   try {
-    // In a real implementation, we would fetch data from GitHub
-    // For demo purposes, we'll use our predefined entries
+    // Get current repository configuration or use default
+    const currentRepo = getCurrentRepository();
     
-    // Attempt to fetch some additional data for demo purposes
-    const modules = [
-      'ghost/core/core/server/services/members',
-      'ghost/core/core/server/api/v2/content',
-    ];
+    // Define modules to process
+    const modules = currentRepo 
+      ? [`${currentRepo.repo}/core/server/services/members`, `${currentRepo.repo}/core/server/api/v2/content`]
+      : ['ghost/core/core/server/services/members', 'ghost/core/core/server/api/v2/content'];
     
     for (const modulePath of modules) {
       try {
@@ -113,7 +122,15 @@ async function processModule(modulePath: string): Promise<void> {
  * @param {string} filePath - Path to the file
  */
 async function processFile(filePath: string): Promise<void> {
+  // Skip if already processed and cached
+  if (processedFilesCache.has(filePath)) {
+    return;
+  }
+  
   try {
+    // Add to processed cache
+    processedFilesCache.add(filePath);
+    
     // Get file content
     const content = await getFileContent(filePath);
     
@@ -207,4 +224,29 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     .filter(item => item.score > 0.1) // At least some relevance
     .sort((a, b) => b.score - a.score) // Sort by descending score
     .map(item => item.entry); // Extract just the entries
+}
+
+/**
+ * Clear the knowledge base
+ * @returns {void}
+ */
+export function clearKnowledgeBase(): void {
+  knowledgeBase = [];
+  processedFilesCache.clear();
+}
+
+/**
+ * Get statistics about the knowledge base
+ * @returns {Object} Knowledge base statistics
+ */
+export function getKnowledgeBaseStats() {
+  return {
+    totalEntries: knowledgeBase.length,
+    byType: {
+      comment: knowledgeBase.filter(entry => entry.type === 'comment').length,
+      function: knowledgeBase.filter(entry => entry.type === 'function').length,
+      export: knowledgeBase.filter(entry => entry.type === 'export').length
+    },
+    processedFiles: processedFilesCache.size
+  };
 }
