@@ -1,4 +1,3 @@
-
 /**
  * Extracts JSDoc comments from code
  * @param {string} code - Source code to parse
@@ -282,18 +281,32 @@ export function extractDatabaseSchema(code: string): Record<string, { fields: st
   return schemas;
 }
 
+// Define interface for the knowledge extraction result
+export interface ExtractedKnowledge {
+  jsDocComments: string[];
+  inlineComments: string[];
+  functions: { name: string, params: string, body: string }[];
+  exports: Record<string, string>;
+  imports: { from: string, imports: string[] }[];
+  filePath: string;
+  fileType: string;
+  apiRoutes?: { method: string, path: string, handler: string }[];
+  databaseSchemas?: Record<string, { fields: string[], relationships: string[] }>;
+  classes?: { name: string, methods: string[], extends: string | null }[];
+}
+
 /**
  * Extracts all knowledge from code
  * @param {string} code - Source code to parse
  * @param {string} filePath - Path to the file
- * @returns {object} Extracted knowledge
+ * @returns {ExtractedKnowledge} Extracted knowledge
  */
-export function extractKnowledge(code: string, filePath: string) {
+export function extractKnowledge(code: string, filePath: string): ExtractedKnowledge {
   // Extract file type from path
   const fileType = filePath.split('.').pop()?.toLowerCase() || '';
   
   // Basic knowledge extraction for all file types
-  const knowledge = {
+  const knowledge: ExtractedKnowledge = {
     jsDocComments: extractJSDocComments(code),
     inlineComments: extractInlineComments(code),
     functions: extractFunctionDefs(code),

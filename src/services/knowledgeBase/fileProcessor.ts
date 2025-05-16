@@ -1,6 +1,7 @@
 
+
 import { getFileContent, getRepositoryContents } from '../githubConnector';
-import { extractKnowledge } from '../codeParser';
+import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { KnowledgeEntry } from './types';
 import { extractKeywords } from './keywordUtils';
 
@@ -30,7 +31,7 @@ export async function processFile(
     const content = await getFileContent(filePath);
     
     // Extract knowledge
-    const knowledge = extractKnowledge(content, filePath);
+    const knowledge: ExtractedKnowledge = extractKnowledge(content, filePath);
     
     // Add JSDoc comments to knowledge base
     for (const comment of knowledge.jsDocComments) {
