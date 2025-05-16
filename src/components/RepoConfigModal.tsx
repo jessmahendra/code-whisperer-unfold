@@ -96,7 +96,12 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       setIsInitializing(true);
       await initializeKnowledgeBase(true);
       updateStats();
-      toast.success("Knowledge base initialized");
+      
+      if (getKnowledgeBaseStats().totalEntries > 0) {
+        toast.success("Knowledge base initialized successfully");
+      } else {
+        toast.warning("Knowledge base initialized with 0 entries. The repository structure may not match the expected paths.");
+      }
 
       // Notify parent component
       onConfigChange();

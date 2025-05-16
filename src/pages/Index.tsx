@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -11,8 +10,9 @@ import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Slack, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Slack } from "lucide-react";
 import { hasRepositoryConfig } from "@/services/repositoryConfig";
+import { isGithubClientInitialized } from "@/services/githubClient";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
@@ -38,14 +38,17 @@ export default function Index() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [hasRepo, setHasRepo] = useState(hasRepositoryConfig());
+  const [isConnected, setIsConnected] = useState(false);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
     const initialize = async () => {
       try {
         await initializeKnowledgeBase();
-        // Check if repository configuration exists
-        setHasRepo(hasRepositoryConfig());
+        // Check if repository configuration exists and GitHub client is initialized
+        const hasConfig = hasRepositoryConfig();
+        setHasRepo(hasConfig);
+        setIsConnected(hasConfig && isGithubClientInitialized());
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
@@ -104,7 +107,7 @@ export default function Index() {
               Instant answers to your Ghost product questions, extracted directly from code.
             </p>
             
-            {!hasRepo && (
+            {!isConnected ? (
               <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
@@ -113,6 +116,18 @@ export default function Index() {
                     <p className="text-sm text-yellow-700 mt-1">
                       You're currently using mock data. To connect to a real GitHub repository, 
                       click the repository icon in the header.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
+                <div className="flex items-start">
+                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
+                  <div>
+                    <h3 className="font-medium text-green-800">Connected to GitHub</h3>
+                    <p className="text-sm text-green-700 mt-1">
+                      You're using real data from GitHub. The knowledge base will be populated as you ask questions.
                     </p>
                   </div>
                 </div>

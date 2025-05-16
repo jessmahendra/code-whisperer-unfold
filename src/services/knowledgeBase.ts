@@ -66,28 +66,50 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   }
   
   try {
-    // Get current repository configuration or use default
+    // Get current repository configuration
     const currentRepo = getCurrentRepository();
     
-    // Define modules to process
-    const modules = currentRepo 
-      ? [`${currentRepo.repo}/core/server/services/members`, `${currentRepo.repo}/core/server/api/v2/content`]
-      : ['ghost/core/core/server/services/members', 'ghost/core/core/server/api/v2/content'];
+    if (!currentRepo) {
+      console.log('No repository configuration found, using mock data');
+      return;
+    }
     
-    for (const modulePath of modules) {
+    // Try multiple potential path patterns for Ghost
+    const pathsToTry = [
+      // Main repo paths
+      `core/server/services/members`,
+      `core/server/api/v2/content`,
+      // With repo name prefix
+      `${currentRepo.repo}/core/server/services/members`,
+      `${currentRepo.repo}/core/server/api/v2/content`,
+      // Ghost monorepo style
+      `packages/core/server/services/members`,
+      `packages/core/server/api/v2/content`,
+    ];
+    
+    let processedAny = false;
+    
+    for (const path of pathsToTry) {
       try {
-        // Attempt to process module but don't block if it fails
-        await processModule(modulePath);
+        await processModule(path);
+        processedAny = true;
+        console.log(`Successfully processed path: ${path}`);
       } catch (error) {
-        // Log but continue - we have our fallback data
-        console.log(`Note: Could not process module ${modulePath}: ${error.message}`);
+        console.log(`Could not process path ${path}: ${error.message}`);
+        // Continue trying other paths
       }
     }
     
-    console.log(`Knowledge base initialized with ${knowledgeBase.length} entries`);
+    if (!processedAny) {
+      console.log('Could not process any paths, falling back to mock data');
+      toast.warning('Using mock data - repository structure may not match expected paths');
+    } else {
+      toast.success(`Knowledge base initialized with ${knowledgeBase.length} entries`);
+      console.log(`Knowledge base initialized with ${knowledgeBase.length} entries`);
+    }
   } catch (error) {
     console.error('Error initializing knowledge base:', error);
-    // We already have fallback data so we won't throw
+    toast.error('Error initializing knowledge base');
   }
 }
 

@@ -1,4 +1,3 @@
-
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
 
@@ -176,6 +175,8 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       // Extract owner and repo from the path or use the configured ones
       const { owner, repo } = config;
       
+      console.log(`Fetching repo contents: ${owner}/${repo}/${repoPath}`);
+      
       const contents = await fetchRepositoryContents(owner, repo, repoPath);
       
       // Convert GitHub API response to FileInfo format
@@ -251,6 +252,9 @@ export async function getFileContent(filePath: string): Promise<string> {
   if (isGithubClientInitialized() && config) {
     try {
       const { owner, repo } = config;
+      
+      console.log(`Fetching file content: ${owner}/${repo}/${filePath}`);
+      
       return await fetchFileContent(owner, repo, filePath);
     } catch (error) {
       console.warn(`Failed to fetch file content from GitHub API, falling back to mock data: ${error}`);
