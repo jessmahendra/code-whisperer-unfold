@@ -7,13 +7,14 @@ import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
 import GradientBackground from "@/components/GradientBackground";
 import { generateAnswer } from "@/services/answerGenerator";
-import { initializeKnowledgeBase, isUsingMockData } from "@/services/knowledgeBase";
+import { initializeKnowledgeBase, isUsingMockData, getKnowledgeBaseStats, isInitializing } from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
 import { hasRepositoryConfig } from "@/services/repositoryConfig";
 import { isGithubClientInitialized } from "@/services/githubClient";
+import { getConnectionDiagnostics } from "@/services/githubConnector";
 
 // Sample suggested questions
 const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
@@ -37,29 +38,70 @@ export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializingKB, setIsInitializingKB] = useState(true);
   const [hasRepo, setHasRepo] = useState(hasRepositoryConfig());
   const [isConnected, setIsConnected] = useState(false);
   const [usingMockData, setUsingMockData] = useState(true);
+  const [knowledgeStats, setKnowledgeStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
     const initialize = async () => {
       try {
+        // Initialize the knowledge base
         await initializeKnowledgeBase();
+        
         // Check if repository configuration exists and GitHub client is initialized
         const hasConfig = hasRepositoryConfig();
+        const isClientInitialized = isGithubClientInitialized();
+        const diagnostics = getConnectionDiagnostics();
+        
+        // Get the latest stats to determine if we're using real data
+        const stats = getKnowledgeBaseStats();
+        setKnowledgeStats(stats);
+        
+        // Update connection status
         setHasRepo(hasConfig);
-        setIsConnected(hasConfig && isGithubClientInitialized());
-        setUsingMockData(isUsingMockData());
+        setIsConnected(hasConfig && isClientInitialized);
+        
+        // Check if we're actually using mock data or real data
+        // We consider truly connected if we have processed files > 0
+        const actuallyUsingMock = isUsingMockData() || stats.processedFiles === 0;
+        setUsingMockData(actuallyUsingMock);
+        
+        console.log("Connection status:", {
+          hasConfig,
+          isClientInitialized,
+          actuallyUsingMock,
+          diagnostics,
+          stats
+        });
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
       } finally {
-        setIsInitializing(false);
+        setIsInitializingKB(false);
       }
     };
+    
     initialize();
+    
+    // Poll for updates in case the connection status changes
+    const intervalId = setInterval(() => {
+      if (isInitializing()) {
+        // Still initializing, don't update yet
+        setIsInitializingKB(true);
+        return;
+      } else if (isInitializingKB) {
+        // Just finished initializing, update everything
+        setIsInitializingKB(false);
+        const stats = getKnowledgeBaseStats();
+        setKnowledgeStats(stats);
+        setUsingMockData(isUsingMockData() || stats.processedFiles === 0);
+      }
+    }, 1000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const handleAskQuestion = async (query: string) => {
@@ -105,6 +147,10 @@ export default function Index() {
     }
   };
 
+  // Determine if we should show the banner
+  const shouldShowWarningBanner = !isConnected || usingMockData;
+  const shouldShowSuccessBanner = isConnected && !usingMockData && !isInitializingKB;
+
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -118,15 +164,19 @@ export default function Index() {
               Instant answers to your Ghost product questions, extracted directly from code.
             </p>
             
-            {!isConnected ? (
+            {shouldShowWarningBanner && !isInitializingKB && (
               <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
                 <div className="flex items-start">
                   <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
                   <div>
-                    <h3 className="font-medium text-yellow-800">Using mock data</h3>
+                    <h3 className="font-medium text-yellow-800">
+                      {!isConnected ? "Using mock data" : "Connected but using mock data"}
+                    </h3>
                     <p className="text-sm text-yellow-700 mt-1">
-                      You're currently using mock data. To connect to the Ghost GitHub repository,
-                      click the button below.
+                      {!isConnected ? 
+                        "You're currently using mock data. To connect to the Ghost GitHub repository, click the button below." : 
+                        "You've connected to GitHub but we're still using mock data. This might happen if the repository structure doesn't match our expectations or if your token lacks permissions."
+                      }
                     </p>
                     <div className="mt-2">
                       <Button 
@@ -136,57 +186,48 @@ export default function Index() {
                         onClick={openConfigModal}
                       >
                         <CodeIcon className="h-4 w-4 mr-1" />
-                        Configure GitHub Connection
+                        {!isConnected ? "Configure GitHub Connection" : "Check GitHub Connection"}
                       </Button>
                     </div>
                   </div>
                 </div>
               </div>
-            ) : usingMockData ? (
-              <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
-                  <div>
-                    <h3 className="font-medium text-yellow-800">Connected but using mock data</h3>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      You've connected to GitHub but we're still using mock data. This might happen if:
-                    </p>
-                    <ul className="list-disc pl-5 text-sm text-yellow-700 mt-1">
-                      <li>The repository structure doesn't match our expectations</li>
-                      <li>Your token lacks permissions to access the repository</li>
-                      <li>There was a network issue during the connection</li>
-                    </ul>
-                    <div className="mt-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-white" 
-                        onClick={openConfigModal}
-                      >
-                        <CodeIcon className="h-4 w-4 mr-1" />
-                        Check GitHub Connection
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
+            )}
+            
+            {shouldShowSuccessBanner && (
               <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
                 <div className="flex items-start">
                   <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
                   <div>
                     <h3 className="font-medium text-green-800">Connected to GitHub</h3>
                     <p className="text-sm text-green-700 mt-1">
-                      You're using real data from the Ghost GitHub repository. The knowledge base has been populated with code insights.
+                      You're using real data from the Ghost GitHub repository. 
+                      {knowledgeStats && (
+                        <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
+                      )}
                     </p>
                   </div>
                 </div>
               </div>
             )}
             
-            <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializing} />
+            {isInitializingKB && (
+              <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-left">
+                <div className="flex items-start">
+                  <div className="animate-spin h-5 w-5 text-blue-500 mt-0.5 mr-2">⏳</div>
+                  <div>
+                    <h3 className="font-medium text-blue-800">Initializing Knowledge Base</h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Please wait while we connect to the GitHub repository and build the knowledge base...
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             
-            <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializing} />
+            <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializingKB} />
+            
+            <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializingKB} />
           </section>
           
           {isProcessing && <div className="max-w-3xl mx-auto text-center">
