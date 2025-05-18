@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -17,7 +18,7 @@ import { toast } from "@/components/ui/sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
-import { hasRepositoryConfig } from "@/services/repositoryConfig";
+import { hasRepositoryConfig, getRepositoryConfig } from "@/services/repositoryConfig";
 import { isGithubClientInitialized, initGithubClient } from "@/services/githubClient";
 import { getConnectionDiagnostics } from "@/services/githubConnector";
 import { getExplorationProgress } from "@/services/knowledgeBase/pathExplorer";
