@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -7,7 +6,12 @@ import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
 import GradientBackground from "@/components/GradientBackground";
 import { generateAnswer } from "@/services/answerGenerator";
-import { initializeKnowledgeBase, isUsingMockData, getKnowledgeBaseStats, isInitializing } from "@/services/knowledgeBase";
+import { 
+  initializeKnowledgeBase, 
+  isUsingMockData, 
+  getKnowledgeBaseStats, 
+  isInitializing 
+} from "@/services/knowledgeBase";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -15,9 +19,16 @@ import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
 import { hasRepositoryConfig } from "@/services/repositoryConfig";
 import { isGithubClientInitialized } from "@/services/githubClient";
 import { getConnectionDiagnostics } from "@/services/githubConnector";
+import { getExplorationProgress } from "@/services/knowledgeBase/pathExplorer";
 
 // Sample suggested questions
-const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
+const suggestedQuestions = [
+  "How does the subscription payment process work in Ghost?", 
+  "What happens when a member's subscription expires?", 
+  "Can members access content after their subscription ends?", 
+  "Is there a limit to how many posts a publication can have?", 
+  "How does Ghost handle premium vs. free content?"
+];
 
 interface Answer {
   text: string;
@@ -43,7 +54,8 @@ export default function Index() {
   const [isConnected, setIsConnected] = useState(false);
   const [usingMockData, setUsingMockData] = useState(true);
   const [knowledgeStats, setKnowledgeStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
-  const [bannerKey, setBannerKey] = useState(0); // Add a key to force re-render of banners
+  const [bannerKey, setBannerKey] = useState(0); // Key to force re-render of banners
+  const [explorationStatus, setExplorationStatus] = useState<"idle" | "exploring" | "complete" | "error">("idle");
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -56,10 +68,12 @@ export default function Index() {
         const hasConfig = hasRepositoryConfig();
         const isClientInitialized = isGithubClientInitialized();
         const diagnostics = getConnectionDiagnostics();
+        const progress = getExplorationProgress();
         
         // Get the latest stats to determine if we're using real data
         const stats = getKnowledgeBaseStats();
         setKnowledgeStats(stats);
+        setExplorationStatus(progress.status);
         
         // Update connection status
         setHasRepo(hasConfig);
@@ -75,7 +89,8 @@ export default function Index() {
           isClientInitialized,
           actuallyUsingMock,
           diagnostics,
-          stats
+          stats,
+          explorationStatus: progress.status
         });
         
         // Force banner re-render
@@ -92,13 +107,23 @@ export default function Index() {
     
     // Poll for updates in case the connection status changes
     const intervalId = setInterval(() => {
-      if (isInitializing()) {
-        // Still initializing, don't update yet
+      // Get current progress
+      const progress = getExplorationProgress();
+      
+      if (isInitializing() || progress.status === "exploring") {
+        // Still initializing, update status but don't change initializing flag yet
         setIsInitializingKB(true);
+        setExplorationStatus(progress.status);
+        
+        // If we're exploring, force banner refresh regularly
+        if (progress.status === "exploring") {
+          setBannerKey(prev => prev + 1);
+        }
         return;
       } else if (isInitializingKB) {
         // Just finished initializing, update everything
         setIsInitializingKB(false);
+        setExplorationStatus(progress.status);
         const stats = getKnowledgeBaseStats();
         setKnowledgeStats(stats);
         const mockStatus = isUsingMockData() || stats.processedFiles === 0;
@@ -111,13 +136,14 @@ export default function Index() {
       // Periodically check connection status even after initialization
       const stats = getKnowledgeBaseStats();
       const mockStatus = isUsingMockData() || stats.processedFiles === 0;
-      if (mockStatus !== usingMockData) {
+      if (mockStatus !== usingMockData || progress.status !== explorationStatus) {
         setUsingMockData(mockStatus);
         setKnowledgeStats(stats);
-        // Force banner re-render when mock data status changes
+        setExplorationStatus(progress.status);
+        // Force banner re-render when status changes
         setBannerKey(prev => prev + 1);
       }
-    }, 1000);
+    }, 500); // Poll more frequently to catch status changes
     
     return () => clearInterval(intervalId);
   }, []);
@@ -165,9 +191,12 @@ export default function Index() {
     }
   };
 
-  // Determine if we should show the banner
-  const shouldShowWarningBanner = !isConnected || usingMockData;
-  const shouldShowSuccessBanner = isConnected && !usingMockData && !isInitializingKB;
+  // Determine if we should show the banner - consider exploration status
+  const shouldShowWarningBanner = (!isConnected || usingMockData) && 
+                                  explorationStatus !== "exploring";
+  const shouldShowSuccessBanner = isConnected && !usingMockData && 
+                                  !isInitializingKB && 
+                                  explorationStatus !== "exploring";
 
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
@@ -231,12 +260,14 @@ export default function Index() {
                 </div>
               )}
               
-              {isInitializingKB && (
+              {(isInitializingKB || explorationStatus === "exploring") && (
                 <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-left">
                   <div className="flex items-start">
                     <div className="animate-spin h-5 w-5 text-blue-500 mt-0.5 mr-2">⏳</div>
                     <div>
-                      <h3 className="font-medium text-blue-800">Initializing Knowledge Base</h3>
+                      <h3 className="font-medium text-blue-800">
+                        {explorationStatus === "exploring" ? "Exploring Repository" : "Initializing Knowledge Base"}
+                      </h3>
                       <p className="text-sm text-blue-700 mt-1">
                         Please wait while we connect to the GitHub repository and build the knowledge base...
                       </p>

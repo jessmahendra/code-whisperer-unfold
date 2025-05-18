@@ -23,6 +23,8 @@ export default function RepositoryProgressIndicator() {
     // Poll for progress updates
     const intervalId = setInterval(() => {
       const currentProgress = getExplorationProgress();
+      
+      // Update state with current progress
       setProgress(currentProgress.progress);
       setStatus(currentProgress.status);
       setErrorMessage(currentProgress.error || getMostRelevantErrorMessage());
@@ -30,6 +32,17 @@ export default function RepositoryProgressIndicator() {
         totalAttempts: currentProgress.totalAttempts,
         successfulPaths: currentProgress.successfulPaths
       });
+      
+      // Auto-hide the component when complete and a bit of time has passed
+      if (currentProgress.status === "complete" && currentProgress.progress >= 100) {
+        // Add a timer to hide the component after 5 seconds
+        const hideTimer = setTimeout(() => {
+          setStatus("idle");
+          setProgress(0);
+        }, 5000);
+        
+        return () => clearTimeout(hideTimer);
+      }
       
       // Check for connection diagnostics
       const diagnostics = getConnectionDiagnostics();
@@ -45,8 +58,14 @@ export default function RepositoryProgressIndicator() {
     };
   }, [errorMessage]);
   
+  // Hide the indicator if we're idle and at 0%
   if (status === "idle" && progress === 0) {
     return null;
+  }
+  
+  // Hide the indicator if we're complete and at 100% for more than 5 seconds
+  if (status === "complete" && progress >= 100) {
+    // We'll let the useEffect handle the hiding after 5 seconds
   }
   
   const getStatusText = () => {

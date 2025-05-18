@@ -1,9 +1,7 @@
-
 import { getRepositoryContents, getCurrentRepository, getFileContent } from '../githubConnector';
 import { KnowledgeEntry } from './types';
 import { processModule, processFile } from './fileProcessor';
 import { toast } from "sonner";
-import { Progress } from "@/components/ui/progress";
 
 // Tracks successful path patterns for future reference
 let successfulPathPatterns: string[] = [];
@@ -14,7 +12,8 @@ let explorationProgress = {
   progress: 0,
   status: "idle" as "idle" | "exploring" | "complete" | "error",
   error: null as string | null,
-  onProgressUpdate: null as ((progress: number) => void) | null
+  onProgressUpdate: null as ((progress: number) => void) | null,
+  lastUpdate: Date.now()
 };
 
 /**
@@ -38,9 +37,32 @@ export function getExplorationProgress(): typeof explorationProgress {
  * @param value New progress value (0-100)
  */
 function updateProgress(value: number): void {
+  // Limit update frequency to reduce UI jank
+  const now = Date.now();
+  const timeSinceLastUpdate = now - explorationProgress.lastUpdate;
+  
   explorationProgress.progress = Math.min(Math.max(0, value), 100);
-  if (explorationProgress.onProgressUpdate) {
+  
+  // Only call the update callback if enough time has passed (at least 100ms)
+  if (explorationProgress.onProgressUpdate && (timeSinceLastUpdate > 100 || value >= 100 || value <= 5)) {
     explorationProgress.onProgressUpdate(explorationProgress.progress);
+    explorationProgress.lastUpdate = now;
+  }
+  
+  // If we've reached 100%, ensure we mark as complete
+  if (value >= 100 && explorationProgress.status === "exploring") {
+    explorationProgress.status = "complete";
+    
+    // Explicitly remove any "loading" toasts
+    // This ensures the "finalizing..." toast doesn't stay on screen
+    toast.dismiss();
+    
+    // Add a success toast that will auto-dismiss
+    if (explorationProgress.successfulPaths > 0) {
+      toast.success(`Repository exploration complete: Found ${explorationProgress.successfulPaths} relevant code paths`, {
+        duration: 3000
+      });
+    }
   }
 }
 
@@ -150,7 +172,8 @@ export async function exploreRepositoryPaths(
       progress: 0,
       status: "exploring",
       error: null,
-      onProgressUpdate: explorationProgress.onProgressUpdate
+      onProgressUpdate: explorationProgress.onProgressUpdate,
+      lastUpdate: Date.now()
     };
     updateProgress(5); // Start at 5%
     
@@ -171,7 +194,7 @@ export async function exploreRepositoryPaths(
     let rootContents = [];
     try {
       updateProgress(10);
-      toast.loading("Exploring repository structure...", { duration: 3000 });
+      toast.loading("Exploring repository structure...", { duration: 3000, id: "repo-loading" });
       rootContents = await getRepositoryContents('');
       console.log(`Found ${rootContents.length} items in the root of the repository:`, 
         rootContents.map(item => item.name).join(', '));
@@ -260,14 +283,17 @@ export async function exploreRepositoryPaths(
     } catch (error) {
       console.error('Error exploring root directory:', error);
       updateProgress(30); // Continue despite error
+      toast.dismiss("repo-loading"); // Dismiss the loading toast
+      toast.error("Error exploring repository structure", { duration: 3000 });
     }
     
     updateProgress(60);
+    toast.dismiss("repo-loading"); // Dismiss previous toast
+    toast.loading("Processing repository files...", { duration: 3000, id: "process-loading" });
     
     // Special handling for Ghost repo - use updated paths based on current Ghost structure
     if (currentRepo.repo === "Ghost" && currentRepo.owner === "TryGhost") {
       console.log("Using specialized path exploration for Ghost repository");
-      toast.loading("Exploring Ghost code structure...", { duration: 3000 });
       
       // Try the most current Ghost paths directly
       const ghostSpecificPaths = [
@@ -326,7 +352,8 @@ export async function exploreRepositoryPaths(
     }
     
     updateProgress(80);
-    toast.loading("Finalizing repository exploration...", { duration: 3000 });
+    toast.dismiss("process-loading"); // Dismiss previous toast
+    toast.loading("Finalizing repository exploration...", { duration: 3000, id: "finalizing-loading" });
     
     // Get paths to try (use discovered paths first, then fall back to defaults)
     const defaultPaths = getDefaultPathsToTry(currentRepo.repo);
@@ -413,10 +440,15 @@ export async function exploreRepositoryPaths(
       }
     }
     
+    // Dismiss any lingering loading toast
+    toast.dismiss("finalizing-loading");
+    
+    // Update progress to 100% and set status
     updateProgress(100);
-    explorationProgress.status = processedAny ? "complete" : "error";
+    
     if (!processedAny) {
       explorationProgress.error = "Could not process any repository paths";
+      toast.error("Repository exploration failed: Could not process any files", { duration: 3000 });
     }
     
     console.log(`Processed ${successfulPaths} paths successfully out of ${attemptedPaths} attempts`);
@@ -426,6 +458,8 @@ export async function exploreRepositoryPaths(
     explorationProgress.status = "error";
     explorationProgress.error = error instanceof Error ? error.message : "Unknown error occurred";
     updateProgress(100);
+    toast.dismiss(); // Dismiss any loading toasts
+    toast.error(`Repository exploration failed: ${explorationProgress.error}`, { duration: 3000 });
     return false;
   }
 }
@@ -447,7 +481,7 @@ export function resetExplorationProgress(): void {
     progress: 0,
     status: "idle",
     error: null,
-    onProgressUpdate: null
+    onProgressUpdate: null,
+    lastUpdate: Date.now()
   };
 }
-
