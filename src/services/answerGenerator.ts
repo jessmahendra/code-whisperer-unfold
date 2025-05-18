@@ -2,6 +2,8 @@
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
+import { hasAICapabilities, generateAnswerWithAI } from "./aiAnalysis";
+import { toast } from "sonner";
 
 interface Reference {
   filePath: string;
@@ -34,6 +36,54 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
   
   if (results.length === 0) {
     return null;
+  }
+  
+  // Check if AI capabilities are available
+  if (hasAICapabilities()) {
+    try {
+      // Prepare context from search results
+      const context = results.map(result => {
+        return `File: ${result.filePath}\n${result.content}`;
+      });
+      
+      // Use AI to generate an answer
+      const aiAnswer = await generateAnswerWithAI(query, context);
+      
+      if (aiAnswer) {
+        // Create references with version information
+        const references = results.slice(0, 3).map(result => {
+          return {
+            filePath: result.filePath,
+            snippet: result.content.substring(0, 120) + (result.content.length > 120 ? '...' : ''),
+            lastUpdated: result.lastUpdated
+          };
+        });
+        
+        // Generate visual context if applicable
+        let visualContext = null;
+        if (query.toLowerCase().includes('flow') || 
+            query.toLowerCase().includes('process') ||
+            query.toLowerCase().includes('subscription') ||
+            query.toLowerCase().includes('post') ||
+            query.toLowerCase().includes('content') ||
+            query.toLowerCase().includes('component') ||
+            query.toLowerCase().includes('state')) {
+          visualContext = generateVisualContext(query, results);
+        }
+        
+        // Return AI-generated answer with high confidence
+        return {
+          text: aiAnswer,
+          confidence: 0.92, // AI answers have higher confidence
+          references,
+          visualContext: visualContext
+        };
+      }
+    } catch (error) {
+      console.error("Error generating AI answer:", error);
+      toast.error("AI answer generation failed, falling back to template-based answers");
+      // Fall back to template-based answers
+    }
   }
   
   // Extract key topics from the results to generate a coherent answer

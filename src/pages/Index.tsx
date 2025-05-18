@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -6,6 +5,7 @@ import SuggestedQuestions from "@/components/SuggestedQuestions";
 import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
 import GradientBackground from "@/components/GradientBackground";
+import { AIStatusBadge } from "@/components/AIStatusBadge";
 import { generateAnswer } from "@/services/answerGenerator";
 import { 
   initializeKnowledgeBase, 
@@ -22,6 +22,7 @@ import { isGithubClientInitialized } from "@/services/githubClient";
 import { getConnectionDiagnostics } from "@/services/githubConnector";
 import { getExplorationProgress } from "@/services/knowledgeBase/pathExplorer";
 import RepositoryProgressIndicator from "@/components/RepositoryProgressIndicator";
+import { hasAICapabilities } from "@/services/aiAnalysis";
 
 // Sample suggested questions
 const suggestedQuestions = [
@@ -59,6 +60,7 @@ export default function Index() {
   const [bannerKey, setBannerKey] = useState(0); // Key to force re-render of banners
   const [explorationStatus, setExplorationStatus] = useState<"idle" | "exploring" | "complete" | "error">("idle");
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
+  const [isAIEnabled, setIsAIEnabled] = useState(hasAICapabilities());
 
   // Function to update connection status - extracted to avoid repetition
   const updateConnectionStatus = useCallback(() => {
@@ -129,6 +131,8 @@ export default function Index() {
     // Poll for updates more frequently (300ms instead of 500ms)
     const intervalId = setInterval(() => {
       updateConnectionStatus();
+      // Check if AI is enabled
+      setIsAIEnabled(hasAICapabilities());
     }, 300);
     
     return () => clearInterval(intervalId);
@@ -236,23 +240,35 @@ export default function Index() {
               
               {shouldShowSuccessBanner && (
                 <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
-                  <div className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
-                    <div>
-                      <h3 className="font-medium text-green-800">Connected to GitHub</h3>
-                      <p className="text-sm text-green-700 mt-1">
-                        You're using real data from the Ghost GitHub repository. 
-                        {knowledgeStats && (
-                          <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
-                        )}
-                      </p>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start">
+                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
+                      <div>
+                        <h3 className="font-medium text-green-800">Connected to GitHub</h3>
+                        <p className="text-sm text-green-700 mt-1">
+                          You're using real data from the Ghost GitHub repository. 
+                          {knowledgeStats && (
+                            <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
+                          )}
+                        </p>
+                      </div>
                     </div>
+                    <AIStatusBadge />
                   </div>
                 </div>
               )}
             </div>
             
-            <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializingKB} />
+            <div className="relative">
+              <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializingKB} />
+              {isAIEnabled && (
+                <div className="absolute -top-5 right-2">
+                  <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                    AI Enabled
+                  </span>
+                </div>
+              )}
+            </div>
             
             <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializingKB} />
           </section>
@@ -271,6 +287,7 @@ export default function Index() {
           <div className="container relative">
             <div className="text-center">
               <p>Currently using {usingMockData ? 'mock' : 'repository'} data for knowledge base</p>
+              {isAIEnabled && <p className="text-green-600 text-xs mt-1">AI-powered answers enabled</p>}
             </div>
             <Button 
               variant="ghost" 
