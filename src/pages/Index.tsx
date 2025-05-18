@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
@@ -8,12 +7,7 @@ import NoAnswerFallback from "@/components/NoAnswerFallback";
 import GradientBackground from "@/components/GradientBackground";
 import { AIStatusBadge } from "@/components/AIStatusBadge";
 import { generateAnswer } from "@/services/answerGenerator";
-import { 
-  initializeKnowledgeBase, 
-  isUsingMockData, 
-  getKnowledgeBaseStats, 
-  isInitializing 
-} from "@/services/knowledgeBase";
+import { initializeKnowledgeBase, isUsingMockData, getKnowledgeBaseStats, isInitializing } from "@/services/knowledgeBase";
 import { toast } from "@/components/ui/sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -26,14 +20,7 @@ import RepositoryProgressIndicator from "@/components/RepositoryProgressIndicato
 import { hasAICapabilities, wasAPIKeyPreviouslySet } from "@/services/aiAnalysis";
 
 // Sample suggested questions
-const suggestedQuestions = [
-  "How does the subscription payment process work in Ghost?", 
-  "What happens when a member's subscription expires?", 
-  "Can members access content after their subscription ends?", 
-  "Is there a limit to how many posts a publication can have?", 
-  "How does Ghost handle premium vs. free content?"
-];
-
+const suggestedQuestions = ["How does the subscription payment process work in Ghost?", "What happens when a member's subscription expires?", "Can members access content after their subscription ends?", "Is there a limit to how many posts a publication can have?", "How does Ghost handle premium vs. free content?"];
 interface Answer {
   text: string;
   confidence: number;
@@ -48,7 +35,6 @@ interface Answer {
     syntax: string;
   };
 }
-
 export default function Index() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -70,41 +56,40 @@ export default function Index() {
     const isClientInitialized = isGithubClientInitialized();
     const diagnostics = getConnectionDiagnostics();
     const progress = getExplorationProgress();
-    
+
     // Get the latest stats to determine if we're using real data
     const stats = getKnowledgeBaseStats();
-    
+
     // Update status states
     setKnowledgeStats(stats);
     setExplorationStatus(progress.status);
     setHasRepo(hasConfig);
     setIsConnected(hasConfig && isClientInitialized);
-    
+
     // Check if we're actually using mock data or real data
     // We consider truly connected if we have processed files > 0
     const actuallyUsingMock = isUsingMockData() || stats.processedFiles === 0;
     setUsingMockData(actuallyUsingMock);
-    
+
     // Show progress indicator when exploring
     setShowProgressIndicator(progress.status === "exploring");
-    
+
     // Check initialization status
     if (isInitializing() || progress.status === "exploring") {
       setIsInitializingKB(true);
     } else {
       setIsInitializingKB(false);
     }
-    
+
     // Force banner refresh
     setBannerKey(prevKey => prevKey + 1);
-    
-    return { 
-      hasConfig, 
-      isClientInitialized, 
-      actuallyUsingMock, 
-      stats, 
-      diagnostics, 
-      progress 
+    return {
+      hasConfig,
+      isClientInitialized,
+      actuallyUsingMock,
+      stats,
+      diagnostics,
+      progress
     };
   }, []);
 
@@ -117,7 +102,6 @@ export default function Index() {
         if (config) {
           console.log("Found existing repository configuration, attempting to reconnect...");
           const repoConfig = getRepositoryConfig();
-          
           if (repoConfig && repoConfig.token) {
             // Re-initialize GitHub client with the stored token
             const initialized = initGithubClient(repoConfig.token);
@@ -127,13 +111,13 @@ export default function Index() {
             }
           }
         }
-        
+
         // Initialize the knowledge base
         await initializeKnowledgeBase();
-        
+
         // Update connection status
         updateConnectionStatus();
-        
+
         // Check if API key was previously set and notify the user
         if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
           toast.info("OpenAI API key needed", {
@@ -141,7 +125,6 @@ export default function Index() {
             duration: 5000
           });
         }
-        
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
@@ -150,19 +133,16 @@ export default function Index() {
         updateConnectionStatus();
       }
     };
-    
     initialize();
-    
+
     // Poll for updates more frequently (300ms instead of 500ms)
     const intervalId = setInterval(() => {
       updateConnectionStatus();
       // Check if AI is enabled
       setIsAIEnabled(hasAICapabilities());
     }, 300);
-    
     return () => clearInterval(intervalId);
   }, [updateConnectionStatus]);
-
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
     setIsProcessing(true);
@@ -185,11 +165,9 @@ export default function Index() {
       setIsProcessing(false);
     }
   };
-
   const handleSelectQuestion = (query: string) => {
     handleAskQuestion(query);
   };
-
   const formatTimestamp = () => {
     const now = new Date();
     return new Intl.DateTimeFormat('en-US', {
@@ -197,7 +175,6 @@ export default function Index() {
       timeStyle: 'short'
     }).format(now);
   };
-
   const openConfigModal = () => {
     // Find and click the config button in the header
     const configButton = document.querySelector('header button') as HTMLButtonElement;
@@ -207,10 +184,8 @@ export default function Index() {
   };
 
   // Determine if we should show the banner - consider exploration status
-  const shouldShowWarningBanner = (!isConnected || usingMockData) && 
-                                  explorationStatus !== "exploring" &&
-                                  !showProgressIndicator;
-                                  
+  const shouldShowWarningBanner = (!isConnected || usingMockData) && explorationStatus !== "exploring" && !showProgressIndicator;
+
   // We're removing the success banner completely, so no need for this variable anymore
   // const shouldShowSuccessBanner = false;
 
@@ -231,8 +206,7 @@ export default function Index() {
             <div key={bannerKey}>
               {showProgressIndicator && <RepositoryProgressIndicator />}
               
-              {shouldShowWarningBanner && (
-                <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
+              {shouldShowWarningBanner && <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
                   <div className="flex items-start">
                     <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
                     <div>
@@ -240,39 +214,26 @@ export default function Index() {
                         {!isConnected ? "Using mock data" : "Connected but using mock data"}
                       </h3>
                       <p className="text-sm text-yellow-700 mt-1">
-                        {!isConnected ? 
-                          "You're currently using mock data. To connect to the Ghost GitHub repository, click the button below." : 
-                          "You've connected to GitHub but we're still using mock data. This might happen if the repository structure doesn't match our expectations or if your token lacks permissions."
-                        }
+                        {!isConnected ? "You're currently using mock data. To connect to the Ghost GitHub repository, click the button below." : "You've connected to GitHub but we're still using mock data. This might happen if the repository structure doesn't match our expectations or if your token lacks permissions."}
                       </p>
                       <div className="mt-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="bg-white" 
-                          onClick={openConfigModal}
-                        >
+                        <Button size="sm" variant="outline" className="bg-white" onClick={openConfigModal}>
                           <CodeIcon className="h-4 w-4 mr-1" />
                           {!isConnected ? "Configure GitHub Connection" : "Check GitHub Connection"}
                         </Button>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                </div>}
               
               {/* Removing the success banner completely */}
             </div>
             
             <div className="relative">
               <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializingKB} />
-              {isAIEnabled && (
-                <div className="absolute -top-5 right-2">
-                  <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                    AI Enabled
-                  </span>
-                </div>
-              )}
+              {isAIEnabled && <div className="absolute -top-5 right-2">
+                  
+                </div>}
             </div>
             
             <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing || isInitializingKB} />
@@ -294,12 +255,7 @@ export default function Index() {
               <p>Currently using {usingMockData ? 'mock' : 'repository'} data for knowledge base</p>
               {isAIEnabled && <p className="text-green-600 text-xs mt-1">AI-powered answers enabled</p>}
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              asChild 
-              className="absolute bottom-0 right-0 hover:bg-slate-100"
-            >
+            <Button variant="ghost" size="icon" asChild className="absolute bottom-0 right-0 hover:bg-slate-100">
               <Link to="/slack-demo">
                 <Slack className="h-5 w-5 text-slate-600" />
               </Link>
