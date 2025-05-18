@@ -1,3 +1,4 @@
+
 import { fetchRepositoryContents, fetchFileContent, isGithubClientInitialized } from './githubClient';
 import { getRepositoryConfig } from './repositoryConfig';
 import { toast } from "sonner";
@@ -30,6 +31,9 @@ let connectionErrors = {
 
 let connectionAttempts = 0;
 const MAX_ERROR_DISPLAY_COUNT = 3;
+
+// Track if we've successfully fetched data from the actual GitHub repo
+let confirmedSuccessfulFetch = false;
 
 // Track API rate limits
 let rateLimitRemaining: number | null = null;
