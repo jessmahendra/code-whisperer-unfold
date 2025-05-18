@@ -18,11 +18,11 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
 import { hasRepositoryConfig } from "@/services/repositoryConfig";
-import { isGithubClientInitialized } from "@/services/githubClient";
+import { isGithubClientInitialized, initGithubClient } from "@/services/githubClient";
 import { getConnectionDiagnostics } from "@/services/githubConnector";
 import { getExplorationProgress } from "@/services/knowledgeBase/pathExplorer";
 import RepositoryProgressIndicator from "@/components/RepositoryProgressIndicator";
-import { hasAICapabilities } from "@/services/aiAnalysis";
+import { hasAICapabilities, wasAPIKeyPreviouslySet } from "@/services/aiAnalysis";
 
 // Sample suggested questions
 const suggestedQuestions = [
@@ -111,11 +111,35 @@ export default function Index() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        // Auto-reconnect to GitHub if we have a config
+        const config = hasRepositoryConfig();
+        if (config) {
+          console.log("Found existing repository configuration, attempting to reconnect...");
+          const repoConfig = getRepositoryConfig();
+          
+          if (repoConfig && repoConfig.token) {
+            // Re-initialize GitHub client with the stored token
+            const initialized = initGithubClient(repoConfig.token);
+            if (initialized) {
+              console.log("Successfully reconnected to GitHub with stored token");
+              toast.success("Reconnected to GitHub repository");
+            }
+          }
+        }
+        
         // Initialize the knowledge base
         await initializeKnowledgeBase();
         
         // Update connection status
         updateConnectionStatus();
+        
+        // Check if API key was previously set and notify the user
+        if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
+          toast.info("OpenAI API key needed", {
+            description: "You previously used AI features. Please re-enter your OpenAI API key.",
+            duration: 5000
+          });
+        }
         
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);

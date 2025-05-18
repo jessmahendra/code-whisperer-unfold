@@ -7,9 +7,9 @@ import { useState, useEffect } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { isUsingMockData, isInitializing, initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { Button } from "./ui/button";
-import { saveRepositoryConfig } from "@/services/repositoryConfig";
-import { initGithubClient, validateGithubToken } from "@/services/githubClient";
-import { toast } from "sonner";
+import { saveRepositoryConfig, getRepositoryConfig } from "@/services/repositoryConfig";
+import { initGithubClient, validateGithubToken, isGithubClientInitialized } from "@/services/githubClient";
+import { toast, dismissToast } from "@/components/ui/sonner";
 import { hasAICapabilities, setOpenAIApiKey, wasAPIKeyPreviouslySet, getAPIKeyState } from "@/services/aiAnalysis";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "./ui/input";
@@ -62,9 +62,24 @@ export default function Header() {
   useEffect(() => {
     updateRepoInfo();
 
-    // Check if API key was previously set
-    if (wasAPIKeyPreviouslySet()) {
-      setIsAIEnabled(true);
+    // Try to automatically reconnect if we have a stored token
+    const autoReconnect = async () => {
+      const config = getRepositoryConfig();
+      if (config && !isGithubClientInitialized()) {
+        console.log("Found existing repository configuration in Header, reconnecting...");
+        initGithubClient(config.token);
+        updateRepoInfo();
+      }
+    };
+    
+    autoReconnect();
+
+    // Check if API key was previously set and prompt user
+    if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
+      setIsAIEnabled(false); // Make sure we don't falsely report AI as enabled
+      
+      // Show a quieter notification in the header - we'll use the badge state
+      // instead of a toast to avoid notification overload
     }
 
     // Poll for changes to connection status
@@ -246,16 +261,29 @@ export default function Header() {
             {/* OpenAI API Key Dialog */}
             <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant={isAIEnabled ? "default" : "outline"} size="sm" className={`flex items-center gap-1 ${apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : ''}`}>
+                <Button 
+                  variant={isAIEnabled ? "default" : wasAPIKeyPreviouslySet() ? "outline" : "outline"} 
+                  size="sm" 
+                  className={`flex items-center gap-1 ${
+                    apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : 
+                    wasAPIKeyPreviouslySet() && !isAIEnabled ? 'bg-amber-50 hover:bg-amber-100 border-amber-200' : ''
+                  }`}
+                >
                   <KeyRound className="h-4 w-4" />
-                  {isAIEnabled ? apiKeyStatus?.lastError ? "AI Error" : "AI Enabled" : "Set OpenAI Key"}
+                  {isAIEnabled ? 
+                    apiKeyStatus?.lastError ? "AI Error" : "AI Enabled" : 
+                    wasAPIKeyPreviouslySet() ? "Re-enter API Key" : "Set OpenAI Key"
+                  }
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>OpenAI API Configuration</DialogTitle>
                   <DialogDescription>
-                    Add your OpenAI API key to enable AI-powered code analysis and answers.
+                    {wasAPIKeyPreviouslySet() && !isAIEnabled ? 
+                      "Please re-enter your OpenAI API key to enable AI-powered analysis." :
+                      "Add your OpenAI API key to enable AI-powered code analysis and answers."
+                    }
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -268,6 +296,18 @@ export default function Header() {
                         {apiKeyStatus.lastError}
                       </AlertDescription>
                     </Alert>}
+                  
+                  {wasAPIKeyPreviouslySet() && !isAIEnabled && !apiKeyStatus?.lastError && (
+                    <Alert variant="warning" className="mb-2">
+                      <AlertTitle className="flex items-center gap-2">
+                        <Info className="h-4 w-4" />
+                        API Key Required
+                      </AlertTitle>
+                      <AlertDescription>
+                        You previously set an API key, but it needs to be re-entered after page refresh.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="openai-key" className="col-span-4">
