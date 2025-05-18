@@ -19,6 +19,7 @@ let initializationState = {
   lastInitTime: 0,
   usingMockData: true,
   initialized: false,
+  fetchConfirmed: false,
   error: null as string | null
 };
 
@@ -37,11 +38,19 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     return;
   }
   
+  // Import here to avoid circular dependency
+  const { resetConnectionState, hasConfirmedSuccessfulFetch } = await import('../githubConnector');
+  
   initializationState.inProgress = true;
   initializationState.error = null;
   
   // Reset exploration progress
   resetExplorationProgress();
+  
+  // Reset connection tracking for fresh start
+  if (forceRefresh) {
+    resetConnectionState();
+  }
   
   // Clear cache if forced refresh
   if (forceRefresh) {
@@ -57,11 +66,16 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     
     // Try to process repository files
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
+    
+    // Update state with fetch confirmation
+    initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
     initializationState.initialized = true;
     
-    if (!processedAny) {
-      console.log('Could not process any paths, falling back to mock data');
+    // If we couldn't process any files or no confirmed fetch, use mock data
+    if (!processedAny || !initializationState.fetchConfirmed) {
+      console.log('Could not process any paths or no confirmed fetch, falling back to mock data');
+      
       // If we couldn't process any files, use mock data
       if (knowledgeBase.length === 0) {
         knowledgeBase = [...mockKnowledgeEntries];
@@ -69,7 +83,11 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       
       initializationState.usingMockData = true;
       
-      toast.warning('Using mock data - could not access repository files.', {
+      const errorMsg = initializationState.fetchConfirmed ? 
+        'Could not process repository files.' : 
+        'Could not connect to GitHub API.';
+      
+      toast.warning(`Using mock data - ${errorMsg}`, {
         description: 'Please check repository configuration, token permissions, and that the repository exists.',
         duration: 6000
       });
@@ -146,6 +164,7 @@ export function clearKnowledgeBase(): void {
     lastInitTime: 0,
     usingMockData: true,
     initialized: false,
+    fetchConfirmed: false,
     error: null
   };
 }

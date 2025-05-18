@@ -15,6 +15,11 @@ const REPO_CONFIG_KEY = 'unfold_repo_config';
  * @param config Repository configuration to save
  */
 export function saveRepositoryConfig(config: Omit<RepositoryConfig, 'lastAccessed'>): void {
+  if (!config.owner || !config.repo || !config.token) {
+    console.error('Invalid repository configuration: missing required fields');
+    throw new Error('Repository configuration requires owner, repo, and token');
+  }
+  
   const fullConfig: RepositoryConfig = {
     ...config,
     lastAccessed: new Date().toISOString()

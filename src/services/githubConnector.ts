@@ -288,6 +288,9 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
       
       const contents = await fetchRepositoryContents(owner, repo, repoPath);
       
+      // Set flag confirming a successful fetch
+      confirmedSuccessfulFetch = true;
+      
       // Check rate limit after successful API call
       if (typeof contents === 'object' && 'headers' in contents) {
         checkRateLimit(contents.headers as Headers);
@@ -345,7 +348,7 @@ export async function getRepositoryContents(repoPath: string): Promise<FileInfo[
         console.error(`Network error: ${errorObj.message}`, errorObj);
         recordError('network', errorObj);
       } else {
-        console.warn(`Failed to fetch from GitHub API (${errorObj.status || 'unknown error'}), falling back to mock data: ${errorObj.message || errorObj}`);
+        console.warn(`Failed to fetch from GitHub API (${errorObj.status || 'unknown error'}), falling back to mock data: ${errorObj.message || error}`);
         recordError('other', errorObj, repoPath);
       }
       
@@ -471,6 +474,22 @@ export function getCurrentRepository(): { owner: string; repo: string } | null {
 }
 
 /**
+ * Indicates whether we have confirmed a successful API fetch
+ * This explicitly checks if we've received actual data from GitHub
+ */
+export function hasConfirmedSuccessfulFetch(): boolean {
+  return confirmedSuccessfulFetch;
+}
+
+/**
+ * Reset connection state including confirmed fetch flag
+ */
+export function resetConnectionState(): void {
+  confirmedSuccessfulFetch = false;
+  resetErrorTracking();
+}
+
+/**
  * Gets the last error message from GitHub operations
  * @returns {string|null} Last error message or null if no errors
  */
@@ -501,6 +520,7 @@ export function resetErrorTracking(): void {
 export function getConnectionDiagnostics(): {
   initialized: boolean;
   configured: boolean;
+  confirmedSuccessfulFetch: boolean;
   errors: typeof connectionErrors;
   connectionAttempts: number;
   pathErrors: number;
@@ -512,6 +532,7 @@ export function getConnectionDiagnostics(): {
   return {
     initialized: isGithubClientInitialized(),
     configured: !!config,
+    confirmedSuccessfulFetch,
     errors: connectionErrors,
     connectionAttempts,
     pathErrors: connectionErrors.notFound.size,

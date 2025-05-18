@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +30,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
 import { getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
+import { hasConfirmedSuccessfulFetch } from "@/services/githubConnector";
 
 interface RepoConfigModalProps {
   onConfigChange: () => void;
@@ -72,6 +72,15 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
         setIsInitializingRepo(false);
         updateStats();
         updateDiagnostics();
+        
+        // Explicitly check if we've confirmed a successful fetch
+        const hasRealData = hasConfirmedSuccessfulFetch() && !isUsingMockData();
+        if (hasRealData) {
+          toast.success("Successfully connected to repository with real data", { 
+            id: "connection-success",
+            duration: 3000 
+          });
+        }
       }
     }, 1000);
     
@@ -124,6 +133,9 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
     }
 
     try {
+      // Clear any existing toasts to prevent confusion
+      toast.dismiss();
+      
       // Initialize GitHub client with the token
       const initialized = initGithubClient(token);
       if (!initialized) {
@@ -134,11 +146,18 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       // Save the configuration
       saveRepositoryConfig({ owner, repo, token });
       setIsConfigured(true);
-      toast.success("Repository configuration saved");
+      toast.success("Repository configuration saved", { duration: 3000 });
 
       // Initialize knowledge base
       setIsInitializingRepo(true);
+      toast.loading("Connecting to repository and building knowledge base...", { 
+        id: "init-kb",
+        duration: 10000  // 10 seconds timeout
+      });
+      
       await initializeKnowledgeBase(true);
+      toast.dismiss("init-kb"); // Dismiss the loading toast
+      
       updateStats();
       updateDiagnostics();
       
@@ -146,11 +165,18 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
       const usingMockData = isUsingMockData();
       setIsMockData(usingMockData);
       
-      if (!usingMockData) {
-        toast.success("Knowledge base initialized successfully with repository data");
+      // Check if we've confirmed a successful fetch from GitHub
+      const hasRealData = hasConfirmedSuccessfulFetch() && !usingMockData;
+      
+      if (hasRealData) {
+        toast.success("Knowledge base initialized successfully with repository data", {
+          id: "kb-success",
+          duration: 3000
+        });
       } else {
         const error = getMostRelevantErrorMessage() || "Unknown error";
         toast.warning(`Using mock data: ${error}`, {
+          id: "mock-data-warning",
           description: "Please check your repository configuration and token permissions."
         });
       }
@@ -186,18 +212,36 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
   const handleRefreshKnowledgeBase = async () => {
     if (!isConfigured) return;
     
+    // Clear any existing toasts
+    toast.dismiss();
+    
     setIsInitializingRepo(true);
     try {
+      toast.loading("Refreshing knowledge base...", { 
+        id: "refresh-kb",
+        duration: 8000 
+      });
+      
       await initializeKnowledgeBase(true); // Force refresh
+      toast.dismiss("refresh-kb");
+      
       updateStats();
       updateDiagnostics();
       
-      // Check if we're still using mock data after refresh
-      if (isUsingMockData()) {
-        const error = getMostRelevantErrorMessage() || "Unknown error";
-        toast.warning(`Still using mock data after refresh: ${error}`);
+      // Check if we're using real data after refresh
+      const hasRealData = hasConfirmedSuccessfulFetch() && !isUsingMockData();
+      
+      if (hasRealData) {
+        toast.success("Knowledge base refreshed with actual repository data", {
+          id: "refresh-success",
+          duration: 3000
+        });
       } else {
-        toast.success("Knowledge base refreshed with repository data");
+        const error = getMostRelevantErrorMessage() || "Unknown error";
+        toast.warning(`Still using mock data after refresh: ${error}`, {
+          id: "refresh-warning",
+          duration: 5000
+        });
       }
     } catch (error) {
       console.error("Error refreshing knowledge base:", error);
