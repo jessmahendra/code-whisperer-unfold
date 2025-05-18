@@ -71,13 +71,12 @@ export default function Header() {
         updateRepoInfo();
       }
     };
-    
     autoReconnect();
 
     // Check if API key was previously set and prompt user
     if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
       setIsAIEnabled(false); // Make sure we don't falsely report AI as enabled
-      
+
       // Show a quieter notification in the header - we'll use the badge state
       // instead of a toast to avoid notification overload
     }
@@ -261,29 +260,16 @@ export default function Header() {
             {/* OpenAI API Key Dialog */}
             <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
               <DialogTrigger asChild>
-                <Button 
-                  variant={isAIEnabled ? "default" : wasAPIKeyPreviouslySet() ? "outline" : "outline"} 
-                  size="sm" 
-                  className={`flex items-center gap-1 ${
-                    apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : 
-                    wasAPIKeyPreviouslySet() && !isAIEnabled ? 'bg-amber-50 hover:bg-amber-100 border-amber-200' : ''
-                  }`}
-                >
+                <Button variant={isAIEnabled ? "default" : wasAPIKeyPreviouslySet() ? "outline" : "outline"} size="sm" className={`flex items-center gap-1 ${apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : wasAPIKeyPreviouslySet() && !isAIEnabled ? 'bg-amber-50 hover:bg-amber-100 border-amber-200' : ''}`}>
                   <KeyRound className="h-4 w-4" />
-                  {isAIEnabled ? 
-                    apiKeyStatus?.lastError ? "AI Error" : "AI Enabled" : 
-                    wasAPIKeyPreviouslySet() ? "Re-enter API Key" : "Set OpenAI Key"
-                  }
+                  {isAIEnabled ? apiKeyStatus?.lastError ? "AI Error" : "AI Enabled" : wasAPIKeyPreviouslySet() ? "Re-enter API Key" : "Set OpenAI Key"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>OpenAI API Configuration</DialogTitle>
                   <DialogDescription>
-                    {wasAPIKeyPreviouslySet() && !isAIEnabled ? 
-                      "Please re-enter your OpenAI API key to enable AI-powered analysis." :
-                      "Add your OpenAI API key to enable AI-powered code analysis and answers."
-                    }
+                    {wasAPIKeyPreviouslySet() && !isAIEnabled ? "Please re-enter your OpenAI API key to enable AI-powered analysis." : "Add your OpenAI API key to enable AI-powered code analysis and answers."}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -297,8 +283,7 @@ export default function Header() {
                       </AlertDescription>
                     </Alert>}
                   
-                  {wasAPIKeyPreviouslySet() && !isAIEnabled && !apiKeyStatus?.lastError && (
-                    <Alert variant="warning" className="mb-2">
+                  {wasAPIKeyPreviouslySet() && !isAIEnabled && !apiKeyStatus?.lastError && <Alert variant="warning" className="mb-2">
                       <AlertTitle className="flex items-center gap-2">
                         <Info className="h-4 w-4" />
                         API Key Required
@@ -306,8 +291,7 @@ export default function Header() {
                       <AlertDescription>
                         You previously set an API key, but it needs to be re-entered after page refresh.
                       </AlertDescription>
-                    </Alert>
-                  )}
+                    </Alert>}
                   
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="openai-key" className="col-span-4">
@@ -337,10 +321,7 @@ export default function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <a href="https://github.com/TryGhost/Ghost" target="_blank" rel="noreferrer" className="inline-flex items-center justify-center text-sm font-medium transition-colors hover:text-primary">
-                    <GitHubLogoIcon className="h-5 w-5 mr-1" />
-                    Ghost Repo
-                  </a>
+                  
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View the Ghost GitHub repository</p>
@@ -351,10 +332,7 @@ export default function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link to="/" className="inline-flex items-center justify-center text-sm font-medium transition-colors hover:text-primary">
-                    <Code2 className="h-5 w-5 mr-1" />
-                    API Docs
-                  </Link>
+                  
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View API documentation</p>
