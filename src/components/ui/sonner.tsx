@@ -21,10 +21,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
-        // Ensure toast duration is short enough to dismiss automatically
+        // Reduce the toast duration to 3 seconds (from the default 4 seconds)
         duration: 3000,
       }}
-      // Explicitly set closeButton true to ensure dismiss option is visible
+      // Explicitly set closeButton to true to ensure dismiss option is visible
       closeButton={true}
       // Set position to bottom-right for consistency
       position="bottom-right"

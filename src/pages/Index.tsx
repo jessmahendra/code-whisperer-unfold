@@ -186,10 +186,8 @@ export default function Index() {
                                   explorationStatus !== "exploring" &&
                                   !showProgressIndicator;
                                   
-  const shouldShowSuccessBanner = isConnected && !usingMockData && 
-                                  !isInitializingKB && 
-                                  explorationStatus !== "exploring" &&
-                                  !showProgressIndicator;
+  // We're removing the success banner completely, so no need for this variable anymore
+  // const shouldShowSuccessBanner = false;
 
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
@@ -238,25 +236,7 @@ export default function Index() {
                 </div>
               )}
               
-              {shouldShowSuccessBanner && (
-                <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start">
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
-                      <div>
-                        <h3 className="font-medium text-green-800">Connected to GitHub</h3>
-                        <p className="text-sm text-green-700 mt-1">
-                          You're using real data from the Ghost GitHub repository. 
-                          {knowledgeStats && (
-                            <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <AIStatusBadge />
-                  </div>
-                </div>
-              )}
+              {/* Removing the success banner completely */}
             </div>
             
             <div className="relative">
