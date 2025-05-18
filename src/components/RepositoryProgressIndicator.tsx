@@ -17,6 +17,9 @@ export default function RepositoryProgressIndicator() {
   const [visible, setVisible] = useState(true);
   
   useEffect(() => {
+    // Clear any existing toast messages when component mounts
+    toast.dismiss();
+    
     // Set the progress callback
     setProgressUpdateCallback((value) => {
       setProgress(value);
@@ -37,10 +40,13 @@ export default function RepositoryProgressIndicator() {
       
       // Auto-hide the component when complete and a bit of time has passed
       if (currentProgress.status === "complete" && currentProgress.progress >= 100) {
+        // Dismiss any lingering loading toasts
+        toast.dismiss();
+        
         // Add a timer to hide the component after 3 seconds (reduced from 5)
         const hideTimer = setTimeout(() => {
           setVisible(false);
-        }, 3000);
+        }, 2000); // Reduced from 3000 to make it disappear faster
         
         return () => clearTimeout(hideTimer);
       }

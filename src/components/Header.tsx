@@ -93,6 +93,9 @@ export default function Header() {
     setConnectionStatus('connecting');
     setShowProgressIndicator(true);
 
+    // Dismiss any existing toasts first
+    toast.dismiss();
+
     // Prompt for GitHub token if not already set
     let token = prompt("Please enter your GitHub personal access token with 'repo' permissions:");
     if (!token) {
@@ -126,7 +129,7 @@ export default function Header() {
         return;
       }
       console.log("GitHub client initialized successfully, saving configuration...");
-      toast.success(`Authenticated as ${user.login}`);
+      toast.success(`Authenticated as ${user.login}`, { duration: 3000 });
 
       // Save Ghost repo configuration
       saveRepositoryConfig({
@@ -135,12 +138,17 @@ export default function Header() {
         token
       });
       console.log("Configuration saved, initializing knowledge base...");
-      toast.loading("Connecting to Ghost repository and building knowledge base...", {
-        duration: 10000
+      
+      // Use shorter duration for the loading toast
+      const loadingToastId = toast.loading("Connecting to Ghost repository...", {
+        duration: 5000 // 5 seconds max
       });
 
       // Initialize knowledge base with force refresh
       await initializeKnowledgeBase(true);
+      
+      // Dismiss the loading toast
+      toast.dismiss(loadingToastId);
 
       // Update UI
       updateRepoInfo();
@@ -150,11 +158,13 @@ export default function Header() {
         setConnectionError(errorMsg);
         setConnectionStatus('partial');
         toast.warning(`Connected to GitHub, but ${errorMsg}`, {
-          description: "Using mock data instead. Check console for details."
+          description: "Using mock data instead. Check console for details.",
+          duration: 4000
         });
       } else {
         toast.success("Successfully connected to Ghost repository!", {
-          description: "Knowledge base has been populated with real repository data."
+          description: "Knowledge base has been populated with real repository data.",
+          duration: 3000
         });
         setConnectionError(null);
         setConnectionStatus('connected');
@@ -165,7 +175,8 @@ export default function Header() {
       setConnectionError(`Error: ${errorMessage}`);
       setConnectionStatus('disconnected');
       toast.error("Failed to connect to Ghost repository", {
-        description: errorMessage
+        description: errorMessage,
+        duration: 4000
       });
     } finally {
       setIsConnecting(false);
