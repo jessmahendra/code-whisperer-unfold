@@ -43,6 +43,7 @@ export default function Index() {
   const [isConnected, setIsConnected] = useState(false);
   const [usingMockData, setUsingMockData] = useState(true);
   const [knowledgeStats, setKnowledgeStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
+  const [bannerKey, setBannerKey] = useState(0); // Add a key to force re-render of banners
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -76,6 +77,9 @@ export default function Index() {
           diagnostics,
           stats
         });
+        
+        // Force banner re-render
+        setBannerKey(prev => prev + 1);
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
@@ -97,7 +101,21 @@ export default function Index() {
         setIsInitializingKB(false);
         const stats = getKnowledgeBaseStats();
         setKnowledgeStats(stats);
-        setUsingMockData(isUsingMockData() || stats.processedFiles === 0);
+        const mockStatus = isUsingMockData() || stats.processedFiles === 0;
+        setUsingMockData(mockStatus);
+        setIsConnected(hasRepositoryConfig() && isGithubClientInitialized());
+        // Force banner re-render
+        setBannerKey(prev => prev + 1);
+      }
+      
+      // Periodically check connection status even after initialization
+      const stats = getKnowledgeBaseStats();
+      const mockStatus = isUsingMockData() || stats.processedFiles === 0;
+      if (mockStatus !== usingMockData) {
+        setUsingMockData(mockStatus);
+        setKnowledgeStats(stats);
+        // Force banner re-render when mock data status changes
+        setBannerKey(prev => prev + 1);
       }
     }, 1000);
     
@@ -164,66 +182,69 @@ export default function Index() {
               Instant answers to your Ghost product questions, extracted directly from code.
             </p>
             
-            {shouldShowWarningBanner && !isInitializingKB && (
-              <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
-                <div className="flex items-start">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
-                  <div>
-                    <h3 className="font-medium text-yellow-800">
-                      {!isConnected ? "Using mock data" : "Connected but using mock data"}
-                    </h3>
-                    <p className="text-sm text-yellow-700 mt-1">
-                      {!isConnected ? 
-                        "You're currently using mock data. To connect to the Ghost GitHub repository, click the button below." : 
-                        "You've connected to GitHub but we're still using mock data. This might happen if the repository structure doesn't match our expectations or if your token lacks permissions."
-                      }
-                    </p>
-                    <div className="mt-2">
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="bg-white" 
-                        onClick={openConfigModal}
-                      >
-                        <CodeIcon className="h-4 w-4 mr-1" />
-                        {!isConnected ? "Configure GitHub Connection" : "Check GitHub Connection"}
-                      </Button>
+            {/* Use key to force re-render of banners when status changes */}
+            <div key={bannerKey}>
+              {shouldShowWarningBanner && !isInitializingKB && (
+                <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
+                  <div className="flex items-start">
+                    <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
+                    <div>
+                      <h3 className="font-medium text-yellow-800">
+                        {!isConnected ? "Using mock data" : "Connected but using mock data"}
+                      </h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        {!isConnected ? 
+                          "You're currently using mock data. To connect to the Ghost GitHub repository, click the button below." : 
+                          "You've connected to GitHub but we're still using mock data. This might happen if the repository structure doesn't match our expectations or if your token lacks permissions."
+                        }
+                      </p>
+                      <div className="mt-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="bg-white" 
+                          onClick={openConfigModal}
+                        >
+                          <CodeIcon className="h-4 w-4 mr-1" />
+                          {!isConnected ? "Configure GitHub Connection" : "Check GitHub Connection"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {shouldShowSuccessBanner && (
-              <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
-                <div className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
-                  <div>
-                    <h3 className="font-medium text-green-800">Connected to GitHub</h3>
-                    <p className="text-sm text-green-700 mt-1">
-                      You're using real data from the Ghost GitHub repository. 
-                      {knowledgeStats && (
-                        <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
-                      )}
-                    </p>
+              )}
+              
+              {shouldShowSuccessBanner && (
+                <div className="mb-6 p-4 border border-green-200 bg-green-50 rounded-lg text-left">
+                  <div className="flex items-start">
+                    <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 mr-2" />
+                    <div>
+                      <h3 className="font-medium text-green-800">Connected to GitHub</h3>
+                      <p className="text-sm text-green-700 mt-1">
+                        You're using real data from the Ghost GitHub repository. 
+                        {knowledgeStats && (
+                          <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {isInitializingKB && (
-              <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-left">
-                <div className="flex items-start">
-                  <div className="animate-spin h-5 w-5 text-blue-500 mt-0.5 mr-2">⏳</div>
-                  <div>
-                    <h3 className="font-medium text-blue-800">Initializing Knowledge Base</h3>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Please wait while we connect to the GitHub repository and build the knowledge base...
-                    </p>
+              )}
+              
+              {isInitializingKB && (
+                <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-left">
+                  <div className="flex items-start">
+                    <div className="animate-spin h-5 w-5 text-blue-500 mt-0.5 mr-2">⏳</div>
+                    <div>
+                      <h3 className="font-medium text-blue-800">Initializing Knowledge Base</h3>
+                      <p className="text-sm text-blue-700 mt-1">
+                        Please wait while we connect to the GitHub repository and build the knowledge base...
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
             
             <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing || isInitializingKB} />
             
