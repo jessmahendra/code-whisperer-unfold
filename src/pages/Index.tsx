@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Header from "@/components/Header";
 import GradientBackground from "@/components/GradientBackground";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
@@ -62,13 +62,15 @@ export default function Index() {
         <Header />
         
         <main className="flex-1 container py-8">
-          <section className="max-w-3xl mx-auto text-center mb-12">
-            <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
-              Unfold
-            </h1>
-            <p className="text-xl mb-8">
-              Instant answers to your Ghost product questions, extracted directly from code.
-            </p>
+          <section className="max-w-3xl mx-auto mb-12">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
+                Unfold
+              </h1>
+              <p className="text-xl">
+                Instant answers to your Ghost product questions, extracted directly from code.
+              </p>
+            </div>
             
             <RepositoryStatus
               bannerKey={connectionStatus.bannerKey}
@@ -86,7 +88,7 @@ export default function Index() {
           </section>
         </main>
         
-        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+        <footer className="border-t py-6 text-sm text-muted-foreground">
           <div className="container relative">
             <div className="text-center">
               <p>Currently using {connectionStatus.usingMockData ? 'mock' : 'repository'} data for knowledge base</p>

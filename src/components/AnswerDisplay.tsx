@@ -130,7 +130,7 @@ export default function AnswerDisplay({
   };
 
   return (
-    <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6">
+    <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6 text-left">
       <div className="mb-4">
         <div className="flex justify-between items-start mb-4">
           <h3 className="font-semibold text-lg">{question}</h3>
@@ -176,7 +176,7 @@ export default function AnswerDisplay({
             </Button>
           </div>
         </div>
-        <div className="text-sm space-y-4 mb-6">
+        <div className="text-sm space-y-4 mb-6 text-left">
           {displayedParagraphs.map((paragraph, index) => (
             <p key={index} className="animate-fade-in">
               {paragraph}

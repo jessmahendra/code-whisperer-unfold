@@ -89,7 +89,7 @@ export default function SlackAnswerDisplay({
     "Low confidence";
 
   return (
-    <div className="flex items-start gap-2 group">
+    <div className="flex items-start gap-2 group text-left">
       {avatar}
       
       <div className="flex-1">
@@ -99,7 +99,7 @@ export default function SlackAnswerDisplay({
         </div>
         
         <div className="mt-2 p-3 border rounded-md bg-white">
-          <div className="text-sm space-y-2 mb-3">
+          <div className="text-sm space-y-2 mb-3 text-left">
             {displayedParagraphs.map((paragraph, index) => (
               <p key={index} className="animate-fade-in">
                 {paragraph}

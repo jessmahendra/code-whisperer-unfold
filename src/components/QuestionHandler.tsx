@@ -84,7 +84,7 @@ export default function QuestionHandler({
   const combinedIsProcessing = isProcessing || externalProcessing;
 
   return (
-    <>
+    <div className="text-left">
       <div className="relative">
         <QuestionInput 
           onAskQuestion={handleAskQuestion} 
@@ -122,6 +122,6 @@ export default function QuestionHandler({
           question && !combinedIsProcessing && <NoAnswerFallback question={question} />
         )
       )}
-    </>
+    </div>
   );
 }
