@@ -20,8 +20,8 @@ export default function Index() {
         // Initialize the connection to GitHub
         await initializeConnection(updateConnectionStatus);
         
-        // Initialize the knowledge base
-        await initializeKnowledgeBase();
+        // Initialize the knowledge base with force refresh to ensure we get fresh data
+        await initializeKnowledgeBase(true);
         
         // Update connection status
         updateConnectionStatus();
@@ -33,7 +33,7 @@ export default function Index() {
     };
     initialize();
 
-    // Poll for updates
+    // Poll for updates more frequently to reflect changes in connection status
     const intervalId = setInterval(() => {
       updateConnectionStatus();
     }, 300);
@@ -84,6 +84,7 @@ export default function Index() {
               isProcessing={connectionStatus.isInitializingKB}
               isInitializingKB={connectionStatus.isInitializingKB}
               isAIEnabled={connectionStatus.isAIEnabled}
+              usingMockData={connectionStatus.usingMockData}
             />
           </section>
         </main>

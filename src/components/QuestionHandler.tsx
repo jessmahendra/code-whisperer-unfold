@@ -6,6 +6,8 @@ import AnswerDisplay from "@/components/AnswerDisplay";
 import NoAnswerFallback from "@/components/NoAnswerFallback";
 import { generateAnswer } from "@/services/answerGenerator";
 import { toast } from "@/components/ui/sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 // Sample suggested questions
 const suggestedQuestions = [
@@ -35,12 +37,14 @@ interface QuestionHandlerProps {
   isProcessing: boolean;
   isInitializingKB: boolean;
   isAIEnabled: boolean;
+  usingMockData: boolean;
 }
 
 export default function QuestionHandler({
   isProcessing: externalProcessing,
   isInitializingKB,
-  isAIEnabled
+  isAIEnabled,
+  usingMockData
 }: QuestionHandlerProps) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -85,6 +89,15 @@ export default function QuestionHandler({
 
   return (
     <div className="text-left">
+      {usingMockData && question && !combinedIsProcessing && (
+        <Alert variant="warning" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Using mock data for answers. Connect to a GitHub repository for accurate responses.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="relative">
         <QuestionInput 
           onAskQuestion={handleAskQuestion} 

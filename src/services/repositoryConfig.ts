@@ -22,6 +22,11 @@ export function saveRepositoryConfig(config: Omit<RepositoryConfig, 'lastAccesse
   
   try {
     localStorage.setItem(REPO_CONFIG_KEY, JSON.stringify(fullConfig));
+    console.log('Repository configuration saved successfully:', config.owner, config.repo);
+    // Ensure we didn't save an empty token
+    if (!config.token) {
+      console.warn('Saved repository config with empty token - connection may fail');
+    }
   } catch (error) {
     console.error('Error saving repository configuration:', error);
   }
@@ -36,7 +41,14 @@ export function getRepositoryConfig(): RepositoryConfig | null {
     const configString = localStorage.getItem(REPO_CONFIG_KEY);
     if (!configString) return null;
     
-    return JSON.parse(configString) as RepositoryConfig;
+    const config = JSON.parse(configString) as RepositoryConfig;
+    
+    // Validate config has required fields
+    if (!config.owner || !config.repo || !config.token) {
+      console.warn('Retrieved incomplete repository configuration');
+    }
+    
+    return config;
   } catch (error) {
     console.error('Error retrieving repository configuration:', error);
     return null;
@@ -49,6 +61,7 @@ export function getRepositoryConfig(): RepositoryConfig | null {
 export function clearRepositoryConfig(): void {
   try {
     localStorage.removeItem(REPO_CONFIG_KEY);
+    console.log('Repository configuration cleared successfully');
   } catch (error) {
     console.error('Error clearing repository configuration:', error);
   }
@@ -59,5 +72,6 @@ export function clearRepositoryConfig(): void {
  * @returns Boolean indicating if configuration exists
  */
 export function hasRepositoryConfig(): boolean {
-  return getRepositoryConfig() !== null;
+  const config = getRepositoryConfig();
+  return config !== null && Boolean(config.owner) && Boolean(config.repo) && Boolean(config.token);
 }
