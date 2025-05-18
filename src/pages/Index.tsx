@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, useCallback } from "react";
 import Header from "@/components/Header";
 import QuestionInput from "@/components/QuestionInput";
 import SuggestedQuestions from "@/components/SuggestedQuestions";
@@ -12,7 +13,7 @@ import {
   getKnowledgeBaseStats, 
   isInitializing 
 } from "@/services/knowledgeBase";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle, Slack, CodeIcon } from "lucide-react";
@@ -20,6 +21,7 @@ import { hasRepositoryConfig } from "@/services/repositoryConfig";
 import { isGithubClientInitialized } from "@/services/githubClient";
 import { getConnectionDiagnostics } from "@/services/githubConnector";
 import { getExplorationProgress } from "@/services/knowledgeBase/pathExplorer";
+import RepositoryProgressIndicator from "@/components/RepositoryProgressIndicator";
 
 // Sample suggested questions
 const suggestedQuestions = [
@@ -56,6 +58,52 @@ export default function Index() {
   const [knowledgeStats, setKnowledgeStats] = useState<ReturnType<typeof getKnowledgeBaseStats> | null>(null);
   const [bannerKey, setBannerKey] = useState(0); // Key to force re-render of banners
   const [explorationStatus, setExplorationStatus] = useState<"idle" | "exploring" | "complete" | "error">("idle");
+  const [showProgressIndicator, setShowProgressIndicator] = useState(false);
+
+  // Function to update connection status - extracted to avoid repetition
+  const updateConnectionStatus = useCallback(() => {
+    // Check if repository configuration exists and GitHub client is initialized
+    const hasConfig = hasRepositoryConfig();
+    const isClientInitialized = isGithubClientInitialized();
+    const diagnostics = getConnectionDiagnostics();
+    const progress = getExplorationProgress();
+    
+    // Get the latest stats to determine if we're using real data
+    const stats = getKnowledgeBaseStats();
+    
+    // Update status states
+    setKnowledgeStats(stats);
+    setExplorationStatus(progress.status);
+    setHasRepo(hasConfig);
+    setIsConnected(hasConfig && isClientInitialized);
+    
+    // Check if we're actually using mock data or real data
+    // We consider truly connected if we have processed files > 0
+    const actuallyUsingMock = isUsingMockData() || stats.processedFiles === 0;
+    setUsingMockData(actuallyUsingMock);
+    
+    // Show progress indicator when exploring
+    setShowProgressIndicator(progress.status === "exploring");
+    
+    // Check initialization status
+    if (isInitializing() || progress.status === "exploring") {
+      setIsInitializingKB(true);
+    } else {
+      setIsInitializingKB(false);
+    }
+    
+    // Force banner refresh
+    setBannerKey(prevKey => prevKey + 1);
+    
+    return { 
+      hasConfig, 
+      isClientInitialized, 
+      actuallyUsingMock, 
+      stats, 
+      diagnostics, 
+      progress 
+    };
+  }, []);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -64,89 +112,27 @@ export default function Index() {
         // Initialize the knowledge base
         await initializeKnowledgeBase();
         
-        // Check if repository configuration exists and GitHub client is initialized
-        const hasConfig = hasRepositoryConfig();
-        const isClientInitialized = isGithubClientInitialized();
-        const diagnostics = getConnectionDiagnostics();
-        const progress = getExplorationProgress();
-        
-        // Get the latest stats to determine if we're using real data
-        const stats = getKnowledgeBaseStats();
-        setKnowledgeStats(stats);
-        setExplorationStatus(progress.status);
-        
         // Update connection status
-        setHasRepo(hasConfig);
-        setIsConnected(hasConfig && isClientInitialized);
+        updateConnectionStatus();
         
-        // Check if we're actually using mock data or real data
-        // We consider truly connected if we have processed files > 0
-        const actuallyUsingMock = isUsingMockData() || stats.processedFiles === 0;
-        setUsingMockData(actuallyUsingMock);
-        
-        console.log("Connection status:", {
-          hasConfig,
-          isClientInitialized,
-          actuallyUsingMock,
-          diagnostics,
-          stats,
-          explorationStatus: progress.status
-        });
-        
-        // Force banner re-render
-        setBannerKey(prev => prev + 1);
       } catch (error) {
         console.error("Failed to initialize knowledge base:", error);
         toast.error("Failed to initialize knowledge base");
       } finally {
-        setIsInitializingKB(false);
+        // Final status update
+        updateConnectionStatus();
       }
     };
     
     initialize();
     
-    // Poll for updates in case the connection status changes
+    // Poll for updates more frequently (300ms instead of 500ms)
     const intervalId = setInterval(() => {
-      // Get current progress
-      const progress = getExplorationProgress();
-      
-      if (isInitializing() || progress.status === "exploring") {
-        // Still initializing, update status but don't change initializing flag yet
-        setIsInitializingKB(true);
-        setExplorationStatus(progress.status);
-        
-        // If we're exploring, force banner refresh regularly
-        if (progress.status === "exploring") {
-          setBannerKey(prev => prev + 1);
-        }
-        return;
-      } else if (isInitializingKB) {
-        // Just finished initializing, update everything
-        setIsInitializingKB(false);
-        setExplorationStatus(progress.status);
-        const stats = getKnowledgeBaseStats();
-        setKnowledgeStats(stats);
-        const mockStatus = isUsingMockData() || stats.processedFiles === 0;
-        setUsingMockData(mockStatus);
-        setIsConnected(hasRepositoryConfig() && isGithubClientInitialized());
-        // Force banner re-render
-        setBannerKey(prev => prev + 1);
-      }
-      
-      // Periodically check connection status even after initialization
-      const stats = getKnowledgeBaseStats();
-      const mockStatus = isUsingMockData() || stats.processedFiles === 0;
-      if (mockStatus !== usingMockData || progress.status !== explorationStatus) {
-        setUsingMockData(mockStatus);
-        setKnowledgeStats(stats);
-        setExplorationStatus(progress.status);
-        // Force banner re-render when status changes
-        setBannerKey(prev => prev + 1);
-      }
-    }, 500); // Poll more frequently to catch status changes
+      updateConnectionStatus();
+    }, 300);
     
     return () => clearInterval(intervalId);
-  }, []);
+  }, [updateConnectionStatus]);
 
   const handleAskQuestion = async (query: string) => {
     setQuestion(query);
@@ -193,10 +179,13 @@ export default function Index() {
 
   // Determine if we should show the banner - consider exploration status
   const shouldShowWarningBanner = (!isConnected || usingMockData) && 
-                                  explorationStatus !== "exploring";
+                                  explorationStatus !== "exploring" &&
+                                  !showProgressIndicator;
+                                  
   const shouldShowSuccessBanner = isConnected && !usingMockData && 
                                   !isInitializingKB && 
-                                  explorationStatus !== "exploring";
+                                  explorationStatus !== "exploring" &&
+                                  !showProgressIndicator;
 
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
@@ -213,7 +202,9 @@ export default function Index() {
             
             {/* Use key to force re-render of banners when status changes */}
             <div key={bannerKey}>
-              {shouldShowWarningBanner && !isInitializingKB && (
+              {showProgressIndicator && <RepositoryProgressIndicator />}
+              
+              {shouldShowWarningBanner && (
                 <div className="mb-6 p-4 border border-yellow-200 bg-yellow-50 rounded-lg text-left">
                   <div className="flex items-start">
                     <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 mr-2" />
@@ -254,22 +245,6 @@ export default function Index() {
                         {knowledgeStats && (
                           <span> The knowledge base has been populated with {knowledgeStats.totalEntries} insights from {knowledgeStats.processedFiles} files.</span>
                         )}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {(isInitializingKB || explorationStatus === "exploring") && (
-                <div className="mb-6 p-4 border border-blue-200 bg-blue-50 rounded-lg text-left">
-                  <div className="flex items-start">
-                    <div className="animate-spin h-5 w-5 text-blue-500 mt-0.5 mr-2">⏳</div>
-                    <div>
-                      <h3 className="font-medium text-blue-800">
-                        {explorationStatus === "exploring" ? "Exploring Repository" : "Initializing Knowledge Base"}
-                      </h3>
-                      <p className="text-sm text-blue-700 mt-1">
-                        Please wait while we connect to the GitHub repository and build the knowledge base...
                       </p>
                     </div>
                   </div>

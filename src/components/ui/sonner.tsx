@@ -21,12 +21,26 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
         },
-        // Ensure toast duration is short enough to not stay on screen too long
+        // Ensure toast duration is short enough to dismiss automatically
         duration: 3000,
       }}
+      // Explicitly set closeButton true to ensure dismiss option is visible
+      closeButton={true}
+      // Set position to bottom-right for consistency
+      position="bottom-right"
       {...props}
     />
   )
 }
 
-export { Toaster, toast }
+// Force dismiss any toast by ID
+const dismissToast = (id?: string) => {
+  if (id) {
+    toast.dismiss(id);
+  } else {
+    // Dismiss all toasts if no ID is provided
+    toast.dismiss();
+  }
+};
+
+export { Toaster, toast, dismissToast }

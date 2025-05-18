@@ -54,13 +54,15 @@ function updateProgress(value: number): void {
     explorationProgress.status = "complete";
     
     // Explicitly remove any "loading" toasts
-    // This ensures the "finalizing..." toast doesn't stay on screen
-    toast.dismiss();
+    toast.dismiss("repo-loading");
+    toast.dismiss("process-loading");
+    toast.dismiss("finalizing-loading");
     
     // Add a success toast that will auto-dismiss
     if (explorationProgress.successfulPaths > 0) {
       toast.success(`Repository exploration complete: Found ${explorationProgress.successfulPaths} relevant code paths`, {
-        duration: 3000
+        duration: 3000,
+        id: "exploration-complete"
       });
     }
   }
@@ -194,7 +196,7 @@ export async function exploreRepositoryPaths(
     let rootContents = [];
     try {
       updateProgress(10);
-      toast.loading("Exploring repository structure...", { duration: 3000, id: "repo-loading" });
+      toast.loading("Exploring repository structure...", { duration: 5000, id: "repo-loading" });
       rootContents = await getRepositoryContents('');
       console.log(`Found ${rootContents.length} items in the root of the repository:`, 
         rootContents.map(item => item.name).join(', '));
@@ -289,7 +291,7 @@ export async function exploreRepositoryPaths(
     
     updateProgress(60);
     toast.dismiss("repo-loading"); // Dismiss previous toast
-    toast.loading("Processing repository files...", { duration: 3000, id: "process-loading" });
+    toast.loading("Processing repository files...", { duration: 5000, id: "process-loading" });
     
     // Special handling for Ghost repo - use updated paths based on current Ghost structure
     if (currentRepo.repo === "Ghost" && currentRepo.owner === "TryGhost") {
@@ -353,7 +355,7 @@ export async function exploreRepositoryPaths(
     
     updateProgress(80);
     toast.dismiss("process-loading"); // Dismiss previous toast
-    toast.loading("Finalizing repository exploration...", { duration: 3000, id: "finalizing-loading" });
+    toast.loading("Finalizing repository exploration...", { duration: 5000, id: "finalizing-loading" });
     
     // Get paths to try (use discovered paths first, then fall back to defaults)
     const defaultPaths = getDefaultPathsToTry(currentRepo.repo);
@@ -458,7 +460,9 @@ export async function exploreRepositoryPaths(
     explorationProgress.status = "error";
     explorationProgress.error = error instanceof Error ? error.message : "Unknown error occurred";
     updateProgress(100);
-    toast.dismiss(); // Dismiss any loading toasts
+    toast.dismiss("repo-loading"); // Dismiss any loading toasts
+    toast.dismiss("process-loading");
+    toast.dismiss("finalizing-loading");
     toast.error(`Repository exploration failed: ${explorationProgress.error}`, { duration: 3000 });
     return false;
   }

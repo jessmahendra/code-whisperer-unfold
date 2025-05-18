@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getExplorationProgress, setProgressUpdateCallback } from "@/services/knowledgeBase/pathExplorer";
 import { getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
+import { toast } from "sonner";
 
 export default function RepositoryProgressIndicator() {
   const [progress, setProgress] = useState(0);
@@ -13,6 +14,7 @@ export default function RepositoryProgressIndicator() {
     totalAttempts: 0,
     successfulPaths: 0
   });
+  const [visible, setVisible] = useState(true);
   
   useEffect(() => {
     // Set the progress callback
@@ -35,11 +37,10 @@ export default function RepositoryProgressIndicator() {
       
       // Auto-hide the component when complete and a bit of time has passed
       if (currentProgress.status === "complete" && currentProgress.progress >= 100) {
-        // Add a timer to hide the component after 5 seconds
+        // Add a timer to hide the component after 3 seconds (reduced from 5)
         const hideTimer = setTimeout(() => {
-          setStatus("idle");
-          setProgress(0);
-        }, 5000);
+          setVisible(false);
+        }, 3000);
         
         return () => clearTimeout(hideTimer);
       }
@@ -63,9 +64,9 @@ export default function RepositoryProgressIndicator() {
     return null;
   }
   
-  // Hide the indicator if we're complete and at 100% for more than 5 seconds
-  if (status === "complete" && progress >= 100) {
-    // We'll let the useEffect handle the hiding after 5 seconds
+  // Hide the indicator if we've explicitly marked it as not visible
+  if (!visible) {
+    return null;
   }
   
   const getStatusText = () => {
