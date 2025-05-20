@@ -10,6 +10,47 @@ let apiKeyState = {
   failedAttempts: 0 as number
 };
 
+// LocalStorage key for API key (storing encrypted version)
+const OPENAI_API_KEY_STORAGE_KEY = 'unfold_openai_api_key';
+
+/**
+ * Simple encryption function for API key
+ * Note: This is NOT secure encryption, just basic obfuscation
+ */
+function encryptKey(key: string): string {
+  return btoa(key.split('').reverse().join(''));
+}
+
+/**
+ * Simple decryption function for API key
+ */
+function decryptKey(encryptedKey: string): string {
+  try {
+    return atob(encryptedKey).split('').reverse().join('');
+  } catch (e) {
+    console.error("Failed to decrypt API key");
+    return "";
+  }
+}
+
+/**
+ * Load the OpenAI API key from localStorage on startup
+ */
+function loadApiKeyFromStorage(): void {
+  try {
+    const encryptedKey = localStorage.getItem(OPENAI_API_KEY_STORAGE_KEY);
+    if (encryptedKey) {
+      openaiApiKey = decryptKey(encryptedKey);
+      console.log("OpenAI API key loaded from storage");
+    }
+  } catch (e) {
+    console.error("Could not load API key from localStorage", e);
+  }
+}
+
+// Load API key on module initialization
+loadApiKeyFromStorage();
+
 /**
  * Set the OpenAI API key
  * @param key - The OpenAI API key
@@ -32,12 +73,13 @@ export function setOpenAIApiKey(key: string): void {
   apiKeyState.lastError = null;
   apiKeyState.failedAttempts = 0;
   
-  // Save a masked version to localStorage just to indicate that a key is set
-  // We don't save the actual key for security reasons
+  // Save an encrypted version to localStorage
   try {
+    const encryptedKey = encryptKey(key);
+    localStorage.setItem(OPENAI_API_KEY_STORAGE_KEY, encryptedKey);
     localStorage.setItem('openai_key_set', 'true');
   } catch (e) {
-    console.error("Could not save API key status to localStorage");
+    console.error("Could not save API key to localStorage", e);
   }
   
   toast.success("OpenAI API key has been set successfully", {
@@ -93,9 +135,10 @@ export function clearOpenAIApiKey(): void {
   };
   
   try {
+    localStorage.removeItem(OPENAI_API_KEY_STORAGE_KEY);
     localStorage.removeItem('openai_key_set');
   } catch (e) {
-    console.error("Could not clear API key status from localStorage");
+    console.error("Could not clear API key from localStorage");
   }
   
   toast.info("OpenAI API key has been cleared", {

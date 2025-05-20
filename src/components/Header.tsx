@@ -10,7 +10,7 @@ import { Button } from "./ui/button";
 import { saveRepositoryConfig, getRepositoryConfig } from "@/services/repositoryConfig";
 import { initGithubClient, validateGithubToken, isGithubClientInitialized } from "@/services/githubClient";
 import { toast, dismissToast } from "@/components/ui/sonner";
-import { hasAICapabilities, setOpenAIApiKey, wasAPIKeyPreviouslySet, getAPIKeyState } from "@/services/aiAnalysis";
+import { hasAICapabilities, setOpenAIApiKey, wasAPIKeyPreviouslySet, getAPIKeyState, getOpenAIApiKey } from "@/services/aiAnalysis";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -69,16 +69,26 @@ export default function Header() {
         console.log("Found existing repository configuration in Header, reconnecting...");
         initGithubClient(config.token);
         updateRepoInfo();
+
+        // If we have a config, initialize the knowledge base
+        try {
+          await initializeKnowledgeBase(false);
+          console.log("Knowledge base initialized from saved configuration");
+        } catch (err) {
+          console.error("Error initializing knowledge base:", err);
+        }
       }
     };
     autoReconnect();
 
-    // Check if API key was previously set and prompt user
-    if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
+    // Check if API key is already available in memory or storage
+    const apiKey = getOpenAIApiKey();
+    if (apiKey) {
+      setIsAIEnabled(true);
+      console.log("OpenAI API key loaded automatically");
+    } else if (wasAPIKeyPreviouslySet() && !hasAICapabilities()) {
       setIsAIEnabled(false); // Make sure we don't falsely report AI as enabled
-
-      // Show a quieter notification in the header - we'll use the badge state
-      // instead of a toast to avoid notification overload
+      // Show a quieter notification in the header
     }
 
     // Poll for changes to connection status
