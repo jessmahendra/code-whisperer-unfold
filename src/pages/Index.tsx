@@ -1,4 +1,3 @@
-
 import { useEffect } from "react";
 import Header from "@/components/Header";
 import GradientBackground from "@/components/GradientBackground";
@@ -9,20 +8,19 @@ import { Slack } from "lucide-react";
 import RepositoryStatus from "@/components/RepositoryStatus";
 import QuestionHandler from "@/components/QuestionHandler";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
-
 export default function Index() {
   const [connectionStatus, updateConnectionStatus] = useConnectionStatus();
-  
+
   // Initialize knowledge base on component mount
   useEffect(() => {
     const initialize = async () => {
       try {
         // Initialize the connection to GitHub
         await initializeConnection(updateConnectionStatus);
-        
+
         // Initialize the knowledge base with force refresh to ensure we get fresh data
         await initializeKnowledgeBase(true);
-        
+
         // Update connection status
         updateConnectionStatus();
       } catch (error) {
@@ -39,7 +37,6 @@ export default function Index() {
     }, 300);
     return () => clearInterval(intervalId);
   }, [updateConnectionStatus]);
-
   const openConfigModal = () => {
     // Find and click the config button in the header
     const configButton = document.querySelector('header button') as HTMLButtonElement;
@@ -49,15 +46,8 @@ export default function Index() {
   };
 
   // Determine if we should show the banner - consider exploration status
-  const shouldShowWarningBanner = (
-    !connectionStatus.isConnected || 
-    connectionStatus.usingMockData
-  ) && 
-  connectionStatus.explorationStatus !== "exploring" && 
-  !connectionStatus.showProgressIndicator;
-
-  return (
-    <GradientBackground>
+  const shouldShowWarningBanner = (!connectionStatus.isConnected || connectionStatus.usingMockData) && connectionStatus.explorationStatus !== "exploring" && !connectionStatus.showProgressIndicator;
+  return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
         
@@ -72,20 +62,9 @@ export default function Index() {
               </p>
             </div>
             
-            <RepositoryStatus
-              bannerKey={connectionStatus.bannerKey}
-              showProgressIndicator={connectionStatus.showProgressIndicator}
-              shouldShowWarningBanner={shouldShowWarningBanner}
-              isConnected={connectionStatus.isConnected}
-              openConfigModal={openConfigModal}
-            />
+            <RepositoryStatus bannerKey={connectionStatus.bannerKey} showProgressIndicator={connectionStatus.showProgressIndicator} shouldShowWarningBanner={shouldShowWarningBanner} isConnected={connectionStatus.isConnected} openConfigModal={openConfigModal} />
             
-            <QuestionHandler
-              isProcessing={connectionStatus.isInitializingKB}
-              isInitializingKB={connectionStatus.isInitializingKB}
-              isAIEnabled={connectionStatus.isAIEnabled}
-              usingMockData={connectionStatus.usingMockData}
-            />
+            <QuestionHandler isProcessing={connectionStatus.isInitializingKB} isInitializingKB={connectionStatus.isInitializingKB} isAIEnabled={connectionStatus.isAIEnabled} usingMockData={connectionStatus.usingMockData} />
           </section>
         </main>
         
@@ -93,7 +72,7 @@ export default function Index() {
           <div className="container relative">
             <div className="text-center">
               <p>Currently using {connectionStatus.usingMockData ? 'mock' : 'repository'} data for knowledge base</p>
-              {connectionStatus.isAIEnabled && <p className="text-green-600 text-xs mt-1">AI-powered answers enabled</p>}
+              {connectionStatus.isAIEnabled}
             </div>
             <Button variant="ghost" size="icon" asChild className="absolute bottom-0 right-0 hover:bg-slate-100">
               <Link to="/slack-demo">
@@ -103,6 +82,5 @@ export default function Index() {
           </div>
         </footer>
       </div>
-    </GradientBackground>
-  );
+    </GradientBackground>;
 }
