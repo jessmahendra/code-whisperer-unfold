@@ -119,22 +119,24 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
   
   // Generate specific answers based on identified topics
   if (query.toLowerCase().includes('subscription') || topics.has('subscription')) {
-    answerText = "Ghost handles subscription payments through Stripe. When a customer's subscription ends, they automatically switch to a free membership. This means they can still log in and access free content, but premium content will require renewal of their subscription.";
+    answerText = "## Subscription Management\n\nGhost handles subscription payments through Stripe. When a customer's subscription ends, they automatically switch to a free membership. This means they can still log in and access free content, but premium content will require renewal of their subscription.\n\n**Key points:**\n\n* Payments processed securely via Stripe\n* Expired subscriptions become free members automatically\n* Free members retain access to non-premium content";
   } else if (query.toLowerCase().includes('post') || topics.has('post')) {
-    answerText = "There's no limit to how many posts you can create in Ghost, regardless of which plan you're on. You can make some content available only to paying members by adjusting visibility settings. Ghost also lets you schedule posts to publish automatically at a future date and time, and helps optimize your content to appear higher in search engine results.";
+    answerText = "## Post Management\n\nThere's no limit to how many posts you can create in Ghost, regardless of which plan you're on. You can make some content available only to paying members by adjusting visibility settings.\n\n**Key features:**\n\n* Unlimited posts on all plans\n* Schedule posts for future publication\n* Control access with member-only visibility settings\n* SEO optimization tools built-in";
   } else if (query.toLowerCase().includes('member') || topics.has('member')) {
-    answerText = "Ghost's membership feature lets your audience sign up, subscribe to emails, and access paid content. Members can join at different levels: free members get access to basic content, paid members get premium access, and you can also manually grant premium access to specific individuals. All member information is stored securely and can be exported if needed, in compliance with privacy regulations.";
+    answerText = "## Member Management\n\nGhost's membership feature lets your audience sign up, subscribe to emails, and access paid content. Members can join at different levels:\n\n* **Free members** - Access to basic content\n* **Paid members** - Premium access to all content\n* **Comped members** - Premium access granted manually\n\nAll member information is stored securely and can be exported if needed, in compliance with privacy regulations.";
   } else if (query.toLowerCase().includes('auth') || topics.has('auth') || topics.has('authenticate')) {
-    answerText = "Ghost uses a secure login system for different types of users. Site administrators log in with a username and password. Readers who sign up as members can log in with either an email/password combination or through 'magic links' sent to their email (no password needed). For connecting with other services, Ghost uses secure access keys - public keys for accessing published content and private admin keys for management functions.";
+    answerText = "## Authentication Options\n\nGhost uses a secure login system for different types of users:\n\n* **Site administrators** - Username and password login\n* **Members** - Email/password or magic link authentication (no password needed)\n* **Service connections** - Secure access keys:\n  * Public keys for accessing published content\n  * Private admin keys for management functions";
   } else if (query.toLowerCase().includes('payment') || topics.has('payment')) {
-    answerText = "Ghost works directly with Stripe to handle all payments securely. Your customers can make one-time payments or sign up for regular subscriptions. If a payment doesn't go through, Ghost automatically tries again based on Stripe's retry schedule and sends notifications to both the customer and the site admin so everyone stays informed.";
+    answerText = "## Payment Processing\n\nGhost works directly with Stripe to handle all payments securely. Your customers can make one-time payments or sign up for regular subscriptions.\n\n**If a payment doesn't go through:**\n\n* Stripe automatically retries based on their retry schedule\n* Notifications are sent to both the customer and site admin\n* Failed payment status is visible in the admin dashboard";
+  } else if (query.toLowerCase().includes('integration') || query.toLowerCase().includes('platform') || topics.has('integration')) {
+    answerText = "## Ghost Integration Options\n\nGhost connects seamlessly with many popular platforms and services:\n\n* **Email providers** - Mailgun, Amazon SES, SendGrid\n* **Payment processors** - Stripe (built-in)\n* **Social media** - Facebook, Twitter, LinkedIn (automatic sharing)\n* **Analytics** - Google Analytics, Plausible, Matomo\n* **Membership tools** - Discord, Slack (community access)\n* **Content tools** - Unsplash (built-in), Zapier (automation)\n\nIntegrations can be managed through the Ghost admin interface or via the custom integrations API for advanced needs.";
   } else {
-    // Generic answer for other queries
-    answerText = "Based on our review of Ghost's system, this feature is handled through specific services that work together to deliver a seamless experience for both you and your audience. ";
+    // Generic answer for other queries with markdown formatting
+    answerText = "## Ghost Platform Features\n\nBased on our review of Ghost's system, this feature is handled through specific services that work together to deliver a seamless experience for both you and your audience.\n\n";
     
     // Add some details based on what was found, in non-technical language
     if (functions.size > 0) {
-      answerText += `The system includes components that handle ${Array.from(functions).slice(0, 3).join(', ')} in user-friendly ways. `;
+      answerText += "The system includes components that handle " + Array.from(functions).slice(0, 3).join(', ') + " in user-friendly ways.\n\n";
     }
     
     answerText += "For more specific information about how this works for your particular needs, please feel free to ask a more detailed question.";
@@ -150,7 +152,7 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
     
     // Add timestamp information to the answer
     if (mostRecentResult.lastUpdated && mostRecentResult.lastUpdated !== 'Unknown') {
-      answerText += `\n\nThis information is current as of ${new Date(mostRecentResult.lastUpdated).toLocaleDateString()}.`;
+      answerText += `\n\n**This information is current as of ${new Date(mostRecentResult.lastUpdated).toLocaleDateString()}.**`;
     }
   }
   

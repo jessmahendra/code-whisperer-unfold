@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
 
 interface Reference {
@@ -101,9 +102,9 @@ export default function SlackAnswerDisplay({
         <div className="mt-2 p-3 border rounded-md bg-white">
           <div className="text-sm space-y-2 mb-3 text-left">
             {displayedParagraphs.map((paragraph, index) => (
-              <p key={index} className="animate-fade-in">
-                {paragraph}
-              </p>
+              <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+                <ReactMarkdown>{paragraph}</ReactMarkdown>
+              </div>
             ))}
             {isTyping && displayedParagraphs.length < paragraphs.length && (
               <div className="flex items-center space-x-2 animate-pulse">
