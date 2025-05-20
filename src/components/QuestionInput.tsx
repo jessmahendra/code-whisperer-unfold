@@ -2,17 +2,19 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 interface QuestionInputProps {
   onAskQuestion: (question: string) => void;
   isProcessing: boolean;
+  centered?: boolean;
 }
 
 export default function QuestionInput({
   onAskQuestion,
-  isProcessing
+  isProcessing,
+  centered = false
 }: QuestionInputProps) {
   const [question, setQuestion] = useState("");
 
@@ -26,22 +28,22 @@ export default function QuestionInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
+    <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
         <Input
-          className="pl-10 pr-24 py-6 text-base shadow-md focus-visible:ring-unfold-purple"
-          placeholder="Ask about Ghost's functionality..."
+          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-4"} shadow-sm focus-visible:ring-unfold-purple`}
+          placeholder={centered ? "What do you want to know today?" : "Ask about Ghost's functionality..."}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={isProcessing}
         />
         <Button 
           type="submit"
-          className="absolute right-1 top-1/2 -translate-y-1/2 bg-gradient-to-r from-unfold-purple to-unfold-teal hover:opacity-90"
+          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-indigo-600 hover:bg-indigo-700`}
           disabled={isProcessing || !question.trim()}
         >
-          {isProcessing ? "Processing..." : "Ask"}
+          {isProcessing ? "Processing..." : centered ? "Search" : "Ask"}
+          {centered && <ArrowRight className="ml-1 h-4 w-4" />}
         </Button>
       </div>
     </form>

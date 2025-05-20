@@ -14,13 +14,12 @@ export default function SuggestedQuestions({
 }: SuggestedQuestionsProps) {
   return (
     <div className="mt-6 max-w-3xl mx-auto">
-      <h3 className="text-sm font-medium text-muted-foreground mb-2">Try asking:</h3>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 justify-center">
         {questions.map((question, index) => (
           <Button
             key={index}
             variant="outline"
-            className="text-sm text-left border-unfold-purple/30 hover:bg-unfold-soft-bg hover:text-unfold-dark-purple"
+            className="text-sm rounded-full border-gray-300 hover:bg-gray-100 hover:text-gray-900"
             onClick={() => onSelectQuestion(question)}
             disabled={isProcessing}
           >

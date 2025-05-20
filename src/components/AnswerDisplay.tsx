@@ -1,12 +1,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Clock } from "lucide-react";
+import { Copy } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import ShareButton from "./ShareButton";
+import { Card } from "@/components/ui/card";
 
 interface Reference {
   filePath: string;
@@ -35,7 +36,6 @@ export default function AnswerDisplay({
   confidence,
   references,
   timestamp,
-  visualContext,
 }: AnswerDisplayProps) {
   const [displayedParagraphs, setDisplayedParagraphs] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(true);
@@ -84,87 +84,95 @@ export default function AnswerDisplay({
   const confidencePercentage = Math.round(confidence * 100);
 
   return (
-    <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6 text-left">
-      <div className="pr-4">
-        <div className="mb-4">
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="font-semibold text-lg">{question}</h3>
-            <div className="flex gap-2">
-              {isTyping && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-muted-foreground text-xs"
-                  onClick={handleCompleteTyping}
-                >
-                  Complete
-                </Button>
-              )}
-              {hasVersionInfo && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-muted-foreground text-xs flex items-center gap-1"
-                  onClick={() => setShowVersionInfo(!showVersionInfo)}
-                >
-                  <Clock className="h-3 w-3" />
-                  {showVersionInfo ? "Hide" : "Show"} Version Info
-                </Button>
-              )}
-              <ShareButton 
-                question={question} 
-                answer={{
-                  text: answer,
-                  confidence: confidence,
-                  references: references,
-                  visualContext: visualContext
-                }}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground"
-                onClick={handleCopyAnswer}
-              >
-                <Copy className="h-4 w-4 mr-1" />
-                Copy
-              </Button>
-            </div>
-          </div>
-          <div className="text-sm space-y-4 mb-6 text-left">
-            {displayedParagraphs.map((paragraph, index) => (
-              <div key={index} className="animate-fade-in prose prose-sm max-w-none">
-                <ReactMarkdown>{paragraph}</ReactMarkdown>
-              </div>
-            ))}
-            {isTyping && displayedParagraphs.length < paragraphs.length && (
-              <div className="flex items-center space-x-2 animate-pulse">
-                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-              </div>
-            )}
-          </div>
+    <div className="mt-8 max-w-3xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-6">{question}</h1>
+      
+      <div className="flex justify-end mb-2">
+        <div className="flex gap-2">
+          {isTyping && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={handleCompleteTyping}
+            >
+              Complete
+            </Button>
+          )}
+          <ShareButton 
+            question={question} 
+            answer={{
+              text: answer,
+              confidence: confidence,
+              references: references
+            }}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyAnswer}
+          >
+            <Copy className="h-4 w-4 mr-1" />
+            Copy
+          </Button>
         </div>
-        <div className="border-t pt-4">
-          <div className="mb-4">
-            <ConfidenceScore score={confidencePercentage} />
-          </div>
-          <h4 className="text-sm font-medium mb-2">References</h4>
-          <div className="space-y-2">
-            {references.map((reference, index) => (
-              <CodeReference 
-                key={index} 
-                filePath={reference.filePath}
-                lineNumbers={reference.lineNumbers}
-                snippet={reference.snippet}
-                lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
-              />
-            ))}
-          </div>
-          <div className="text-xs text-muted-foreground mt-4 pb-2">
-            Generated on {timestamp}
-          </div>
+      </div>
+
+      <Card className="mb-4 p-6 text-left">
+        <div className="text-sm space-y-4 mb-4">
+          {displayedParagraphs.map((paragraph, index) => (
+            <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+              <ReactMarkdown>{paragraph}</ReactMarkdown>
+            </div>
+          ))}
+          {isTyping && displayedParagraphs.length < paragraphs.length && (
+            <div className="flex items-center space-x-2 animate-pulse">
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <div className="mt-8">
+        <h2 className="text-lg font-medium mb-4">Sources</h2>
+        <div className="flex flex-wrap gap-2 mb-4">
+          {/* File reference badges */}
+          {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
+            <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+              {filename}
+            </span>
+          ))}
+        </div>
+
+        <div className="space-y-2 mt-4">
+          {references.map((reference, index) => (
+            <CodeReference 
+              key={index} 
+              filePath={reference.filePath}
+              lineNumbers={reference.lineNumbers}
+              snippet={reference.snippet}
+              lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
+            />
+          ))}
+        </div>
+        
+        <div className="flex justify-between items-center mt-8">
+          <ConfidenceScore score={confidencePercentage} />
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs text-gray-500"
+            onClick={() => setShowVersionInfo(!showVersionInfo)}
+          >
+            {showVersionInfo ? "Hide version info" : "Show version info"}
+          </Button>
+        </div>
+        
+        <div className="text-xs text-muted-foreground mt-2">
+          Generated on {timestamp}
         </div>
       </div>
     </div>

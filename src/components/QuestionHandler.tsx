@@ -98,24 +98,32 @@ export default function QuestionHandler({
         </Alert>
       )}
 
-      <div className="relative">
-        <QuestionInput 
-          onAskQuestion={handleAskQuestion} 
-          isProcessing={combinedIsProcessing || isInitializingKB}
-        />
-        {isAIEnabled && <div className="absolute -top-5 right-2"></div>}
+      <div className={question ? "" : "flex flex-col items-center justify-center py-16"}>
+        {!question && (
+          <h1 className="text-3xl font-bold mb-8 text-center">What do you want to know today?</h1>
+        )}
+        
+        <div className="relative w-full">
+          <QuestionInput 
+            onAskQuestion={handleAskQuestion} 
+            isProcessing={combinedIsProcessing || isInitializingKB}
+            centered={!question}
+          />
+        </div>
+
+        {!question && (
+          <SuggestedQuestions 
+            questions={suggestedQuestions} 
+            onSelectQuestion={handleSelectQuestion} 
+            isProcessing={combinedIsProcessing || isInitializingKB}
+          />
+        )}
       </div>
 
-      <SuggestedQuestions 
-        questions={suggestedQuestions} 
-        onSelectQuestion={handleSelectQuestion} 
-        isProcessing={combinedIsProcessing || isInitializingKB}
-      />
-
       {combinedIsProcessing && (
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
-            <div className="h-2 w-2 bg-unfold-purple rounded-full" />
+        <div className="max-w-3xl mx-auto text-center mt-8">
+          <div className="inline-flex items-center gap-2 text-sm bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
+            <div className="h-2 w-2 bg-indigo-600 rounded-full" />
             Processing your question...
           </div>
         </div>
