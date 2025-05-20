@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
@@ -240,7 +241,7 @@ export default function SharePage() {
               {/* Code References */}
               <h4 className="text-sm font-medium mb-2">References</h4>
               <div className="space-y-2">
-                {answer.answer.references.map((reference, index) => (
+                {answer.answer.references.map((reference: Reference, index) => (
                   <CodeReference 
                     key={index} 
                     filePath={reference.filePath}
