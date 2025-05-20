@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy } from "lucide-react";
@@ -104,8 +103,6 @@ export default function AnswerDisplay({
 
   return (
     <div className="mt-8 max-w-3xl mx-auto">
-      {question && <h1 className="text-2xl font-semibold mb-6">{question}</h1>}
-      
       <div className="flex justify-end mb-2">
         <div className="flex gap-2">
           {isTyping && (
@@ -140,6 +137,7 @@ export default function AnswerDisplay({
       </div>
 
       <Card className="mb-4 p-6 text-left">
+        {question && <h1 className="text-2xl font-semibold mb-6">{question}</h1>}
         <div className="text-sm space-y-4 mb-4">
           {displayedParagraphs.map((paragraph, index) => (
             <div key={index} className="animate-fade-in prose prose-sm max-w-none">
