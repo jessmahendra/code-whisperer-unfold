@@ -1,5 +1,5 @@
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle } from "lucide-react";
+import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle, History } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
 import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
@@ -19,7 +19,10 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
+import { useNavigate } from "react-router-dom";
+
 export default function Header() {
+  const navigate = useNavigate();
   const [currentRepo, setCurrentRepo] = useState<{
     owner: string;
     repo: string;
@@ -230,14 +233,18 @@ export default function Header() {
         };
     }
   };
+  const handleLogoClick = () => {
+    navigate("/");
+  };
   const statusInfo = getConnectionStatusInfo();
+  
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          <Link to="/" className="flex items-center space-x-2">
+          <div onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
             <BookOpen className="h-6 w-6 text-unfold-purple" />
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">Unfold</span>
-          </Link>
+          </div>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
@@ -274,6 +281,20 @@ export default function Header() {
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Connect directly to the Ghost GitHub repository</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/history")} className="flex items-center gap-1">
+                    <History className="h-4 w-4" />
+                    History
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>View your chat history</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

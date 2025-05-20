@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import SlackMessage from "./SlackMessage";
 import SlackAnswerDisplay from "./SlackAnswerDisplay";
 import { generateAnswer } from "@/services/answerGenerator";
 import { Send, Search } from "lucide-react";
+import { addChatEntry } from "@/services/chatHistoryService";
 
 // Pre-defined sample questions and conversation flows
 const DEMO_SCENARIOS = {
@@ -99,6 +99,9 @@ export default function SlackInterface({ scenario }: SlackInterfaceProps) {
           const answer = await generateAnswer(actualQuestion);
           
           if (answer) {
+            // Save to chat history
+            addChatEntry(actualQuestion, answer);
+            
             // Add bot response
             setMessages(prev => [...prev, {
               sender: "Unfold",

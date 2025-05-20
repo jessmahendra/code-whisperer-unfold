@@ -1,147 +1,75 @@
-
 import { useState } from "react";
-import QuestionInput from "@/components/QuestionInput";
-import SuggestedQuestions from "@/components/SuggestedQuestions";
-import AnswerDisplay from "@/components/AnswerDisplay";
-import NoAnswerFallback from "@/components/NoAnswerFallback";
+import AnswerDisplay from "./AnswerDisplay";
+import QuestionInput from "./QuestionInput";
+import SuggestedQuestions from "./SuggestedQuestions";
 import { generateAnswer } from "@/services/answerGenerator";
-import { toast } from "@/components/ui/sonner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { addChatEntry } from "@/services/chatHistoryService";
 
-// Sample suggested questions
-const suggestedQuestions = [
-  "How does the subscription payment process work in Ghost?",
-  "What happens when a member's subscription expires?",
-  "Can members access content after their subscription ends?",
-  "Is there a limit to how many posts a publication can have?",
-  "How does Ghost handle premium vs. free content?"
-];
-
-interface Answer {
-  text: string;
-  confidence: number;
-  references: {
-    filePath: string;
-    lineNumbers?: string;
-    snippet?: string;
-    lastUpdated?: string;
-  }[];
-  visualContext?: {
-    type: 'flowchart' | 'component' | 'state';
-    syntax: string;
-  };
-}
-
-interface QuestionHandlerProps {
-  isProcessing: boolean;
-  isInitializingKB: boolean;
-  isAIEnabled: boolean;
-  usingMockData: boolean;
-}
-
-export default function QuestionHandler({
-  isProcessing: externalProcessing,
-  isInitializingKB,
-  isAIEnabled,
-  usingMockData
-}: QuestionHandlerProps) {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<Answer | null>(null);
+export default function QuestionHandler({ className }: { className?: string }) {
+  const [lastAnswer, setLastAnswer] = useState<any>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleAskQuestion = async (query: string) => {
-    setQuestion(query);
-    setIsProcessing(true);
-    // Reset answer when a new question is asked
-    setAnswer(null);
+  const suggestedQuestions = [
+    "How does Ghost handle image uploads?",
+    "What is the difference between a post and a page in Ghost?",
+    "How can I integrate Ghost with other services?",
+  ];
+
+  const handleAskQuestion = async (question: string) => {
     try {
-      // Simulate a bit of processing time to show the animation
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const result = await generateAnswer(query);
-      if (result) {
-        setAnswer(result);
-      } else {
-        setAnswer(null);
+      setIsProcessing(true);
+      setCurrentQuestion(question);
+      setError(null);
+      
+      const answer = await generateAnswer(question);
+
+      // Save to chat history after getting the answer
+      if (answer) {
+        addChatEntry(question, answer);
+      }
+      
+      setLastAnswer(answer);
+      
+      if (!answer || !answer.answer) {
+        setError("I couldn't find information related to your question.");
       }
     } catch (error) {
-      console.error("Error generating answer:", error);
-      toast.error("Failed to generate answer");
-      setAnswer(null);
+      console.error("Error processing question:", error);
+      setError(`Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleSelectQuestion = (query: string) => {
-    handleAskQuestion(query);
+  const handleSelectQuestion = (question: string) => {
+    handleAskQuestion(question);
   };
-
-  const formatTimestamp = () => {
-    const now = new Date();
-    return new Intl.DateTimeFormat('en-US', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(now);
-  };
-
-  const combinedIsProcessing = isProcessing || externalProcessing;
 
   return (
-    <div className="text-left">
-      {usingMockData && question && !combinedIsProcessing && (
-        <Alert variant="warning" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Using mock data for answers. Connect to a GitHub repository for accurate responses.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      <div className={question ? "" : "flex flex-col items-center justify-center py-16"}>
-        {!question && (
-          <h1 className="text-3xl font-bold mb-8 text-center">What do you want to know today?</h1>
-        )}
-        
-        <div className="relative w-full">
-          <QuestionInput 
-            onAskQuestion={handleAskQuestion} 
-            isProcessing={combinedIsProcessing || isInitializingKB}
-            centered={!question}
-          />
+    <div className={className}>
+      <QuestionInput
+        onAskQuestion={handleAskQuestion}
+        isProcessing={isProcessing}
+        centered
+      />
+      <SuggestedQuestions
+        questions={suggestedQuestions}
+        onSelectQuestion={handleSelectQuestion}
+        isProcessing={isProcessing}
+      />
+      {lastAnswer && currentQuestion && (
+        <div className="mt-8 max-w-3xl mx-auto">
+          <h2 className="text-lg font-semibold mb-4">
+            Answer to: {currentQuestion}
+          </h2>
+          {error ? (
+            <p className="text-red-500">{error}</p>
+          ) : (
+            <AnswerDisplay answer={lastAnswer} />
+          )}
         </div>
-
-        {!question && (
-          <SuggestedQuestions 
-            questions={suggestedQuestions} 
-            onSelectQuestion={handleSelectQuestion} 
-            isProcessing={combinedIsProcessing || isInitializingKB}
-          />
-        )}
-      </div>
-
-      {combinedIsProcessing && (
-        <div className="max-w-3xl mx-auto text-center mt-8">
-          <div className="inline-flex items-center gap-2 text-sm bg-background/80 px-4 py-2 rounded-full shadow-sm animate-pulse-slow">
-            <div className="h-2 w-2 bg-indigo-600 rounded-full" />
-            Processing your question...
-          </div>
-        </div>
-      )}
-
-      {!combinedIsProcessing && question && (
-        answer ? (
-          <AnswerDisplay
-            question={question}
-            answer={answer.text}
-            confidence={answer.confidence}
-            references={answer.references}
-            timestamp={formatTimestamp()}
-            visualContext={answer.visualContext}
-          />
-        ) : (
-          question && !combinedIsProcessing && <NoAnswerFallback question={question} />
-        )
       )}
     </div>
   );
