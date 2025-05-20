@@ -23,7 +23,7 @@ interface VisualContext {
 
 export interface AnswerDisplayProps {
   question?: string;
-  answer: string;
+  answer: string | { text: string; [key: string]: any };
   confidence?: number;
   references?: Reference[];
   timestamp?: string;
@@ -43,15 +43,21 @@ export default function AnswerDisplay({
   const [paragraphIndex, setParagraphIndex] = useState(0);
   const [showVersionInfo, setShowVersionInfo] = useState(false);
   const typingSpeed = 300; // milliseconds per paragraph
-  const paragraphs = typeof answer === 'string' ? answer.split('\n\n').filter(p => p.trim() !== '') : [];
+  
+  // Handle the answer text based on its type
+  const answerContent = typeof answer === 'string' ? answer : 
+                       (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
+                       "No answer text available";
+                       
+  const paragraphs = answerContent.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
 
   useEffect(() => {
-    if (typeof answer === 'string') {
-      fullTextRef.current = answer.split('\n\n').filter(p => p.trim() !== '');
-    } else {
-      fullTextRef.current = ["No answer text available"];
-    }
+    const content = typeof answer === 'string' ? answer : 
+                   (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
+                   "No answer text available";
+                   
+    fullTextRef.current = content.split('\n\n').filter(p => p.trim() !== '');
     setParagraphIndex(0);
     setDisplayedParagraphs([]);
     setIsTyping(true);
@@ -73,12 +79,11 @@ export default function AnswerDisplay({
   }, [paragraphIndex, isTyping]);
 
   const handleCopyAnswer = () => {
-    if (typeof answer === 'string') {
-      navigator.clipboard.writeText(answer);
-      toast.success("Answer copied to clipboard");
-    } else {
-      toast.error("Unable to copy answer");
-    }
+    const textToCopy = typeof answer === 'string' ? answer : 
+                      (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
+                      "No answer text available";
+    navigator.clipboard.writeText(textToCopy);
+    toast.success("Answer copied to clipboard");
   };
 
   const handleCompleteTyping = () => {
@@ -92,10 +97,10 @@ export default function AnswerDisplay({
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
   const confidencePercentage = Math.round(confidence * 100);
 
-  // Handle the case where answer is not a string
+  // Extract the answer text for ShareButton
   const answerText = typeof answer === 'string' ? answer : 
-                     (answer && typeof answer === 'object' && 'text' in answer) ? answer.text as string :
-                     "No readable answer available";
+                    (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
+                    "No readable answer available";
 
   return (
     <div className="mt-8 max-w-3xl mx-auto">
