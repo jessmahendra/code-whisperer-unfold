@@ -1,12 +1,12 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Clock, GitBranch, Blocks, PieChart } from "lucide-react";
+import { Copy, Clock } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import ShareButton from "./ShareButton";
-import mermaid from "mermaid";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Reference {
@@ -42,47 +42,9 @@ export default function AnswerDisplay({
   const [isTyping, setIsTyping] = useState(true);
   const [paragraphIndex, setParagraphIndex] = useState(0);
   const [showVersionInfo, setShowVersionInfo] = useState(false);
-  const [renderKey, setRenderKey] = useState(0);
   const typingSpeed = 300; // milliseconds per paragraph
   const paragraphs = answer.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
-  const diagramRef = useRef<HTMLDivElement>(null);
-
-  // Initialize mermaid
-  useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'neutral',
-      securityLevel: 'loose',
-    });
-  }, []);
-
-  // Render mermaid diagram when visualContext changes
-  useEffect(() => {
-    if (visualContext && diagramRef.current) {
-      const renderDiagram = async () => {
-        try {
-          diagramRef.current!.innerHTML = '';
-          const { svg } = await mermaid.render(`diagram-${renderKey}`, visualContext.syntax);
-          
-          // Add styles to constrain SVG dimensions to prevent scroll jumping
-          const svgElement = diagramRef.current.querySelector('svg');
-          if (svgElement) {
-            svgElement.style.maxWidth = '100%';
-            svgElement.style.height = 'auto';
-            svgElement.setAttribute('preserveAspectRatio', 'xMinYMin meet');
-          }
-          
-          setRenderKey(prev => prev + 1);
-        } catch (error) {
-          console.error("Failed to render diagram:", error);
-          diagramRef.current!.innerHTML = '<p class="text-red-500">Failed to render diagram</p>';
-        }
-      };
-
-      renderDiagram();
-    }
-  }, [visualContext, renderKey]);
 
   useEffect(() => {
     fullTextRef.current = answer.split('\n\n').filter(p => p.trim() !== '');
@@ -121,22 +83,6 @@ export default function AnswerDisplay({
 
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
   const confidencePercentage = Math.round(confidence * 100);
-
-  // Get the appropriate icon for the visual context type
-  const getVisualIcon = () => {
-    if (!visualContext) return null;
-    
-    switch (visualContext.type) {
-      case 'flowchart':
-        return <GitBranch className="h-4 w-4" />;
-      case 'component':
-        return <Blocks className="h-4 w-4" />;
-      case 'state':
-        return <PieChart className="h-4 w-4" />;
-      default:
-        return null;
-    }
-  };
 
   return (
     <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6 text-left">
@@ -202,18 +148,7 @@ export default function AnswerDisplay({
               )}
             </div>
             
-            {/* Visual Context Display */}
-            {visualContext && (
-              <div className="mt-6 mb-6 border rounded-md p-4 overflow-hidden">
-                <div className="flex items-center mb-2">
-                  {getVisualIcon()}
-                  <h4 className="text-sm font-medium ml-2">
-                    {visualContext.type.charAt(0).toUpperCase() + visualContext.type.slice(1)} Visualization
-                  </h4>
-                </div>
-                <div ref={diagramRef} className="w-full overflow-hidden"></div>
-              </div>
-            )}
+            {/* Visual Context Display removed */}
           </div>
           <div className="border-t pt-4">
             <div className="mb-4">

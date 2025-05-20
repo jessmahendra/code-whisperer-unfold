@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
@@ -119,15 +120,7 @@ export default function SlackAnswerDisplay({
                 )}
               </div>
               
-              {/* Only render visual context if present and not typing */}
-              {!isTyping && answer.visualContext && (
-                <div className="border-t pt-2 mt-3 overflow-hidden">
-                  <div className="text-xs font-medium mb-1">Visualization:</div>
-                  <div className="text-xs text-muted-foreground italic mb-2">
-                    Open in Unfold for interactive visualization
-                  </div>
-                </div>
-              )}
+              {/* Note: Visualization section removed */}
               
               {!isTyping && (
                 <>
@@ -200,13 +193,6 @@ export default function SlackAnswerDisplay({
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Note about detailed view */}
-                  {answer.visualContext && (
-                    <div className="mt-2 mb-2 text-xs text-muted-foreground">
-                      <span className="italic">This answer includes visualizations. Open in Unfold for the full view.</span>
                     </div>
                   )}
                 </>

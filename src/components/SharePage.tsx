@@ -1,12 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
 import { Button } from "@/components/ui/button";
-import { Copy, Twitter, Linkedin, Mail, ExternalLink, GitBranch, Blocks, PieChart, BookOpen } from "lucide-react";
+import { Copy, Twitter, Linkedin, Mail, ExternalLink, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
-import mermaid from "mermaid";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 
 interface Reference {
@@ -22,17 +22,8 @@ export default function SharePage() {
   const { id } = useParams<{ id: string }>();
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
-  const [renderKey, setRenderKey] = useState(0);
-  const diagramRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Initialize mermaid
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'neutral',
-      securityLevel: 'loose',
-    });
-
     // Load the answer data
     if (id) {
       const sharedAnswer = getShareableAnswer(id);
@@ -40,28 +31,6 @@ export default function SharePage() {
       setLoading(false);
     }
   }, [id]);
-
-  // Render mermaid diagram when answer is loaded
-  useEffect(() => {
-    if (answer?.answer.visualContext && diagramRef.current) {
-      const renderDiagram = async () => {
-        try {
-          diagramRef.current!.innerHTML = '';
-          const { svg } = await mermaid.render(
-            `diagram-${renderKey}`, 
-            answer.answer.visualContext!.syntax
-          );
-          diagramRef.current!.innerHTML = svg;
-          setRenderKey(prev => prev + 1);
-        } catch (error) {
-          console.error("Failed to render diagram:", error);
-          diagramRef.current!.innerHTML = '<p class="text-red-500">Failed to render diagram</p>';
-        }
-      };
-
-      renderDiagram();
-    }
-  }, [answer, renderKey]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href)
@@ -85,29 +54,6 @@ export default function SharePage() {
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString();
-  };
-
-  // Get confidence class based on score
-  const getConfidenceClass = (score: number) => {
-    if (score >= 0.8) return 'bg-green-500';
-    if (score >= 0.5) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  // Get the appropriate icon for the visual context type
-  const getVisualIcon = () => {
-    if (!answer?.answer.visualContext) return null;
-    
-    switch (answer.answer.visualContext.type) {
-      case 'flowchart':
-        return <GitBranch className="h-4 w-4" />;
-      case 'component':
-        return <Blocks className="h-4 w-4" />;
-      case 'state':
-        return <PieChart className="h-4 w-4" />;
-      default:
-        return null;
-    }
   };
 
   if (loading) {
@@ -217,19 +163,7 @@ export default function SharePage() {
               ))}
             </div>
             
-            {/* Visual Context Display */}
-            {answer.answer.visualContext && (
-              <div className="mt-6 mb-6 border rounded-md p-4">
-                <div className="flex items-center mb-2">
-                  {getVisualIcon()}
-                  <h4 className="text-sm font-medium ml-2">
-                    {answer.answer.visualContext.type.charAt(0).toUpperCase() + 
-                     answer.answer.visualContext.type.slice(1)} Visualization
-                  </h4>
-                </div>
-                <div ref={diagramRef} className="overflow-x-auto"></div>
-              </div>
-            )}
+            {/* Visual Context Display removed */}
             
             <div className="border-t pt-4 mt-6">
               {/* Confidence Score */}
