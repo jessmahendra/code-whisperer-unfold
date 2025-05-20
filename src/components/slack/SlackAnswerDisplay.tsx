@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink } from "lucide-react";
@@ -41,7 +40,9 @@ export default function SlackAnswerDisplay({
   const [paragraphIndex, setParagraphIndex] = useState(0);
   const typingSpeed = 500; // milliseconds per paragraph
   
-  const paragraphs = answer.text.split('\n\n').filter(p => p.trim() !== '');
+  // Make sure we have a valid text content to display
+  const answerText = answer && typeof answer.text === 'string' ? answer.text : "No answer available";
+  const paragraphs = answerText.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
 
   // Get avatar for Unfold
@@ -52,11 +53,11 @@ export default function SlackAnswerDisplay({
   );
 
   useEffect(() => {
-    fullTextRef.current = answer.text.split('\n\n').filter(p => p.trim() !== '');
+    fullTextRef.current = answerText.split('\n\n').filter(p => p.trim() !== '');
     setParagraphIndex(0);
     setDisplayedParagraphs([]);
     setIsTyping(true);
-  }, [answer.text]);
+  }, [answerText]);
 
   useEffect(() => {
     if (!isTyping) return;

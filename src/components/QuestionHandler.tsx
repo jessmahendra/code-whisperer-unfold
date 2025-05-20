@@ -5,6 +5,7 @@ import QuestionInput from "./QuestionInput";
 import SuggestedQuestions from "./SuggestedQuestions";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
+import NoAnswerFallback from "./NoAnswerFallback";
 
 export default function QuestionHandler({ className }: { className?: string }) {
   const [lastAnswer, setLastAnswer] = useState<any>(null);
@@ -62,17 +63,14 @@ export default function QuestionHandler({ className }: { className?: string }) {
       />
       {lastAnswer && currentQuestion && (
         <div className="mt-8 max-w-3xl mx-auto">
-          <h2 className="text-lg font-semibold mb-4">
-            Answer to: {currentQuestion}
-          </h2>
           {error ? (
-            <p className="text-red-500">{error}</p>
+            <NoAnswerFallback question={currentQuestion} />
           ) : (
             <AnswerDisplay 
               question={currentQuestion}
-              answer={lastAnswer.answer || ""}
-              confidence={lastAnswer.confidence || 1.0}
-              references={lastAnswer.references || []}
+              answer={lastAnswer.answer}
+              confidence={lastAnswer.confidence}
+              references={lastAnswer.references}
               timestamp={new Date().toLocaleString()}
             />
           )}
