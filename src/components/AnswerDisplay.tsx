@@ -22,16 +22,16 @@ interface VisualContext {
 }
 
 export interface AnswerDisplayProps {
-  question: string;
+  question?: string;
   answer: string;
-  confidence: number;
-  references: Reference[];
-  timestamp: string;
+  confidence?: number;
+  references?: Reference[];
+  timestamp?: string;
   visualContext?: VisualContext;
 }
 
 export default function AnswerDisplay({
-  question,
+  question = "",
   answer,
   confidence = 1.0,
   references = [],
@@ -94,12 +94,12 @@ export default function AnswerDisplay({
 
   // Handle the case where answer is not a string
   const answerText = typeof answer === 'string' ? answer : 
-                     (answer && typeof answer === 'object' && answer.text) ? answer.text :
+                     (answer && typeof answer === 'object' && 'text' in answer) ? answer.text as string :
                      "No readable answer available";
 
   return (
     <div className="mt-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-6">{question}</h1>
+      {question && <h1 className="text-2xl font-semibold mb-6">{question}</h1>}
       
       <div className="flex justify-end mb-2">
         <div className="flex gap-2">
@@ -113,14 +113,16 @@ export default function AnswerDisplay({
               Complete
             </Button>
           )}
-          <ShareButton 
-            question={question} 
-            answer={{
-              text: typeof answer === 'string' ? answer : JSON.stringify(answer),
-              confidence: confidence,
-              references: references
-            }}
-          />
+          {question && (
+            <ShareButton 
+              question={question} 
+              answer={{
+                text: answerText,
+                confidence: confidence,
+                references: references
+              }}
+            />
+          )}
           <Button
             variant="outline"
             size="sm"
