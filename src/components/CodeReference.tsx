@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Code2, Copy, ExternalLink, Clock } from "lucide-react";
+import { Code2, Copy, ExternalLink, Clock, User } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -9,9 +9,11 @@ interface CodeReferenceProps {
   lineNumbers?: string;
   snippet?: string;
   lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
 }
 
-export default function CodeReference({ filePath, lineNumbers, snippet, lastUpdated }: CodeReferenceProps) {
+export default function CodeReference({ filePath, lineNumbers, snippet, lastUpdated, author, authorEmail }: CodeReferenceProps) {
   const [showHistory, setShowHistory] = useState(false);
   
   const handleCopyPath = () => {
@@ -44,7 +46,7 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
           )}
         </div>
         <div className="flex gap-1">
-          {lastUpdated && (
+          {(lastUpdated || author) && (
             <Button
               variant="ghost"
               size="sm"
@@ -82,9 +84,16 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
         </div>
       </div>
       
-      {showHistory && lastUpdated && (
+      {showHistory && (lastUpdated || author) && (
         <div className="mb-2 text-xs text-muted-foreground bg-slate-100 p-2 rounded-md">
-          {formatLastUpdated()}
+          {lastUpdated && <div>{formatLastUpdated()}</div>}
+          {author && (
+            <div className="flex items-center mt-1">
+              <User className="h-3 w-3 mr-1" />
+              <span>Author: {author}</span>
+              {authorEmail && <span className="ml-1">({authorEmail})</span>}
+            </div>
+          )}
         </div>
       )}
       

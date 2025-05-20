@@ -1,3 +1,4 @@
+
 import { useEffect } from "react";
 import Header from "@/components/Header";
 import GradientBackground from "@/components/GradientBackground";
@@ -8,6 +9,7 @@ import { Slack } from "lucide-react";
 import RepositoryStatus from "@/components/RepositoryStatus";
 import QuestionHandler from "@/components/QuestionHandler";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
+
 export default function Index() {
   const [connectionStatus, updateConnectionStatus] = useConnectionStatus();
 
@@ -37,6 +39,7 @@ export default function Index() {
     }, 300);
     return () => clearInterval(intervalId);
   }, [updateConnectionStatus]);
+  
   const openConfigModal = () => {
     // Find and click the config button in the header
     const configButton = document.querySelector('header button') as HTMLButtonElement;
@@ -47,6 +50,7 @@ export default function Index() {
 
   // Determine if we should show the banner - consider exploration status
   const shouldShowWarningBanner = (!connectionStatus.isConnected || connectionStatus.usingMockData) && connectionStatus.explorationStatus !== "exploring" && !connectionStatus.showProgressIndicator;
+  
   return <GradientBackground>
       <div className="min-h-screen flex flex-col">
         <Header />
@@ -72,7 +76,6 @@ export default function Index() {
           <div className="container relative">
             <div className="text-center">
               <p>Currently using {connectionStatus.usingMockData ? 'mock' : 'repository'} data for knowledge base</p>
-              {connectionStatus.isAIEnabled}
             </div>
             <Button variant="ghost" size="icon" asChild className="absolute bottom-0 right-0 hover:bg-slate-100">
               <Link to="/slack-demo">

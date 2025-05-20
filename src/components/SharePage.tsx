@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
@@ -239,6 +238,8 @@ export default function SharePage() {
                     lineNumbers={reference.lineNumbers}
                     snippet={reference.snippet}
                     lastUpdated={reference.lastUpdated}
+                    author={reference.author}
+                    authorEmail={reference.authorEmail}
                   />
                 ))}
               </div>

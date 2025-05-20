@@ -159,11 +159,48 @@ export async function fetchCommitHistory(owner: string, repo: string, path: stri
       sha: item.sha,
       date: item.commit.author?.date || new Date().toISOString(),
       message: item.commit.message,
-      author: item.commit.author?.name || 'Unknown'
+      author: item.commit.author?.name || 'Unknown',
+      authorEmail: item.commit.author?.email || undefined
     }));
   } catch (error) {
     console.error(`Error fetching commit history for ${owner}/${repo}/${path}:`, error);
     throw error;
+  }
+}
+
+/**
+ * Get the most recent author information for a file
+ * @param owner Repository owner
+ * @param repo Repository name
+ * @param path Path to the file
+ * @returns Author information (name and email)
+ */
+export async function fetchFileAuthor(owner: string, repo: string, path: string) {
+  if (!octokitInstance) {
+    throw new Error("GitHub client not initialized");
+  }
+
+  try {
+    const commits = await fetchCommitHistory(owner, repo, path, 1);
+    
+    if (commits && commits.length > 0) {
+      return {
+        name: commits[0].author,
+        email: commits[0].authorEmail
+      };
+    }
+    
+    return {
+      name: undefined,
+      email: undefined
+    };
+  } catch (error) {
+    console.error(`Error fetching author for ${owner}/${repo}/${path}:`, error);
+    // Return undefined instead of throwing to prevent errors from blocking rendering
+    return {
+      name: undefined,
+      email: undefined
+    };
   }
 }
 

@@ -11,6 +11,8 @@ interface Reference {
   lineNumbers?: string;
   snippet?: string;
   lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
 }
 
 interface VisualContext {
@@ -177,6 +179,7 @@ export default function SlackAnswerDisplay({
                     {answer.references.slice(0, 2).map((ref, idx) => (
                       <div key={idx} className="font-mono">
                         {ref.filePath.split('/').pop()}
+                        {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
                       </div>
                     ))}
                     {answer.references.length > 2 && (
