@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";

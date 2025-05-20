@@ -1,4 +1,3 @@
-
 /**
  * Service for handling shareable answer creation and retrieval
  */
@@ -8,6 +7,8 @@ interface Reference {
   lineNumbers?: string;
   snippet?: string;
   lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
 }
 
 interface VisualContext {
