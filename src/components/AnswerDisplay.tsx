@@ -8,6 +8,7 @@ import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import ShareButton from "./ShareButton";
 import mermaid from "mermaid";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Reference {
   filePath: string;
@@ -132,99 +133,101 @@ export default function AnswerDisplay({
 
   return (
     <div className="mt-8 max-w-3xl mx-auto bg-white rounded-lg shadow-md border p-6 text-left">
-      <div className="mb-4">
-        <div className="flex justify-between items-start mb-4">
-          <h3 className="font-semibold text-lg">{question}</h3>
-          <div className="flex gap-2">
-            {isTyping && (
+      <ScrollArea className="h-[75vh] pr-4">
+        <div className="mb-4">
+          <div className="flex justify-between items-start mb-4">
+            <h3 className="font-semibold text-lg">{question}</h3>
+            <div className="flex gap-2">
+              {isTyping && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-muted-foreground text-xs"
+                  onClick={handleCompleteTyping}
+                >
+                  Complete
+                </Button>
+              )}
+              {hasVersionInfo && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-muted-foreground text-xs flex items-center gap-1"
+                  onClick={() => setShowVersionInfo(!showVersionInfo)}
+                >
+                  <Clock className="h-3 w-3" />
+                  {showVersionInfo ? "Hide" : "Show"} Version Info
+                </Button>
+              )}
+              <ShareButton 
+                question={question} 
+                answer={{
+                  text: answer,
+                  confidence: confidence,
+                  references: references,
+                  visualContext: visualContext
+                }}
+              />
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="text-muted-foreground text-xs"
-                onClick={handleCompleteTyping}
+                className="text-muted-foreground"
+                onClick={handleCopyAnswer}
               >
-                Complete
+                <Copy className="h-4 w-4 mr-1" />
+                Copy
               </Button>
-            )}
-            {hasVersionInfo && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-muted-foreground text-xs flex items-center gap-1"
-                onClick={() => setShowVersionInfo(!showVersionInfo)}
-              >
-                <Clock className="h-3 w-3" />
-                {showVersionInfo ? "Hide" : "Show"} Version Info
-              </Button>
-            )}
-            <ShareButton 
-              question={question} 
-              answer={{
-                text: answer,
-                confidence: confidence,
-                references: references,
-                visualContext: visualContext
-              }}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={handleCopyAnswer}
-            >
-              <Copy className="h-4 w-4 mr-1" />
-              Copy
-            </Button>
-          </div>
-        </div>
-        <div className="text-sm space-y-4 mb-6 text-left">
-          {displayedParagraphs.map((paragraph, index) => (
-            <div key={index} className="animate-fade-in prose prose-sm max-w-none">
-              <ReactMarkdown>{paragraph}</ReactMarkdown>
             </div>
-          ))}
-          {isTyping && displayedParagraphs.length < paragraphs.length && (
-            <div className="flex items-center space-x-2 animate-pulse">
-              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-              <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+          </div>
+          <div className="text-sm space-y-4 mb-6 text-left">
+            {displayedParagraphs.map((paragraph, index) => (
+              <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+                <ReactMarkdown>{paragraph}</ReactMarkdown>
+              </div>
+            ))}
+            {isTyping && displayedParagraphs.length < paragraphs.length && (
+              <div className="flex items-center space-x-2 animate-pulse">
+                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+              </div>
+            )}
+          </div>
+          
+          {/* Visual Context Display */}
+          {visualContext && (
+            <div className="mt-6 mb-6 border rounded-md p-4">
+              <div className="flex items-center mb-2">
+                {getVisualIcon()}
+                <h4 className="text-sm font-medium ml-2">
+                  {visualContext.type.charAt(0).toUpperCase() + visualContext.type.slice(1)} Visualization
+                </h4>
+              </div>
+              <div ref={diagramRef} className="overflow-x-auto"></div>
             </div>
           )}
         </div>
-        
-        {/* Visual Context Display */}
-        {visualContext && (
-          <div className="mt-6 mb-6 border rounded-md p-4">
-            <div className="flex items-center mb-2">
-              {getVisualIcon()}
-              <h4 className="text-sm font-medium ml-2">
-                {visualContext.type.charAt(0).toUpperCase() + visualContext.type.slice(1)} Visualization
-              </h4>
-            </div>
-            <div ref={diagramRef} className="overflow-x-auto"></div>
+        <div className="border-t pt-4">
+          <div className="mb-4">
+            <ConfidenceScore score={confidencePercentage} />
           </div>
-        )}
-      </div>
-      <div className="border-t pt-4">
-        <div className="mb-4">
-          <ConfidenceScore score={confidencePercentage} />
+          <h4 className="text-sm font-medium mb-2">References</h4>
+          <div className="space-y-2">
+            {references.map((reference, index) => (
+              <CodeReference 
+                key={index} 
+                filePath={reference.filePath}
+                lineNumbers={reference.lineNumbers}
+                snippet={reference.snippet}
+                lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
+              />
+            ))}
+          </div>
+          <div className="text-xs text-muted-foreground mt-4">
+            Generated on {timestamp}
+          </div>
         </div>
-        <h4 className="text-sm font-medium mb-2">References</h4>
-        <div className="space-y-2">
-          {references.map((reference, index) => (
-            <CodeReference 
-              key={index} 
-              filePath={reference.filePath}
-              lineNumbers={reference.lineNumbers}
-              snippet={reference.snippet}
-              lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
-            />
-          ))}
-        </div>
-        <div className="text-xs text-muted-foreground mt-4">
-          Generated on {timestamp}
-        </div>
-      </div>
+      </ScrollArea>
     </div>
   );
 }
