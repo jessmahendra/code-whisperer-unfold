@@ -9,6 +9,15 @@ import CodeReference from "./CodeReference";
 import mermaid from "mermaid";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 
+interface Reference {
+  filePath: string;
+  lineNumbers?: string;
+  snippet?: string;
+  lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
+}
+
 export default function SharePage() {
   const { id } = useParams<{ id: string }>();
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
