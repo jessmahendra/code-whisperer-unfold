@@ -5,7 +5,6 @@ import { Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface Reference {
   filePath: string;
@@ -103,102 +102,98 @@ export default function SlackAnswerDisplay({
         </div>
         
         <div className="mt-2 p-3 border rounded-md bg-white">
-          <ScrollArea className="max-h-[40vh]">
-            <div className="pr-3">
-              <div className="text-sm space-y-2 mb-3 text-left">
-                {displayedParagraphs.map((paragraph, index) => (
-                  <div key={index} className="animate-fade-in prose prose-sm max-w-none">
-                    <ReactMarkdown>{paragraph}</ReactMarkdown>
+          <div className="pr-3 max-h-[60vh] overflow-auto">
+            <div className="text-sm space-y-2 mb-3 text-left">
+              {displayedParagraphs.map((paragraph, index) => (
+                <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+                  <ReactMarkdown>{paragraph}</ReactMarkdown>
+                </div>
+              ))}
+              {isTyping && displayedParagraphs.length < paragraphs.length && (
+                <div className="flex items-center space-x-2 animate-pulse">
+                  <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                  <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                  <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                </div>
+              )}
+            </div>
+            
+            {!isTyping && (
+              <>
+                <div className="border-t pt-2 mt-3">
+                  <div className="text-xs flex items-center mb-2">
+                    <div className={`w-2 h-2 rounded-full mr-1 ${
+                      confidencePercentage >= 80 ? "bg-green-500" : 
+                      confidencePercentage >= 50 ? "bg-amber-500" : 
+                      "bg-red-500"
+                    }`}></div>
+                    <span className="text-muted-foreground">
+                      {confidenceLabel} ({confidencePercentage}%)
+                    </span>
                   </div>
-                ))}
-                {isTyping && displayedParagraphs.length < paragraphs.length && (
-                  <div className="flex items-center space-x-2 animate-pulse">
-                    <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-                    <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
-                    <div className="h-2 w-2 bg-unfold-purple rounded-full"></div>
+                  
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Based on {answer.references.length} file{answer.references.length !== 1 ? 's' : ''}
                   </div>
-                )}
-              </div>
-              
-              {/* Note: Visualization section removed */}
-              
-              {!isTyping && (
-                <>
-                  <div className="border-t pt-2 mt-3">
-                    <div className="text-xs flex items-center mb-2">
-                      <div className={`w-2 h-2 rounded-full mr-1 ${
-                        confidencePercentage >= 80 ? "bg-green-500" : 
-                        confidencePercentage >= 50 ? "bg-amber-500" : 
-                        "bg-red-500"
-                      }`}></div>
-                      <span className="text-muted-foreground">
-                        {confidenceLabel} ({confidencePercentage}%)
-                      </span>
-                    </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={handleCopyAnswer}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
                     
-                    <div className="text-xs text-muted-foreground mb-2">
-                      Based on {answer.references.length} file{answer.references.length !== 1 ? 's' : ''}
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      asChild
+                    >
+                      <Link to="/">
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Open in Unfold
+                      </Link>
+                    </Button>
                     
-                    <div className="flex gap-2">
+                    {isTyping && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="text-xs"
-                        onClick={handleCopyAnswer}
+                        onClick={handleCompleteTyping}
                       >
-                        <Copy className="h-3 w-3 mr-1" />
-                        Copy
+                        Complete typing
                       </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs"
-                        asChild
-                      >
-                        <Link to="/">
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          Open in Unfold
-                        </Link>
-                      </Button>
-                      
-                      {isTyping && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          onClick={handleCompleteTyping}
-                        >
-                          Complete typing
-                        </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* File references (simplified for Slack) */}
+                {answer.references.length > 0 && (
+                  <div className="mt-3 mb-1">
+                    <div className="text-xs font-medium mb-1">Source files:</div>
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      {answer.references.slice(0, 2).map((ref, idx) => (
+                        <div key={idx} className="font-mono">
+                          {ref.filePath.split('/').pop()}
+                          {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
+                        </div>
+                      ))}
+                      {answer.references.length > 2 && (
+                        <div className="text-xs text-muted-foreground">
+                          +{answer.references.length - 2} more files
+                        </div>
                       )}
                     </div>
                   </div>
-
-                  {/* File references (simplified for Slack) */}
-                  {answer.references.length > 0 && (
-                    <div className="mt-3 mb-1">
-                      <div className="text-xs font-medium mb-1">Source files:</div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        {answer.references.slice(0, 2).map((ref, idx) => (
-                          <div key={idx} className="font-mono">
-                            {ref.filePath.split('/').pop()}
-                            {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
-                          </div>
-                        ))}
-                        {answer.references.length > 2 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{answer.references.length - 2} more files
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </ScrollArea>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
