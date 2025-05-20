@@ -119,25 +119,25 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
   
   // Generate specific answers based on identified topics
   if (query.toLowerCase().includes('subscription') || topics.has('subscription')) {
-    answerText = "Ghost handles subscription payments through its integration with Stripe. When a subscription expires, the member's status is automatically changed to 'free', which means they can still access free content and their account, but premium content will be restricted.";
+    answerText = "Ghost handles subscription payments through Stripe. When a customer's subscription ends, they automatically switch to a free membership. This means they can still log in and access free content, but premium content will require renewal of their subscription.";
   } else if (query.toLowerCase().includes('post') || topics.has('post')) {
-    answerText = "There are no limits on the number of posts that can be created in Ghost for any plan. However, premium content can be restricted to paid members through visibility settings. Posts can be scheduled for future publication, and Ghost handles SEO metadata for optimizing post visibility in search engines.";
+    answerText = "There's no limit to how many posts you can create in Ghost, regardless of which plan you're on. You can make some content available only to paying members by adjusting visibility settings. Ghost also lets you schedule posts to publish automatically at a future date and time, and helps optimize your content to appear higher in search engine results.";
   } else if (query.toLowerCase().includes('member') || topics.has('member')) {
-    answerText = "Ghost's members feature enables user registration, email subscriptions, and paid memberships. Members can have different access levels: free, paid, or comped (manually granted premium access). Member data is stored securely and can be exported in compliance with data protection regulations.";
+    answerText = "Ghost's membership feature lets your audience sign up, subscribe to emails, and access paid content. Members can join at different levels: free members get access to basic content, paid members get premium access, and you can also manually grant premium access to specific individuals. All member information is stored securely and can be exported if needed, in compliance with privacy regulations.";
   } else if (query.toLowerCase().includes('auth') || topics.has('auth') || topics.has('authenticate')) {
-    answerText = "Ghost uses a token-based authentication system. Admin users authenticate with username/password, while members can use email/password or magic links. API authentication uses content API keys for public content and admin API keys for administrative tasks.";
+    answerText = "Ghost uses a secure login system for different types of users. Site administrators log in with a username and password. Readers who sign up as members can log in with either an email/password combination or through 'magic links' sent to their email (no password needed). For connecting with other services, Ghost uses secure access keys - public keys for accessing published content and private admin keys for management functions.";
   } else if (query.toLowerCase().includes('payment') || topics.has('payment')) {
-    answerText = "Ghost integrates directly with Stripe for payment processing. It supports one-time payments and recurring subscriptions. When payments fail, Ghost automatically retries based on Stripe's retry schedule and notifies both the member and site admin.";
+    answerText = "Ghost works directly with Stripe to handle all payments securely. Your customers can make one-time payments or sign up for regular subscriptions. If a payment doesn't go through, Ghost automatically tries again based on Stripe's retry schedule and sends notifications to both the customer and the site admin so everyone stays informed.";
   } else {
     // Generic answer for other queries
-    answerText = "Based on the Ghost codebase analysis, this functionality is handled through specific services and APIs. ";
+    answerText = "Based on our review of Ghost's system, this feature is handled through specific services that work together to deliver a seamless experience for both you and your audience. ";
     
-    // Add some details based on what was found
+    // Add some details based on what was found, in non-technical language
     if (functions.size > 0) {
-      answerText += `Key functions involved include ${Array.from(functions).slice(0, 3).join(', ')}. `;
+      answerText += `The system includes components that handle ${Array.from(functions).slice(0, 3).join(', ')} in user-friendly ways. `;
     }
     
-    answerText += "For more detailed information, please refer to the documentation or ask a more specific question.";
+    answerText += "For more specific information about how this works for your particular needs, please feel free to ask a more detailed question.";
   }
   
   // Add version awareness to the answer
@@ -150,7 +150,7 @@ export async function generateAnswer(query: string): Promise<Answer | null> {
     
     // Add timestamp information to the answer
     if (mostRecentResult.lastUpdated && mostRecentResult.lastUpdated !== 'Unknown') {
-      answerText += `\n\nThis information reflects the code as of ${new Date(mostRecentResult.lastUpdated).toLocaleDateString()}.`;
+      answerText += `\n\nThis information is current as of ${new Date(mostRecentResult.lastUpdated).toLocaleDateString()}.`;
     }
   }
   
