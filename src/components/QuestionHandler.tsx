@@ -68,7 +68,7 @@ export default function QuestionHandler({ className }: { className?: string }) {
           ) : (
             <AnswerDisplay 
               question={currentQuestion}
-              answer={lastAnswer.answer}
+              answer={lastAnswer}
               confidence={lastAnswer.confidence}
               references={lastAnswer.references}
               timestamp={new Date().toLocaleString()}
