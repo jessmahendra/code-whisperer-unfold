@@ -68,12 +68,7 @@ export default function Index() {
             />
           )}
           
-          <QuestionHandler 
-            isProcessing={connectionStatus.isInitializingKB} 
-            isInitializingKB={connectionStatus.isInitializingKB} 
-            isAIEnabled={connectionStatus.isAIEnabled} 
-            usingMockData={connectionStatus.usingMockData} 
-          />
+          <QuestionHandler className="mt-4" />
         </section>
       </main>
       

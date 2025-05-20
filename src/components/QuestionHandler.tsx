@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -32,7 +33,7 @@ export default function QuestionHandler({ className }: { className?: string }) {
       
       setLastAnswer(answer);
       
-      if (!answer || !answer.answer) {
+      if (!answer) {
         setError("I couldn't find information related to your question.");
       }
     } catch (error) {
@@ -67,7 +68,13 @@ export default function QuestionHandler({ className }: { className?: string }) {
           {error ? (
             <p className="text-red-500">{error}</p>
           ) : (
-            <AnswerDisplay answer={lastAnswer} />
+            <AnswerDisplay 
+              question={currentQuestion}
+              answer={lastAnswer.answer || ""}
+              confidence={lastAnswer.confidence || 1.0}
+              references={lastAnswer.references || []}
+              timestamp={new Date().toLocaleString()}
+            />
           )}
         </div>
       )}

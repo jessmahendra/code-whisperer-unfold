@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/components/ui/sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { History } from "lucide-react";
+import { History as HistoryIcon } from "lucide-react";
 
 export default function History() {
   const [history, setHistory] = useState<ChatEntry[]>([]);
@@ -48,7 +48,7 @@ export default function History() {
       
       <div className="container py-8">
         <div className="flex items-center gap-2 mb-6">
-          <History className="h-6 w-6 text-indigo-600" />
+          <HistoryIcon className="h-6 w-6 text-indigo-600" />
           <h1 className="text-2xl font-bold">Chat History</h1>
         </div>
         
@@ -120,7 +120,13 @@ export default function History() {
                   </CardHeader>
                   <Separator />
                   <CardContent className="pt-6">
-                    <AnswerDisplay answer={selectedEntry.answer} />
+                    <AnswerDisplay 
+                      question={selectedEntry.question}
+                      answer={selectedEntry.answer}
+                      confidence={1.0}
+                      references={[]}
+                      timestamp={new Date(selectedEntry.timestamp).toLocaleString()}
+                    />
                   </CardContent>
                 </Card>
               )}
