@@ -43,25 +43,37 @@ export default function ShareButton({ question, answer }: ShareButtonProps) {
     setIsCreatingShare(true);
     
     try {
+      console.log("Creating shareable answer for question:", question);
       // Create shareable version
       const shareableLink = await createShareableAnswer(question, answer);
+      console.log("Created shareable link:", shareableLink);
       setShareUrl(shareableLink.fullUrl);
       
-      // Copy to clipboard
+      // Copy to clipboard and verify data was stored
       copyToClipboard(shareableLink.fullUrl);
       
       // Verify data was saved correctly by trying to access the data
-      // This helps ensure storage is working properly
-      const testStorage = localStorage.getItem('unfold_shareableAnswers');
-      if (!testStorage || !testStorage.includes(shareableLink.id)) {
-        throw new Error('Failed to verify storage');
+      try {
+        // Check localStorage
+        const localData = localStorage.getItem('unfold_shareableAnswers');
+        // Check sessionStorage as fallback
+        const sessionData = sessionStorage.getItem('unfold_shareableAnswers');
+        
+        if ((!localData || !localData.includes(shareableLink.id)) && 
+            (!sessionData || !sessionData.includes(shareableLink.id))) {
+          console.error("Storage verification failed - ID not found in either storage");
+          toast.error("Warning: Link created but may not persist across sessions.");
+        } else {
+          // Show success toast
+          toast.success(
+            "Link copied to clipboard! This link will work across browser sessions.",
+            { duration: 5000 }
+          );
+        }
+      } catch (verifyError) {
+        console.error("Error verifying storage:", verifyError);
+        toast.warning("Link created but might not work in all browsers.");
       }
-      
-      // Show info toast about persistent storage
-      toast.success(
-        "Link copied to clipboard! This link will work across browser sessions.",
-        { duration: 5000 }
-      );
     } catch (error) {
       console.error('Error sharing answer:', error);
       toast.error("Failed to create shareable link. Storage might be blocked in your browser.");

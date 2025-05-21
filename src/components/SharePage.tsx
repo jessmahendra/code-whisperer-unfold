@@ -23,12 +23,41 @@ export default function SharePage() {
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [storageStatus, setStorageStatus] = useState<{local: boolean, session: boolean}>({local: false, session: false});
 
   useEffect(() => {
     // Load the answer data
     if (id) {
       try {
         console.log("Attempting to load shared answer with ID:", id);
+        
+        // Check what's in storage to aid debugging
+        try {
+          const localData = localStorage.getItem('unfold_shareableAnswers');
+          const sessionData = sessionStorage.getItem('unfold_shareableAnswers');
+          
+          setStorageStatus({
+            local: !!localData,
+            session: !!sessionData
+          });
+          
+          console.log("localStorage has data:", !!localData);
+          console.log("sessionStorage has data:", !!sessionData);
+          
+          if (localData) {
+            const parsed = JSON.parse(localData);
+            console.log("Available IDs in localStorage:", Object.keys(parsed));
+          }
+          
+          if (sessionData) {
+            const parsed = JSON.parse(sessionData);
+            console.log("Available IDs in sessionStorage:", Object.keys(parsed));
+          }
+        } catch (storageError) {
+          console.error("Error checking storage:", storageError);
+        }
+        
+        // Try to get the answer
         const sharedAnswer = getShareableAnswer(id);
         
         if (sharedAnswer) {
@@ -126,6 +155,16 @@ export default function SharePage() {
                   <strong>Note:</strong> In this current demo version, shared answers are stored in your browser's storage.
                   For a production environment, a proper backend database would be used for persistence.
                 </p>
+              </div>
+              
+              {/* Debug information */}
+              <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
+                <p className="text-sm text-gray-700 font-medium mb-2">Debug Information:</p>
+                <ul className="text-xs text-gray-600 space-y-1">
+                  <li>ID parameter: {id || "Not provided"}</li>
+                  <li>localStorage available: {storageStatus.local ? "Yes" : "No"}</li>
+                  <li>sessionStorage available: {storageStatus.session ? "Yes" : "No"}</li>
+                </ul>
               </div>
             </CardContent>
             <CardFooter>
