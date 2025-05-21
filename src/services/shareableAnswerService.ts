@@ -36,8 +36,7 @@ export interface ShareableAnswer {
   }[];
 }
 
-// Using sessionStorage for convenience in this demo
-// Storage key
+// Storage key for local and session storage
 const STORAGE_KEY = 'unfold_shareableAnswers';
 
 // Initialize example shareable answers on module load
@@ -143,13 +142,27 @@ export async function createShareableAnswer(
     referrers: []
   };
   
-  // Store in both localStorage and sessionStorage for persistence
-  const existingAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  existingAnswers[shareId] = shareableAnswer;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
-  
-  // Also store in sessionStorage as backup
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+  try {
+    // Store in localStorage (primary storage)
+    const existingAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    existingAnswers[shareId] = shareableAnswer;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+    
+    // Also store in sessionStorage as backup
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+    
+    // Use the localStorage event to notify other tabs/windows
+    const event = new CustomEvent('shareableAnswerCreated', { 
+      detail: { id: shareId, answer: shareableAnswer } 
+    });
+    window.dispatchEvent(event);
+  } catch (error) {
+    console.error('Error storing shareable answer:', error);
+    // Fallback to sessionStorage only if localStorage fails
+    const sessionAnswers = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+    sessionAnswers[shareId] = shareableAnswer;
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sessionAnswers));
+  }
   
   // Return the shareable link data
   const baseUrl = window.location.origin;
@@ -164,58 +177,125 @@ export async function createShareableAnswer(
  * Get a shareable answer by ID
  */
 export function getShareableAnswer(id: string): ShareableAnswer | null {
-  // First try localStorage
-  let existingAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  let answer = existingAnswers[id];
-  
-  // If not found in localStorage, try sessionStorage
-  if (!answer) {
-    existingAnswers = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
-    answer = existingAnswers[id];
+  try {
+    // First try localStorage (primary storage)
+    const localStorageData = localStorage.getItem(STORAGE_KEY);
+    if (localStorageData) {
+      const existingAnswers = JSON.parse(localStorageData);
+      const answer = existingAnswers[id];
+      
+      if (answer) {
+        // Update view count
+        answer.views += 1;
+        
+        // Add referrer if available
+        if (document.referrer) {
+          answer.referrers.push({
+            url: document.referrer,
+            date: new Date().toISOString()
+          });
+        }
+        
+        // Save updated stats
+        existingAnswers[id] = answer;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+        
+        return answer;
+      }
+    }
+    
+    // If not found in localStorage, try sessionStorage
+    const sessionStorageData = sessionStorage.getItem(STORAGE_KEY);
+    if (sessionStorageData) {
+      const sessionAnswers = JSON.parse(sessionStorageData);
+      const answer = sessionAnswers[id];
+      
+      if (answer) {
+        // Update view count
+        answer.views += 1;
+        
+        // Add referrer if available
+        if (document.referrer) {
+          answer.referrers.push({
+            url: document.referrer,
+            date: new Date().toISOString()
+          });
+        }
+        
+        // Save updated stats to session storage
+        sessionAnswers[id] = answer;
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(sessionAnswers));
+        
+        // Try to save to localStorage as well
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionAnswers));
+        } catch (e) {
+          console.warn('Could not save to localStorage:', e);
+        }
+        
+        return answer;
+      }
+    }
+    
+    // Answer not found in either storage
+    return null;
+  } catch (error) {
+    console.error('Error retrieving shareable answer:', error);
+    return null;
   }
-  
-  if (!answer) return null;
-  
-  // Increment view count
-  answer.views += 1;
-  
-  // Add referrer if available
-  if (document.referrer) {
-    answer.referrers.push({
-      url: document.referrer,
-      date: new Date().toISOString()
-    });
-  }
-  
-  // Save updated view count to both storage mechanisms
-  existingAnswers[id] = answer;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
-  
-  return answer;
 }
 
 /**
  * Track a share event
  */
 export function trackShare(id: string, platform: string): void {
-  // First try localStorage
-  let existingAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-  let answer = existingAnswers[id];
-  
-  // If not found in localStorage, try sessionStorage
-  if (!answer) {
-    existingAnswers = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
-    answer = existingAnswers[id];
+  try {
+    // First try localStorage
+    let existingAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+    let answer = existingAnswers[id];
+    
+    // If not found in localStorage, try sessionStorage
+    if (!answer) {
+      existingAnswers = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || '{}');
+      answer = existingAnswers[id];
+    }
+    
+    if (!answer) return;
+    
+    // Increment share count
+    answer.shares += 1;
+    
+    // Save updated share count to both storage mechanisms
+    existingAnswers[id] = answer;
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+    } catch (e) {
+      console.warn('Could not save share tracking to localStorage:', e);
+    }
+    
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+  } catch (error) {
+    console.error('Error tracking share:', error);
   }
+}
+
+/**
+ * Listen for shareable answer events from other tabs/windows
+ * This helps synchronize storage across tabs
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY && event.newValue) {
+      // Synchronize with sessionStorage when localStorage changes
+      sessionStorage.setItem(STORAGE_KEY, event.newValue);
+    }
+  });
   
-  if (!answer) return;
-  
-  // Increment share count
-  answer.shares += 1;
-  
-  // Save updated share count to both storage mechanisms
-  existingAnswers[id] = answer;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(existingAnswers));
+  // Listen for custom events from this tab
+  window.addEventListener('shareableAnswerCreated', ((event: CustomEvent) => {
+    // Can be used for additional synchronization if needed
+    console.log('Shareable answer created:', event.detail.id);
+  }) as EventListener);
 }

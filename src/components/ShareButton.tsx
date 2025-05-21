@@ -50,6 +50,13 @@ export default function ShareButton({ question, answer }: ShareButtonProps) {
       // Copy to clipboard
       copyToClipboard(shareableLink.fullUrl);
       
+      // Verify data was saved correctly by trying to access the data
+      // This helps ensure storage is working properly
+      const testStorage = localStorage.getItem('unfold_shareableAnswers');
+      if (!testStorage || !testStorage.includes(shareableLink.id)) {
+        throw new Error('Failed to verify storage');
+      }
+      
       // Show info toast about persistent storage
       toast.success(
         "Link copied to clipboard! This link will work across browser sessions.",
@@ -57,7 +64,7 @@ export default function ShareButton({ question, answer }: ShareButtonProps) {
       );
     } catch (error) {
       console.error('Error sharing answer:', error);
-      toast.error("Failed to create shareable link");
+      toast.error("Failed to create shareable link. Storage might be blocked in your browser.");
     } finally {
       setIsCreatingShare(false);
     }

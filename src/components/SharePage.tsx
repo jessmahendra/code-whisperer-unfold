@@ -22,13 +22,28 @@ export default function SharePage() {
   const { id } = useParams<{ id: string }>();
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Load the answer data
     if (id) {
-      const sharedAnswer = getShareableAnswer(id);
-      setAnswer(sharedAnswer);
-      setLoading(false);
+      try {
+        console.log("Attempting to load shared answer with ID:", id);
+        const sharedAnswer = getShareableAnswer(id);
+        
+        if (sharedAnswer) {
+          console.log("Successfully loaded shared answer:", sharedAnswer.id);
+          setAnswer(sharedAnswer);
+        } else {
+          console.log("No answer found for ID:", id);
+          setError("The shared answer could not be found");
+        }
+      } catch (err) {
+        console.error("Error loading shared answer:", err);
+        setError("Failed to load the shared answer");
+      } finally {
+        setLoading(false);
+      }
     }
   }, [id]);
 
@@ -69,7 +84,7 @@ export default function SharePage() {
     );
   }
 
-  if (!answer) {
+  if (!answer || error) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <div className="border-b bg-white shadow-sm">
@@ -95,16 +110,16 @@ export default function SharePage() {
             <CardHeader>
               <CardTitle>Answer Not Found</CardTitle>
               <CardDescription>
-                The shared answer you're looking for does not exist or is no longer available.
+                {error || "The shared answer you're looking for does not exist or is no longer available."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p>This could be because:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>The link is incorrect or incomplete</li>
-                <li>The answer was created in a different device</li>
-                <li>The browser's storage was cleared</li>
-                <li>The answer has expired</li>
+                <li>The answer was created in a different browser or device</li>
+                <li>Your browser's storage was cleared or is restricted</li>
+                <li>The answer has expired or was removed</li>
               </ul>
               <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
                 <p className="text-sm text-amber-800">
