@@ -36,6 +36,7 @@ export default function Header() {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
+  
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
@@ -272,9 +273,8 @@ export default function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="flex items-center gap-1">
-                    <Settings className="h-4 w-4" />
-                    Settings
+                  <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="flex items-center justify-center p-0 h-9 w-9">
+                    <Settings className="h-5 w-5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -337,32 +337,6 @@ export default function Header() {
                   {connectionError.length > 60 ? `${connectionError.substring(0, 60)}...` : connectionError}
                 </AlertDescription>
               </Alert>}
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <a href="https://github.com/TryGhost/Ghost" target="_blank" rel="noopener noreferrer">
-                    <GitHubLogoIcon className="h-6 w-6" />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View the Ghost GitHub repository</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <a href="https://ghost.org/docs/api/v5/admin/" target="_blank" rel="noopener noreferrer">
-                    <Code2 className="h-5 w-5" />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View API documentation</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
             
             <TooltipProvider>
               <Tooltip>
