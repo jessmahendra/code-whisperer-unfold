@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Mail } from "lucide-react";
@@ -114,8 +115,14 @@ Best regards,
     confidencePercentage >= 50 ? "Medium confidence" : 
     "Low confidence";
 
-  // Custom components for ReactMarkdown
+  // Custom components for ReactMarkdown with enhanced heading styles
   const markdownComponents = {
+    h1: (props: any) => <h1 className="text-2xl font-bold mt-5 mb-3" {...props} />,
+    h2: (props: any) => <h2 className="text-xl font-bold mt-4 mb-2" {...props} />,
+    h3: (props: any) => <h3 className="text-lg font-semibold mt-3 mb-2" {...props} />,
+    h4: (props: any) => <h4 className="text-md font-semibold mt-3 mb-1" {...props} />,
+    h5: (props: any) => <h5 className="text-base font-semibold mt-2 mb-1" {...props} />,
+    h6: (props: any) => <h6 className="text-sm font-semibold mt-2 mb-1" {...props} />,
     ul: (props: any) => <ul className="list-disc pl-6 my-3" {...props} />,
     ol: (props: any) => <ol className="list-decimal pl-6 my-3" {...props} />,
     li: (props: any) => <li className="my-1" {...props} />
