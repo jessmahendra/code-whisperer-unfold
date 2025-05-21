@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
 import SuggestedQuestions from "./SuggestedQuestions";
+import ShareSessionButton from "./ShareSessionButton";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
@@ -105,6 +106,13 @@ export default function QuestionHandler({ className }: { className?: string }) {
       {/* Search input at the bottom - fixed position */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
         <div className="max-w-2xl mx-auto px-4">
+          <div className="flex items-center justify-between mb-3">
+            <ShareSessionButton 
+              answers={answers}
+              className="text-sm"
+            />
+          </div>
+          
           <QuestionInput
             onAskQuestion={handleAskQuestion}
             isProcessing={isProcessing}

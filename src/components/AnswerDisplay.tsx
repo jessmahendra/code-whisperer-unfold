@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
-import ShareButton from "./ShareButton";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 
 interface Reference {
@@ -125,11 +124,6 @@ Best regards,
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
   const confidencePercentage = Math.round(confidence * 100);
 
-  // Extract the answer text for ShareButton
-  const answerText = typeof answer === 'string' ? answer : 
-                    (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
-                    "No readable answer available";
-
   return (
     <Card className="mb-4 overflow-hidden">
       <CardHeader className="pb-0">
@@ -172,16 +166,6 @@ Best regards,
             <Mail className="h-4 w-4 mr-1" />
             Create Email
           </Button>
-          {question && (
-            <ShareButton 
-              question={question} 
-              answer={{
-                text: answerText,
-                confidence: confidence,
-                references: references
-              }}
-            />
-          )}
           <Button
             variant="outline"
             size="sm"
