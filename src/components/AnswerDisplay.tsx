@@ -194,7 +194,7 @@ Best regards,
         <div className="mt-8">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
           
-          {/* Always display file reference pills, not hidden behind the button */}
+          {/* Always display file reference pills */}
           <div className="flex flex-wrap gap-2 mb-4">
             {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
               <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
@@ -209,10 +209,10 @@ Best regards,
             className="mb-3 text-xs"
             onClick={() => setShowReferences(!showReferences)}
           >
-            {showReferences ? "Hide all source files" : "Show all source files"}
+            {showReferences ? "Hide source code" : "Show source code"}
           </Button>
           
-          {/* Only show code references when the button is clicked */}
+          {/* Show code references directly when button is clicked */}
           {showReferences && (
             <div className="space-y-3 mt-4">
               {references.map((reference, index) => (

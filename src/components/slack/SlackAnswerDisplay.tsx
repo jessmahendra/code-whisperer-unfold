@@ -1,11 +1,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, ExternalLink, ChevronDown, Mail } from "lucide-react";
+import { Copy, ExternalLink, Mail } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Reference {
   filePath: string;
@@ -210,40 +209,39 @@ Best regards,
                 {/* Source files section */}
                 {answer.references.length > 0 && (
                   <div className="mt-3 mb-1">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {Array.from(new Set(answer.references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
+                        <span key={index} className="bg-gray-100 text-gray-700 px-2 py-1 rounded-full text-xs">
+                          {filename}
+                        </span>
+                      ))}
+                    </div>
+                    
                     <div className="flex items-center justify-between mb-1">
-                      <div className="text-xs font-medium">Source files:</div>
+                      <div className="text-xs font-medium">Source code:</div>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 text-xs py-0"
                         onClick={() => setShowSourceFiles(!showSourceFiles)}
                       >
-                        {showSourceFiles ? "Hide files" : "Show files"}
+                        {showSourceFiles ? "Hide code" : "Show code"}
                       </Button>
                     </div>
                     
                     {showSourceFiles && (
-                      <div className="text-xs space-y-1">
+                      <div className="text-xs space-y-2">
                         {answer.references.map((ref, idx) => (
-                          <Collapsible key={idx}>
-                            <div className="flex items-center justify-between">
-                              <div className="font-mono text-muted-foreground">
-                                {ref.filePath.split('/').pop()}
-                                {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
-                              </div>
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                  <ChevronDown className="h-4 w-4" />
-                                  <span className="sr-only">Toggle</span>
-                                </Button>
-                              </CollapsibleTrigger>
+                          <div key={idx} className="bg-slate-50 p-2 rounded border">
+                            <div className="font-mono text-xs text-muted-foreground mb-1">
+                              {ref.filePath.split('/').pop()}
+                              {ref.lineNumbers && <span className="ml-2">Lines: {ref.lineNumbers}</span>}
+                              {ref.author && <span className="ml-2">by {ref.author}</span>}
                             </div>
-                            <CollapsibleContent>
-                              <div className="mt-1 p-2 bg-slate-100 rounded-md font-mono text-xs">
-                                {ref.snippet || `// File path: ${ref.filePath}`}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
+                            <div className="p-2 bg-slate-100 rounded-md font-mono text-xs overflow-auto">
+                              {ref.snippet || `// File path: ${ref.filePath}`}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
