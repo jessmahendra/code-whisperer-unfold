@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, ExternalLink } from "lucide-react";
+import { Copy, ExternalLink, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface Reference {
   filePath: string;
@@ -173,20 +174,35 @@ export default function SlackAnswerDisplay({
                   </div>
                 </div>
 
-                {/* File references (simplified for Slack) */}
+                {/* File references (collapsible for Slack) */}
                 {answer.references.length > 0 && (
                   <div className="mt-3 mb-1">
                     <div className="text-xs font-medium mb-1">Source files:</div>
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      {answer.references.slice(0, 2).map((ref, idx) => (
-                        <div key={idx} className="font-mono">
-                          {ref.filePath.split('/').pop()}
-                          {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
-                        </div>
+                    <div className="text-xs space-y-1">
+                      {answer.references.slice(0, 3).map((ref, idx) => (
+                        <Collapsible key={idx}>
+                          <div className="flex items-center justify-between">
+                            <div className="font-mono text-muted-foreground">
+                              {ref.filePath.split('/').pop()}
+                              {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
+                            </div>
+                            <CollapsibleTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                <ChevronDown className="h-4 w-4" />
+                                <span className="sr-only">Toggle</span>
+                              </Button>
+                            </CollapsibleTrigger>
+                          </div>
+                          <CollapsibleContent>
+                            <div className="mt-1 p-2 bg-slate-100 rounded-md font-mono text-xs">
+                              {ref.snippet || `// File path: ${ref.filePath}`}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
                       ))}
-                      {answer.references.length > 2 && (
+                      {answer.references.length > 3 && (
                         <div className="text-xs text-muted-foreground">
-                          +{answer.references.length - 2} more files
+                          +{answer.references.length - 3} more files
                         </div>
                       )}
                     </div>

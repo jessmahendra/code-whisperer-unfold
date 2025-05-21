@@ -166,7 +166,7 @@ export default function AnswerDisplay({
             ))}
           </div>
 
-          <div className="space-y-2 mt-4">
+          <div className="space-y-3 mt-4">
             {references.map((reference, index) => (
               <CodeReference 
                 key={index} 
