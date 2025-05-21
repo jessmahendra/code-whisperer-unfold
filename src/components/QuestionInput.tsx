@@ -28,6 +28,12 @@ export default function QuestionInput({
     setQuestion(""); // Clear input after submitting
   };
 
+  const handleEmptyButtonClick = () => {
+    if (!question.trim()) {
+      toast.error("Please enter a question");
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
       <div className="relative">
@@ -40,10 +46,11 @@ export default function QuestionInput({
         />
         <Button 
           type="submit"
-          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} !bg-sky-900 hover:!bg-sky-800 !border-sky-900`}
-          disabled={isProcessing || !question.trim()}
+          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-sky-900 hover:bg-sky-800 border-sky-900`}
+          disabled={isProcessing}
           variant="default"
-          style={{ backgroundColor: "#0c4a6e" }} /* Adding inline style for additional specificity */
+          style={{ backgroundColor: "#0c4a6e" }}
+          onClick={!question.trim() ? handleEmptyButtonClick : undefined}
         >
           {isProcessing ? "Processing..." : centered ? "Search" : "Ask"}
           {centered && <ArrowRight className="ml-1 h-4 w-4" />}
