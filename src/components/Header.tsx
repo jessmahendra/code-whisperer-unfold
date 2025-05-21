@@ -20,6 +20,7 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
 import { useNavigate } from "react-router-dom";
+
 export default function Header() {
   const navigate = useNavigate();
   const [currentRepo, setCurrentRepo] = useState<{
@@ -242,7 +243,6 @@ export default function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <div onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
-            
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">Unfold</span>
           </div>
         </div>
