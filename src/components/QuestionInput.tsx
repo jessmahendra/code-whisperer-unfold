@@ -32,7 +32,7 @@ export default function QuestionInput({
     <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
       <div className="relative">
         <Input
-          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} shadow-sm focus-visible:ring-unfold-purple`}
+          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} shadow-sm focus-visible:ring-sky-900`}
           placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -40,7 +40,7 @@ export default function QuestionInput({
         />
         <Button 
           type="submit"
-          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-unfold-purple hover:bg-unfold-dark-purple`}
+          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-sky-900 hover:bg-sky-800 border-sky-900`}
           disabled={isProcessing || !question.trim()}
         >
           {isProcessing ? "Processing..." : centered ? "Search" : "Ask"}
