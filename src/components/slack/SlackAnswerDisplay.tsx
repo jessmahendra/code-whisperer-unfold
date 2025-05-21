@@ -129,7 +129,7 @@ Best regards,
           <div className="pr-3 max-h-[60vh] overflow-auto">
             <div className="text-sm space-y-2 mb-3 text-left">
               {displayedParagraphs.map((paragraph, index) => (
-                <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+                <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert prose-ul:list-disc prose-ol:list-decimal">
                   <ReactMarkdown>{paragraph}</ReactMarkdown>
                 </div>
               ))}
