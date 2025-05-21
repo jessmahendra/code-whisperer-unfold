@@ -236,7 +236,7 @@ export default function Header() {
   const handleLogoClick = () => {
     navigate("/");
   };
-  const statusInfo = getConnectionStatus ? getConnectionStatusInfo() : null;
+  const statusInfo = getConnectionStatusInfo();
   
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -341,7 +341,9 @@ export default function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  
+                  <a href="https://github.com/TryGhost/Ghost" target="_blank" rel="noopener noreferrer">
+                    <GitHubLogoIcon className="h-6 w-6" />
+                  </a>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View the Ghost GitHub repository</p>
@@ -352,7 +354,9 @@ export default function Header() {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  
+                  <a href="https://ghost.org/docs/api/v5/admin/" target="_blank" rel="noopener noreferrer">
+                    <Code2 className="h-5 w-5" />
+                  </a>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>View API documentation</p>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { KeyRound, AlertCircle } from "lucide-react";
 import { hasAICapabilities, wasAPIKeyPreviouslySet, getAPIKeyState } from "@/services/aiAnalysis";
-import { getCurrentRepository, getConnectionDiagnostics } from "@/services/githubConnector";
+import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
 import { isUsingMockData } from "@/services/knowledgeBase";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
 import { Link } from "react-router-dom";
@@ -54,6 +54,9 @@ export default function Settings() {
   const diagnostics = getConnectionDiagnostics();
   const apiKeyStatus = getAPIKeyState();
   const isAIEnabled = hasAICapabilities();
+  
+  // Get the most relevant error message if any
+  const errorMessage = getMostRelevantErrorMessage();
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
@@ -111,10 +114,10 @@ export default function Settings() {
                     </div>
                   )}
                   
-                  {diagnostics.message && (
+                  {errorMessage && (
                     <div className="text-sm text-amber-600">
                       <AlertCircle className="h-4 w-4 inline mr-1" />
-                      {diagnostics.message}
+                      {errorMessage}
                     </div>
                   )}
                 </div>
