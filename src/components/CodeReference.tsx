@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Code2, Copy, ExternalLink, Clock, User, ChevronDown } from "lucide-react";
+import { Code2, Copy, ExternalLink, Clock, User, ChevronDown, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -17,6 +17,7 @@ interface CodeReferenceProps {
 export default function CodeReference({ filePath, lineNumbers, snippet, lastUpdated, author, authorEmail }: CodeReferenceProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [showCard, setShowCard] = useState(false);
   
   const handleCopyPath = () => {
     navigator.clipboard.writeText(filePath);
@@ -37,6 +38,22 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
     }
   };
 
+  if (!showCard) {
+    return (
+      <div className="mt-1">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowCard(true)} 
+          className="text-xs flex items-center gap-1"
+        >
+          <Eye className="h-3 w-3" />
+          <span>Show code for {getFileName()}</span>
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-slate-50 border rounded-md p-3 mt-2">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -49,6 +66,14 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
             )}
           </div>
           <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 p-1 text-xs"
+              onClick={() => setShowCard(false)}
+            >
+              Hide
+            </Button>
             <CollapsibleTrigger asChild>
               <Button
                 variant="ghost"
