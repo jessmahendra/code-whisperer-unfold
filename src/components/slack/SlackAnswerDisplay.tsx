@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Mail } from "lucide-react";
@@ -115,6 +114,13 @@ Best regards,
     confidencePercentage >= 50 ? "Medium confidence" : 
     "Low confidence";
 
+  // Custom components for ReactMarkdown
+  const markdownComponents = {
+    ul: (props: any) => <ul className="list-disc pl-6 my-3" {...props} />,
+    ol: (props: any) => <ol className="list-decimal pl-6 my-3" {...props} />,
+    li: (props: any) => <li className="my-1" {...props} />
+  };
+
   return (
     <div className="flex items-start gap-2 group text-left">
       {avatar}
@@ -129,8 +135,8 @@ Best regards,
           <div className="pr-3 max-h-[60vh] overflow-auto">
             <div className="text-sm space-y-2 mb-3 text-left">
               {displayedParagraphs.map((paragraph, index) => (
-                <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert prose-ul:list-disc prose-ol:list-decimal">
-                  <ReactMarkdown>{paragraph}</ReactMarkdown>
+                <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown components={markdownComponents}>{paragraph}</ReactMarkdown>
                 </div>
               ))}
               {isTyping && displayedParagraphs.length < paragraphs.length && (

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Mail } from "lucide-react";
@@ -124,6 +123,13 @@ Best regards,
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
   const confidencePercentage = Math.round(confidence * 100);
 
+  // Custom components for ReactMarkdown
+  const markdownComponents = {
+    ul: (props: any) => <ul className="list-disc pl-6 my-4" {...props} />,
+    ol: (props: any) => <ol className="list-decimal pl-6 my-4" {...props} />,
+    li: (props: any) => <li className="my-1" {...props} />
+  };
+
   return (
     <Card className="mb-4 overflow-hidden">
       <CardHeader className="pb-0">
@@ -133,8 +139,8 @@ Best regards,
       <CardContent className="pt-4">
         <div className="text-sm space-y-4 mb-4">
           {displayedParagraphs.map((paragraph, index) => (
-            <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert prose-ul:list-disc prose-ol:list-decimal">
-              <ReactMarkdown>{paragraph}</ReactMarkdown>
+            <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown components={markdownComponents}>{paragraph}</ReactMarkdown>
             </div>
           ))}
           {isTyping && displayedParagraphs.length < paragraphs.length && (
