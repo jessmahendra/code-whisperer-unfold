@@ -40,7 +40,7 @@ export default function QuestionInput({
         />
         <Button 
           type="submit"
-          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-indigo-600 hover:bg-indigo-700`}
+          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-unfold-purple hover:bg-unfold-dark-purple`}
           disabled={isProcessing || !question.trim()}
         >
           {isProcessing ? "Processing..." : centered ? "Search" : "Ask"}
