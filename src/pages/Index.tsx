@@ -55,7 +55,7 @@ export default function Index() {
     <div className="min-h-screen flex flex-col bg-white">
       <Header />
       
-      <main className="flex-1 container py-4 px-4">
+      <main className="flex-1 container py-4 px-4 pb-20">
         {shouldShowWarningBanner && (
           <div className="mb-6">
             <RepositoryStatus 
@@ -69,11 +69,11 @@ export default function Index() {
         )}
         
         <div className="max-w-3xl mx-auto">
-          <QuestionHandler className="pb-20" />
+          <QuestionHandler />
         </div>
       </main>
       
-      <footer className="border-t py-4 text-sm text-muted-foreground">
+      <footer className="border-t py-4 text-sm text-muted-foreground mt-16">
         <div className="container relative">
           <div className="text-center">
             <p>Currently using {connectionStatus.usingMockData ? 'mock' : 'repository'} data for knowledge base</p>

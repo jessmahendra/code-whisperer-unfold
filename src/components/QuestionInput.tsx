@@ -32,7 +32,7 @@ export default function QuestionInput({
     <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
       <div className="relative">
         <Input
-          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-4"} shadow-sm focus-visible:ring-unfold-purple`}
+          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} shadow-sm focus-visible:ring-unfold-purple`}
           placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}

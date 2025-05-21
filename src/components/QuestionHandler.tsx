@@ -58,9 +58,9 @@ export default function QuestionHandler({ className }: { className?: string }) {
   };
 
   return (
-    <div className={className}>
+    <div className={`relative min-h-[calc(100vh-200px)] ${className}`}>
       {/* Display answers at the top */}
-      <div className="space-y-8 mb-8">
+      <div className="space-y-8 mb-8 pb-36">
         {answers.map((item, index) => (
           <div key={index} className="max-w-3xl mx-auto">
             {error && index === 0 ? (
@@ -86,21 +86,23 @@ export default function QuestionHandler({ className }: { className?: string }) {
         </div>
       )}
       
-      {/* Search input at the bottom */}
-      <div className={`sticky bottom-4 max-w-2xl mx-auto bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-sm ${answers.length > 0 ? 'mt-12' : ''}`}>
-        <QuestionInput
-          onAskQuestion={handleAskQuestion}
-          isProcessing={isProcessing}
-          centered={answers.length === 0}
-        />
-        
-        {answers.length === 0 && (
-          <SuggestedQuestions
-            questions={suggestedQuestions}
-            onSelectQuestion={handleSelectQuestion}
+      {/* Search input at the bottom - now fixed position */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
+        <div className="max-w-2xl mx-auto px-4">
+          <QuestionInput
+            onAskQuestion={handleAskQuestion}
             isProcessing={isProcessing}
+            centered={answers.length === 0}
           />
-        )}
+          
+          {answers.length === 0 && (
+            <SuggestedQuestions
+              questions={suggestedQuestions}
+              onSelectQuestion={handleSelectQuestion}
+              isProcessing={isProcessing}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
