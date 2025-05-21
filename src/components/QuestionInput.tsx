@@ -25,6 +25,7 @@ export default function QuestionInput({
       return;
     }
     onAskQuestion(question);
+    setQuestion(""); // Clear input after submitting
   };
 
   return (
@@ -32,7 +33,7 @@ export default function QuestionInput({
       <div className="relative">
         <Input
           className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-4"} shadow-sm focus-visible:ring-unfold-purple`}
-          placeholder={centered ? "What do you want to know today?" : "Ask about Ghost's functionality..."}
+          placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           disabled={isProcessing}

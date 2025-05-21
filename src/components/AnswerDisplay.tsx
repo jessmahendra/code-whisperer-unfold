@@ -1,12 +1,13 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, Share, Mail } from "lucide-react";
+import { Copy, Mail } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import ShareButton from "./ShareButton";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 
 interface Reference {
   filePath: string;
@@ -130,9 +131,29 @@ Best regards,
                     "No readable answer available";
 
   return (
-    <div className="mt-8 max-w-3xl mx-auto">
-      <div className="flex justify-end mb-2">
-        <div className="flex gap-2">
+    <Card className="mb-4 overflow-hidden">
+      <CardHeader className="pb-0">
+        {question && <h1 className="text-2xl font-semibold">{question}</h1>}
+      </CardHeader>
+
+      <CardContent className="pt-4">
+        <div className="text-sm space-y-4 mb-4">
+          {displayedParagraphs.map((paragraph, index) => (
+            <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+              <ReactMarkdown>{paragraph}</ReactMarkdown>
+            </div>
+          ))}
+          {isTyping && displayedParagraphs.length < paragraphs.length && (
+            <div className="flex items-center space-x-2 animate-pulse">
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
+            </div>
+          )}
+        </div>
+
+        {/* Action buttons inside card */}
+        <div className="flex justify-end gap-2 mt-4 border-t pt-4">
           {isTyping && (
             <Button
               variant="outline"
@@ -170,28 +191,10 @@ Best regards,
             Copy
           </Button>
         </div>
-      </div>
-
-      <Card className="mb-4 p-6 text-left">
-        {question && <h1 className="text-2xl font-semibold mb-6">{question}</h1>}
-        <div className="text-sm space-y-4 mb-4">
-          {displayedParagraphs.map((paragraph, index) => (
-            <div key={index} className="animate-fade-in prose prose-sm max-w-none">
-              <ReactMarkdown>{paragraph}</ReactMarkdown>
-            </div>
-          ))}
-          {isTyping && displayedParagraphs.length < paragraphs.length && (
-            <div className="flex items-center space-x-2 animate-pulse">
-              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
-              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
-              <div className="h-2 w-2 bg-indigo-600 rounded-full"></div>
-            </div>
-          )}
-        </div>
-      </Card>
+      </CardContent>
 
       {references && references.length > 0 && (
-        <div className="mt-8">
+        <CardFooter className="flex-col items-start border-t pt-4">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
           
           {/* Always display file reference pills */}
@@ -229,7 +232,7 @@ Best regards,
             </div>
           )}
           
-          <div className="flex justify-between items-center mt-8">
+          <div className="flex justify-between items-center mt-8 w-full">
             <ConfidenceScore score={confidencePercentage} />
             
             <Button
@@ -245,8 +248,8 @@ Best regards,
           <div className="text-xs text-muted-foreground mt-2">
             Generated on {timestamp}
           </div>
-        </div>
+        </CardFooter>
       )}
-    </div>
+    </Card>
   );
 }

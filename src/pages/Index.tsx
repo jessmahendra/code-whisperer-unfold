@@ -1,7 +1,6 @@
 
 import { useEffect } from "react";
 import Header from "@/components/Header";
-import GradientBackground from "@/components/GradientBackground";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -56,9 +55,9 @@ export default function Index() {
     <div className="min-h-screen flex flex-col bg-white">
       <Header />
       
-      <main className="flex-1 container py-8 px-4">
-        <section className="max-w-3xl mx-auto">
-          {shouldShowWarningBanner && (
+      <main className="flex-1 container py-4 px-4">
+        {shouldShowWarningBanner && (
+          <div className="mb-6">
             <RepositoryStatus 
               bannerKey={connectionStatus.bannerKey} 
               showProgressIndicator={connectionStatus.showProgressIndicator} 
@@ -66,10 +65,12 @@ export default function Index() {
               isConnected={connectionStatus.isConnected} 
               openConfigModal={openConfigModal} 
             />
-          )}
-          
-          <QuestionHandler className="mt-4" />
-        </section>
+          </div>
+        )}
+        
+        <div className="max-w-3xl mx-auto">
+          <QuestionHandler className="pb-20" />
+        </div>
       </main>
       
       <footer className="border-t py-4 text-sm text-muted-foreground">
