@@ -133,7 +133,7 @@ Best regards,
       <CardContent className="pt-4">
         <div className="text-sm space-y-4 mb-4">
           {displayedParagraphs.map((paragraph, index) => (
-            <div key={index} className="animate-fade-in prose prose-sm max-w-none">
+            <div key={index} className="animate-fade-in prose prose-sm max-w-none prose-li:list-disc">
               <ReactMarkdown>{paragraph}</ReactMarkdown>
             </div>
           ))}
