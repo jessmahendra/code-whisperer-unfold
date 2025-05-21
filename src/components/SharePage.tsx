@@ -102,14 +102,14 @@ export default function SharePage() {
               <p>This could be because:</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>The link is incorrect or incomplete</li>
-                <li>The answer was created in a different browser session</li>
-                <li>The browser's local storage was cleared</li>
+                <li>The answer was created in a different device</li>
+                <li>The browser's storage was cleared</li>
                 <li>The answer has expired</li>
               </ul>
               <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
                 <p className="text-sm text-amber-800">
-                  <strong>Note:</strong> In this current demo version, shared answers are temporarily stored in your browser's local storage.
-                  This means shared links will only work in the same browser session where they were created.
+                  <strong>Note:</strong> In this current demo version, shared answers are stored in your browser's storage.
+                  For a production environment, a proper backend database would be used for persistence.
                 </p>
               </div>
             </CardContent>

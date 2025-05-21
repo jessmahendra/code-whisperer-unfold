@@ -10,6 +10,8 @@ interface Reference {
   lineNumbers?: string;
   snippet?: string;
   lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
 }
 
 interface VisualContext {
@@ -48,9 +50,9 @@ export default function ShareButton({ question, answer }: ShareButtonProps) {
       // Copy to clipboard
       copyToClipboard(shareableLink.fullUrl);
       
-      // Show info toast about session limitation
-      toast.info(
-        "Note: This shared link will only work in this browser session. For permanent sharing, consider taking a screenshot.",
+      // Show info toast about persistent storage
+      toast.success(
+        "Link copied to clipboard! This link will work across browser sessions.",
         { duration: 5000 }
       );
     } catch (error) {
