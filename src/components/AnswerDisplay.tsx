@@ -193,6 +193,16 @@ Best regards,
       {references && references.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
+          
+          {/* Always display file reference pills, not hidden behind the button */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
+              <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+                {filename}
+              </span>
+            ))}
+          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -202,31 +212,21 @@ Best regards,
             {showReferences ? "Hide all source files" : "Show all source files"}
           </Button>
           
+          {/* Only show code references when the button is clicked */}
           {showReferences && (
-            <>
-              <div className="flex flex-wrap gap-2 mb-4">
-                {/* File reference badges */}
-                {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
-                  <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
-                    {filename}
-                  </span>
-                ))}
-              </div>
-
-              <div className="space-y-3 mt-4">
-                {references.map((reference, index) => (
-                  <CodeReference 
-                    key={index} 
-                    filePath={reference.filePath}
-                    lineNumbers={reference.lineNumbers}
-                    snippet={reference.snippet}
-                    lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
-                    author={reference.author}
-                    authorEmail={reference.authorEmail}
-                  />
-                ))}
-              </div>
-            </>
+            <div className="space-y-3 mt-4">
+              {references.map((reference, index) => (
+                <CodeReference 
+                  key={index} 
+                  filePath={reference.filePath}
+                  lineNumbers={reference.lineNumbers}
+                  snippet={reference.snippet}
+                  lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
+                  author={reference.author}
+                  authorEmail={reference.authorEmail}
+                />
+              ))}
+            </div>
           )}
           
           <div className="flex justify-between items-center mt-8">
