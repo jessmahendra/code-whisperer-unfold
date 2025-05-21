@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -6,6 +7,7 @@ import ShareSessionButton from "./ShareSessionButton";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
+
 export default function QuestionHandler({
   className
 }: {
@@ -60,32 +62,58 @@ export default function QuestionHandler({
       });
     }
   }, [answers.length]);
-  return <div className={`relative min-h-[calc(100vh-200px)] ${className}`}>
-      {/* Header with share button */}
-      <div className="flex justify-end mb-6">
-        <ShareSessionButton answers={answers} />
-      </div>
 
-      {/* Display answers at the top - oldest to newest */}
-      <div className="space-y-8 mb-8 pb-36">
-        {answers.map((item, index) => <div key={index} className="max-w-3xl mx-auto" ref={index === answers.length - 1 ? latestAnswerRef : null}>
-            {error && index === answers.length - 1 ? <NoAnswerFallback question={item.question} /> : <AnswerDisplay question={item.question} answer={item.answer} confidence={item.answer.confidence} references={item.answer.references} timestamp={item.timestamp} />}
-          </div>)}
-      </div>
-      
-      {/* Initial view when no answers yet */}
-      {answers.length === 0 && <div className="text-center my-16">
-          <h2 className="text-2xl font-semibold mb-2">Ask anything about Ghost</h2>
-          <p className="text-muted-foreground mb-8">Get instant answers based on the codebase</p>
-        </div>}
-      
-      {/* Search input at the bottom - fixed position */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
-        <div className="max-w-2xl mx-auto px-4">
-          <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing} centered={answers.length === 0} />
-          
-          {answers.length === 0 && <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing} />}
+  // Determine the layout based on whether we have answers or not
+  const hasAnswers = answers.length > 0;
+  
+  return (
+    <div className={`relative ${className}`}>
+      {/* Header with share button - only show when there are answers */}
+      {hasAnswers && (
+        <div className="flex justify-end mb-6">
+          <ShareSessionButton answers={answers} />
         </div>
-      </div>
-    </div>;
+      )}
+
+      {/* Initial view when no answers yet - search is at the top */}
+      {!hasAnswers && (
+        <div className="my-16 max-w-2xl mx-auto">
+          <h2 className="text-2xl font-semibold mb-2 text-center">Ask anything about Ghost</h2>
+          <p className="text-muted-foreground mb-8 text-center">Get instant answers based on the codebase</p>
+          <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing} centered={true} />
+          <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing} />
+        </div>
+      )}
+
+      {/* Display answers - only when we have answers */}
+      {hasAnswers && (
+        <div>
+          <div className="space-y-8 mb-8">
+            {answers.map((item, index) => (
+              <div key={index} className="max-w-3xl mx-auto" ref={index === answers.length - 1 ? latestAnswerRef : null}>
+                {error && index === answers.length - 1 ? (
+                  <NoAnswerFallback question={item.question} />
+                ) : (
+                  <AnswerDisplay 
+                    question={item.question} 
+                    answer={item.answer} 
+                    confidence={item.answer.confidence} 
+                    references={item.answer.references} 
+                    timestamp={item.timestamp} 
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Search input at the bottom - only when we have answers */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
+            <div className="max-w-2xl mx-auto px-4">
+              <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing} centered={false} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
