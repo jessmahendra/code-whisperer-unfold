@@ -20,7 +20,6 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
 import { useNavigate } from "react-router-dom";
-
 export default function Header() {
   const navigate = useNavigate();
   const [currentRepo, setCurrentRepo] = useState<{
@@ -36,7 +35,6 @@ export default function Header() {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
-  
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
@@ -143,7 +141,9 @@ export default function Header() {
         return;
       }
       console.log("GitHub client initialized successfully, saving configuration...");
-      toast.success(`Authenticated as ${user.login}`, { duration: 3000 });
+      toast.success(`Authenticated as ${user.login}`, {
+        duration: 3000
+      });
 
       // Save Ghost repo configuration
       saveRepositoryConfig({
@@ -152,7 +152,7 @@ export default function Header() {
         token
       });
       console.log("Configuration saved, initializing knowledge base...");
-      
+
       // Use shorter duration for the loading toast
       const loadingToastId = toast.loading("Connecting to Ghost repository...", {
         duration: 5000 // 5 seconds max
@@ -160,7 +160,7 @@ export default function Header() {
 
       // Initialize knowledge base with force refresh
       await initializeKnowledgeBase(true);
-      
+
       // Dismiss the loading toast
       toast.dismiss(loadingToastId);
 
@@ -238,13 +238,12 @@ export default function Header() {
     navigate("/");
   };
   const statusInfo = getConnectionStatusInfo();
-  
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <div onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
-            <BookOpen className="h-6 w-6 text-unfold-purple" />
-            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">Unfold</span>
+            
+            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-neutral-300">Unfold</span>
           </div>
         </div>
         
