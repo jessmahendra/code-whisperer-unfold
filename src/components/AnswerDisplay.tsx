@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Share, Mail } from "lucide-react";
@@ -14,6 +13,8 @@ interface Reference {
   lineNumbers?: string;
   snippet?: string;
   lastUpdated?: string;
+  author?: string;
+  authorEmail?: string;
 }
 
 interface VisualContext {
