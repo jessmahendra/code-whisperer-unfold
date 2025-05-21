@@ -17,7 +17,6 @@ interface CodeReferenceProps {
 export default function CodeReference({ filePath, lineNumbers, snippet, lastUpdated, author, authorEmail }: CodeReferenceProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [showCard, setShowCard] = useState(false);
   
   const handleCopyPath = () => {
     navigator.clipboard.writeText(filePath);
@@ -38,56 +37,30 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
     }
   };
 
-  if (!showCard) {
-    return (
-      <div className="mt-1">
+  return (
+    <Collapsible className="mt-2">
+      <CollapsibleTrigger asChild>
         <Button 
           variant="ghost" 
           size="sm" 
-          onClick={() => setShowCard(true)} 
-          className="text-xs flex items-center gap-1"
+          className="text-xs flex items-center gap-1 w-full justify-start"
         >
           <Eye className="h-3 w-3" />
           <span>Show code for {getFileName()}</span>
         </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-slate-50 border rounded-md p-3 mt-2">
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center">
-            <Code2 className="h-4 w-4 text-muted-foreground mr-2" />
-            <span className="text-sm font-medium">{getFileName()}</span>
-            {lineNumbers && (
-              <span className="text-xs text-muted-foreground ml-2">Lines: {lineNumbers}</span>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 p-1 text-xs"
-              onClick={() => setShowCard(false)}
-            >
-              Hide
-            </Button>
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 p-1 text-xs flex items-center gap-1"
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'transform rotate-180' : ''}`} />
-                <span className="sr-only md:not-sr-only md:inline-block">
-                  {isOpen ? "Hide details" : "Show details"}
-                </span>
-              </Button>
-            </CollapsibleTrigger>
-            
-            {(lastUpdated || author) && (
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent>
+        <div className="bg-slate-50 border rounded-md p-3 mt-1">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center">
+              <Code2 className="h-4 w-4 text-muted-foreground mr-2" />
+              <span className="text-sm font-medium">{getFileName()}</span>
+              {lineNumbers && (
+                <span className="text-xs text-muted-foreground ml-2">Lines: {lineNumbers}</span>
+              )}
+            </div>
+            <div className="flex gap-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -97,35 +70,33 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
                 <Clock className="h-3 w-3" />
                 <span className="sr-only md:not-sr-only md:inline-block">History</span>
               </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              onClick={handleCopyPath}
-            >
-              <Copy className="h-4 w-4" />
-              <span className="sr-only">Copy file path</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              asChild
-            >
-              <a 
-                href={`https://github.com/TryGhost/Ghost/blob/main/${filePath}`}
-                target="_blank"
-                rel="noreferrer"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={handleCopyPath}
               >
-                <ExternalLink className="h-4 w-4" />
-                <span className="sr-only">View on GitHub</span>
-              </a>
-            </Button>
+                <Copy className="h-4 w-4" />
+                <span className="sr-only">Copy file path</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                asChild
+              >
+                <a 
+                  href={`https://github.com/TryGhost/Ghost/blob/main/${filePath}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">View on GitHub</span>
+                </a>
+              </Button>
+            </div>
           </div>
-        </div>
-        
-        <CollapsibleContent>
+          
           {showHistory && (lastUpdated || author) && (
             <div className="mb-2 text-xs text-muted-foreground bg-slate-100 p-2 rounded-md">
               {lastUpdated && <div>{formatLastUpdated()}</div>}
@@ -144,8 +115,8 @@ export default function CodeReference({ filePath, lineNumbers, snippet, lastUpda
               {snippet || `// File path: ${filePath}`}
             </code>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

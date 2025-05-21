@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy, ExternalLink, ChevronDown } from "lucide-react";
+import { Copy, ExternalLink, ChevronDown, Mail } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
@@ -39,6 +40,7 @@ export default function SlackAnswerDisplay({
   const [displayedParagraphs, setDisplayedParagraphs] = useState<string[]>([]);
   const [isTyping, setIsTyping] = useState(true);
   const [paragraphIndex, setParagraphIndex] = useState(0);
+  const [showSourceFiles, setShowSourceFiles] = useState(false);
   const typingSpeed = 500; // milliseconds per paragraph
   
   // Make sure we have a valid text content to display
@@ -84,6 +86,27 @@ export default function SlackAnswerDisplay({
     setDisplayedParagraphs(fullTextRef.current);
     setParagraphIndex(fullTextRef.current.length);
     setIsTyping(false);
+  };
+  
+  const handleCreateEmailTemplate = () => {
+    const subject = `RE: Your Slack question`;
+    const body = `Hello,
+
+I found the answer to your question in our Slack channel:
+
+${answer.text}
+
+Please let me know if you need any additional information.
+
+Best regards,
+[Your Name]`;
+
+    // Create mailto link
+    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open default email client
+    window.open(mailtoLink);
+    toast.success("Email template created");
   };
 
   // Format confidence percentage for display
@@ -153,6 +176,16 @@ export default function SlackAnswerDisplay({
                       variant="outline"
                       size="sm"
                       className="text-xs"
+                      onClick={handleCreateEmailTemplate}
+                    >
+                      <Mail className="h-3 w-3 mr-1" />
+                      Email
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
                       asChild
                     >
                       <Link to="/">
@@ -174,38 +207,46 @@ export default function SlackAnswerDisplay({
                   </div>
                 </div>
 
-                {/* File references (collapsible for Slack) */}
+                {/* Source files section */}
                 {answer.references.length > 0 && (
                   <div className="mt-3 mb-1">
-                    <div className="text-xs font-medium mb-1">Source files:</div>
-                    <div className="text-xs space-y-1">
-                      {answer.references.slice(0, 3).map((ref, idx) => (
-                        <Collapsible key={idx}>
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono text-muted-foreground">
-                              {ref.filePath.split('/').pop()}
-                              {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
-                            </div>
-                            <CollapsibleTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                <ChevronDown className="h-4 w-4" />
-                                <span className="sr-only">Toggle</span>
-                              </Button>
-                            </CollapsibleTrigger>
-                          </div>
-                          <CollapsibleContent>
-                            <div className="mt-1 p-2 bg-slate-100 rounded-md font-mono text-xs">
-                              {ref.snippet || `// File path: ${ref.filePath}`}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      ))}
-                      {answer.references.length > 3 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{answer.references.length - 3} more files
-                        </div>
-                      )}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs font-medium">Source files:</div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs py-0"
+                        onClick={() => setShowSourceFiles(!showSourceFiles)}
+                      >
+                        {showSourceFiles ? "Hide files" : "Show files"}
+                      </Button>
                     </div>
+                    
+                    {showSourceFiles && (
+                      <div className="text-xs space-y-1">
+                        {answer.references.map((ref, idx) => (
+                          <Collapsible key={idx}>
+                            <div className="flex items-center justify-between">
+                              <div className="font-mono text-muted-foreground">
+                                {ref.filePath.split('/').pop()}
+                                {ref.author && <span className="ml-2 text-muted-foreground">by {ref.author}</span>}
+                              </div>
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                  <ChevronDown className="h-4 w-4" />
+                                  <span className="sr-only">Toggle</span>
+                                </Button>
+                              </CollapsibleTrigger>
+                            </div>
+                            <CollapsibleContent>
+                              <div className="mt-1 p-2 bg-slate-100 rounded-md font-mono text-xs">
+                                {ref.snippet || `// File path: ${ref.filePath}`}
+                              </div>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </>

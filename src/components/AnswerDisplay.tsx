@@ -1,6 +1,7 @@
+
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Copy } from "lucide-react";
+import { Copy, Share, Mail } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
@@ -41,6 +42,7 @@ export default function AnswerDisplay({
   const [isTyping, setIsTyping] = useState(true);
   const [paragraphIndex, setParagraphIndex] = useState(0);
   const [showVersionInfo, setShowVersionInfo] = useState(false);
+  const [showReferences, setShowReferences] = useState(false);
   const typingSpeed = 300; // milliseconds per paragraph
   
   // Handle the answer text based on its type
@@ -91,6 +93,31 @@ export default function AnswerDisplay({
     setIsTyping(false);
   };
   
+  const handleCreateEmailTemplate = () => {
+    const textAnswer = typeof answer === 'string' ? answer : 
+                     (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
+                     "No answer text available";
+    
+    const subject = `RE: ${question || "Your inquiry"}`;
+    const body = `Hello,
+
+Thank you for reaching out with your question${question ? ` about "${question}"` : ""}.
+
+${textAnswer}
+
+Please let me know if you need any additional information.
+
+Best regards,
+[Your Name]`;
+
+    // Create mailto link
+    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open default email client
+    window.open(mailtoLink);
+    toast.success("Email template created");
+  };
+
   const hasVersionInfo = references.some(ref => ref.lastUpdated);
 
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
@@ -115,6 +142,14 @@ export default function AnswerDisplay({
               Complete
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCreateEmailTemplate}
+          >
+            <Mail className="h-4 w-4 mr-1" />
+            Create Email
+          </Button>
           {question && (
             <ShareButton 
               question={question} 
@@ -157,26 +192,41 @@ export default function AnswerDisplay({
       {references && references.length > 0 && (
         <div className="mt-8">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {/* File reference badges */}
-            {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
-              <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
-                {filename}
-              </span>
-            ))}
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mb-3 text-xs"
+            onClick={() => setShowReferences(!showReferences)}
+          >
+            {showReferences ? "Hide all source files" : "Show all source files"}
+          </Button>
+          
+          {showReferences && (
+            <>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {/* File reference badges */}
+                {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
+                  <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+                    {filename}
+                  </span>
+                ))}
+              </div>
 
-          <div className="space-y-3 mt-4">
-            {references.map((reference, index) => (
-              <CodeReference 
-                key={index} 
-                filePath={reference.filePath}
-                lineNumbers={reference.lineNumbers}
-                snippet={reference.snippet}
-                lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
-              />
-            ))}
-          </div>
+              <div className="space-y-3 mt-4">
+                {references.map((reference, index) => (
+                  <CodeReference 
+                    key={index} 
+                    filePath={reference.filePath}
+                    lineNumbers={reference.lineNumbers}
+                    snippet={reference.snippet}
+                    lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
+                    author={reference.author}
+                    authorEmail={reference.authorEmail}
+                  />
+                ))}
+              </div>
+            </>
+          )}
           
           <div className="flex justify-between items-center mt-8">
             <ConfidenceScore score={confidencePercentage} />
