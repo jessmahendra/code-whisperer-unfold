@@ -243,7 +243,7 @@ export default function Header() {
         <div className="mr-4 flex">
           <div onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
             
-            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-neutral-300">Unfold</span>
+            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">Unfold</span>
           </div>
         </div>
         
