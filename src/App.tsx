@@ -9,11 +9,12 @@ import NotFound from "./pages/NotFound";
 import SharePage from "./components/SharePage";
 import SlackDemo from "./pages/SlackDemo";
 import History from "./pages/History";
-import { BookOpen, GitBranch, Blocks, PieChart, Slack, History as HistoryIcon } from "lucide-react";
+import Settings from "./pages/Settings";
+import { BookOpen, GitBranch, Blocks, PieChart, Slack, History as HistoryIcon, Settings as SettingsIcon } from "lucide-react";
 
 // Make the icons available globally to ensure they're imported for SharePage
 // This is a workaround since we can't import them directly in the SharePage component
-const icons = { BookOpen, GitBranch, Blocks, PieChart, Slack, History: HistoryIcon };
+const icons = { BookOpen, GitBranch, Blocks, PieChart, Slack, History: HistoryIcon, Settings: SettingsIcon };
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/share/:id" element={<SharePage />} />
           <Route path="/slack-demo" element={<SlackDemo />} />
           <Route path="/history" element={<History />} />
+          <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

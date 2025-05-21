@@ -72,6 +72,11 @@ export default function QuestionHandler({ className }: { className?: string }) {
 
   return (
     <div className={`relative min-h-[calc(100vh-200px)] ${className}`}>
+      {/* Header with share button */}
+      <div className="flex justify-end mb-6">
+        <ShareSessionButton answers={answers} />
+      </div>
+
       {/* Display answers at the top - oldest to newest */}
       <div className="space-y-8 mb-8 pb-36">
         {answers.map((item, index) => (
@@ -106,13 +111,6 @@ export default function QuestionHandler({ className }: { className?: string }) {
       {/* Search input at the bottom - fixed position */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
         <div className="max-w-2xl mx-auto px-4">
-          <div className="flex items-center justify-between mb-3">
-            <ShareSessionButton 
-              answers={answers}
-              className="text-sm"
-            />
-          </div>
-          
           <QuestionInput
             onAskQuestion={handleAskQuestion}
             isProcessing={isProcessing}

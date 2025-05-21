@@ -1,5 +1,5 @@
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle, History } from "lucide-react";
+import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle, History, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
 import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
@@ -236,7 +236,7 @@ export default function Header() {
   const handleLogoClick = () => {
     navigate("/");
   };
-  const statusInfo = getConnectionStatusInfo();
+  const statusInfo = getConnectionStatus ? getConnectionStatusInfo() : null;
   
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -253,37 +253,7 @@ export default function Header() {
         
         <div className={`flex ${showProgressIndicator ? '' : 'flex-1'} items-center justify-between space-x-2 md:justify-end`}>
           <nav className="flex items-center space-x-4">
-            {currentRepo && <div className="flex items-center">
-                
-                
-                {connectionError && <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <AlertCircle className="ml-2 h-4 w-4 text-amber-500" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p className="text-sm">{connectionError}</p>
-                        <p className="text-xs mt-1 text-muted-foreground">
-                          Try reconnecting or check your token permissions
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>}
-              </div>}
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={connectToGhostRepo} disabled={isConnecting} className={`flex items-center gap-1 ${connectionStatus === 'connected' ? 'bg-green-50 border-green-200' : ''}`}>
-                    <GitHubLogoIcon className="h-4 w-4" />
-                    {isConnecting ? "Connecting..." : "Connect to Ghost"}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Connect directly to the Ghost GitHub repository</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Moved Connect to Ghost and API Key buttons to Settings page */}
             
             <TooltipProvider>
               <Tooltip>
@@ -299,14 +269,22 @@ export default function Header() {
               </Tooltip>
             </TooltipProvider>
             
-            {/* OpenAI API Key Dialog */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => navigate("/settings")} className="flex items-center gap-1">
+                    <Settings className="h-4 w-4" />
+                    Settings
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Configure application settings</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            {/* OpenAI API Key Dialog - keep this hidden but still available for the Settings page to trigger */}
             <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant={isAIEnabled ? "default" : wasAPIKeyPreviouslySet() ? "outline" : "outline"} size="sm" className={`flex items-center gap-1 ${apiKeyStatus?.lastError ? 'bg-red-50 hover:bg-red-100 border-red-200' : wasAPIKeyPreviouslySet() && !isAIEnabled ? 'bg-amber-50 hover:bg-amber-100 border-amber-200' : ''}`}>
-                  <KeyRound className="h-4 w-4" />
-                  {isAIEnabled ? apiKeyStatus?.lastError ? "AI Error" : "AI Enabled" : wasAPIKeyPreviouslySet() ? "Re-enter API Key" : "Set OpenAI Key"}
-                </Button>
-              </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>OpenAI API Configuration</DialogTitle>

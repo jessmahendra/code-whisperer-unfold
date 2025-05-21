@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Share, Link2, Check } from "lucide-react";
+import { Share, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { createShareableAnswer } from "@/services/shareableAnswerService";
 
@@ -84,7 +84,7 @@ export default function ShareSessionButton({ answers, className }: ShareSessionB
       copyToClipboard(shareableLink.fullUrl);
       
       toast.success(
-        "All answers shared! Link copied to clipboard.",
+        "Page shared! Link copied to clipboard.",
         { duration: 5000 }
       );
     } catch (error) {
@@ -127,7 +127,7 @@ export default function ShareSessionButton({ answers, className }: ShareSessionB
       ) : (
         <>
           <Share className="h-4 w-4" />
-          <span>Share All Answers</span>
+          <span>Share Page</span>
         </>
       )}
     </Button>
