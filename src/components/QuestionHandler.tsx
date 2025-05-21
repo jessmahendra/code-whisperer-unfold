@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
 import SuggestedQuestions from "./SuggestedQuestions";
@@ -15,6 +15,8 @@ export default function QuestionHandler({ className }: { className?: string }) {
   }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Create a ref for the most recent answer to scroll to
+  const latestAnswerRef = useRef<HTMLDivElement>(null);
 
   const suggestedQuestions = [
     "How does Ghost handle image uploads?",
@@ -33,14 +35,14 @@ export default function QuestionHandler({ className }: { className?: string }) {
       if (answer) {
         addChatEntry(question, answer);
         
-        // Add the new answer to the beginning of our answers array
+        // Add the new answer to the END of our answers array to maintain oldest-to-newest ordering
         setAnswers(prev => [
+          ...prev,
           {
             question,
             answer,
             timestamp: new Date().toLocaleString()
-          },
-          ...prev
+          }
         ]);
       } else {
         setError(`I couldn't find information related to "${question}".`);
@@ -57,13 +59,27 @@ export default function QuestionHandler({ className }: { className?: string }) {
     handleAskQuestion(question);
   };
 
+  // Effect to scroll to the most recent answer when it's added
+  useEffect(() => {
+    if (latestAnswerRef.current && answers.length > 0) {
+      latestAnswerRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center'
+      });
+    }
+  }, [answers.length]);
+
   return (
     <div className={`relative min-h-[calc(100vh-200px)] ${className}`}>
-      {/* Display answers at the top */}
+      {/* Display answers at the top - oldest to newest */}
       <div className="space-y-8 mb-8 pb-36">
         {answers.map((item, index) => (
-          <div key={index} className="max-w-3xl mx-auto">
-            {error && index === 0 ? (
+          <div 
+            key={index} 
+            className="max-w-3xl mx-auto"
+            ref={index === answers.length - 1 ? latestAnswerRef : null}
+          >
+            {error && index === answers.length - 1 ? (
               <NoAnswerFallback question={item.question} />
             ) : (
               <AnswerDisplay 
@@ -86,7 +102,7 @@ export default function QuestionHandler({ className }: { className?: string }) {
         </div>
       )}
       
-      {/* Search input at the bottom - now fixed position */}
+      {/* Search input at the bottom - fixed position */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t shadow-md py-4 z-10">
         <div className="max-w-2xl mx-auto px-4">
           <QuestionInput
