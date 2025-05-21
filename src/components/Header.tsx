@@ -1,6 +1,6 @@
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { BookOpen, Code2, Info, KeyRound, AlertCircle, CheckCircle, History, Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import RepoConfigModal from "./RepoConfigModal";
 import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
 import { useState, useEffect } from "react";
@@ -19,7 +19,6 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
-import { useNavigate } from "react-router-dom";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -236,15 +235,17 @@ export default function Header() {
     }
   };
   const handleLogoClick = () => {
-    navigate("/");
+    console.log("Logo clicked, navigating to homepage");
+    navigate("/", { replace: true });
   };
   const statusInfo = getConnectionStatusInfo();
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          <div onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
+          {/* Replace div with Link component for more reliable navigation */}
+          <Link to="/" className="flex items-center space-x-2 cursor-pointer">
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">Unfold</span>
-          </div>
+          </Link>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
