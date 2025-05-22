@@ -30,11 +30,19 @@ export default function Settings() {
   }, [updateConnectionStatus]);
 
   // Find the GitHub connection button from Header
-  const openGhostConnectDialog = () => {
-    // Find and click the connect to ghost button in the header
-    const ghostButton = document.querySelector('header button:has(.h-4.w-4)') as HTMLButtonElement;
-    if (ghostButton) {
-      ghostButton.click();
+  const openGithubConnectDialog = () => {
+    // Find and click the GitHub config button in the header
+    const configButton = document.querySelector('header button:has(.CodeIcon)') as HTMLButtonElement;
+    if (configButton) {
+      configButton.click();
+    } else {
+      // Fallback to finding the RepoConfigModal button
+      const repoConfigButton = document.querySelector('header button.repo-config-trigger') as HTMLButtonElement;
+      if (repoConfigButton) {
+        repoConfigButton.click();
+      } else {
+        console.error('Could not find repository configuration button');
+      }
     }
   };
 
@@ -96,7 +104,7 @@ export default function Settings() {
                       </p>
                     </div>
                     <Button 
-                      onClick={openGhostConnectDialog}
+                      onClick={openGithubConnectDialog}
                       variant={isConnected && !usingMockData ? "outline" : "default"}
                       className="flex items-center gap-1"
                     >
