@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import RepositoryManager from "@/components/RepositoryManager";
 import RepositoryRescan from "@/components/RepositoryRescan";
@@ -9,9 +9,11 @@ import { KeyRound, AlertCircle } from "lucide-react";
 import { hasAICapabilities, wasAPIKeyPreviouslySet, getAPIKeyState } from "@/services/aiAnalysis";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
 import { Link } from "react-router-dom";
+import { AIStatusBadge } from "@/components/AIStatusBadge";
 
 export default function Settings() {
   const [connectionStatus, updateConnectionStatus] = useConnectionStatus();
+  const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false);
 
   useEffect(() => {
     // Initialize the connection to GitHub if needed
@@ -27,15 +29,6 @@ export default function Settings() {
     }, 300);
     return () => clearInterval(intervalId);
   }, [updateConnectionStatus]);
-
-  // Find the API key dialog from Header
-  const openAPIKeyDialog = () => {
-    // Find and click the API key button in the header
-    const apiKeyButton = document.querySelector('header button:has(.KeyRound)') as HTMLButtonElement;
-    if (apiKeyButton) {
-      apiKeyButton.click();
-    }
-  };
 
   const apiKeyStatus = getAPIKeyState();
   const isAIEnabled = hasAICapabilities();
@@ -83,18 +76,16 @@ export default function Settings() {
                         }
                       </p>
                     </div>
-                    <Button
-                      onClick={openAPIKeyDialog}
-                      variant={isAIEnabled ? "outline" : "default"}
-                      className={`flex items-center gap-1 ${apiKeyStatus?.lastError ? 'bg-red-50 border-red-200' : ''}`}
-                    >
-                      <KeyRound className="h-4 w-4" />
-                      {isAIEnabled ? "Update API Key" : "Set API Key"}
-                    </Button>
+                    
+                    {/* Using the AIStatusBadge component directly */}
+                    <AIStatusBadge 
+                      initialOpen={isApiKeyDialogOpen} 
+                      onOpenChange={setIsApiKeyDialogOpen}
+                    />
                   </div>
                   
                   {apiKeyStatus?.lastError && (
-                    <div className="text-sm text-red-600">
+                    <div className="text-sm text-red-600 mt-2">
                       <AlertCircle className="h-4 w-4 inline mr-1" />
                       {apiKeyStatus.lastError}
                     </div>

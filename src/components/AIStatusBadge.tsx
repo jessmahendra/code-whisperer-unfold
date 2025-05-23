@@ -23,11 +23,13 @@ import { toast } from "sonner";
 
 interface AIStatusBadgeProps {
   className?: string;
+  onOpenChange?: (open: boolean) => void;
+  initialOpen?: boolean;
 }
 
-export function AIStatusBadge({ className }: AIStatusBadgeProps) {
+export function AIStatusBadge({ className, onOpenChange, initialOpen = false }: AIStatusBadgeProps) {
   const [openaiKey, setOpenaiKey] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(initialOpen);
   const isAIEnabled = hasAICapabilities();
   const apiKeyState = getAPIKeyState();
   const hasError = !!apiKeyState.lastError;
@@ -37,14 +39,22 @@ export function AIStatusBadge({ className }: AIStatusBadgeProps) {
       setOpenAIApiKey(openaiKey.trim());
       setDialogOpen(false);
       setOpenaiKey("");
+      toast.success("API key saved successfully");
     } else {
       toast.error("Please enter a valid OpenAI API key");
+    }
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (onOpenChange) {
+      onOpenChange(open);
     }
   };
   
   return (
     <>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
         <DialogTrigger asChild>
           <Button 
             variant="outline" 

@@ -1,3 +1,4 @@
+
 // AI Analysis Service to enhance repository search with OpenAI
 import { toast } from "sonner";
 
@@ -41,6 +42,10 @@ function loadApiKeyFromStorage(): void {
     if (encryptedKey) {
       openaiApiKey = decryptKey(encryptedKey);
       console.log("OpenAI API key loaded from storage");
+      
+      // Clear any previous errors when loading from storage
+      apiKeyState.lastError = null;
+      apiKeyState.failedAttempts = 0;
     }
   } catch (e) {
     console.error("Could not load API key from localStorage", e);
