@@ -2,11 +2,10 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KeyRound, ArrowRight, X } from "lucide-react";
+import { KeyRound, ArrowRight, X, Check } from "lucide-react";
 import { initGithubClient, validateGithubToken } from "@/services/githubClient";
 import { saveRepositoryConfig } from "@/services/repositoryConfig";
 import { setOpenAIApiKey, hasAICapabilities } from "@/services/aiAnalysis";
@@ -32,8 +31,11 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
   const [isConnectingRepo, setIsConnectingRepo] = useState(false);
   const [isSavingApiKey, setIsSavingApiKey] = useState(false);
   
-  // Tab state
-  const [activeTab, setActiveTab] = useState("github");
+  // Step state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  const totalSteps = 2;
 
   // Handle GitHub repository connection
   const handleConnectRepo = async () => {
@@ -68,12 +70,9 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
       
       toast.success(`Repository ${owner}/${repo} connected successfully`);
       
-      // Move to the API key tab if not already set up
-      if (!hasAICapabilities()) {
-        setActiveTab("openai");
-      } else {
-        onComplete();
-      }
+      // Mark step as completed and move to next step
+      setCompletedSteps([1]);
+      setCurrentStep(2);
     } catch (error) {
       console.error("Error connecting repository:", error);
       toast.error("Failed to connect repository");
@@ -93,6 +92,7 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
     try {
       setOpenAIApiKey(apiKey.trim());
       toast.success("API key saved successfully");
+      setCompletedSteps([1, 2]);
       onComplete();
     } catch (error) {
       console.error("Error saving API key:", error);
@@ -100,6 +100,172 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
     } finally {
       setIsSavingApiKey(false);
     }
+  };
+
+  const handleSkipStep = () => {
+    if (currentStep === 1) {
+      // Skip to API key step
+      setCurrentStep(2);
+    } else {
+      // Skip everything and complete onboarding
+      onSkip();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center justify-center mb-6">
+      {Array.from({ length: totalSteps }, (_, index) => {
+        const stepNumber = index + 1;
+        const isCompleted = completedSteps.includes(stepNumber);
+        const isCurrent = currentStep === stepNumber;
+        
+        return (
+          <React.Fragment key={stepNumber}>
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+              isCompleted 
+                ? "bg-primary border-primary text-primary-foreground" 
+                : isCurrent 
+                ? "border-primary text-primary" 
+                : "border-muted-foreground text-muted-foreground"
+            }`}>
+              {isCompleted ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <span className="text-sm font-medium">{stepNumber}</span>
+              )}
+            </div>
+            {index < totalSteps - 1 && (
+              <div className={`w-12 h-0.5 mx-2 ${
+                isCompleted ? "bg-primary" : "bg-muted"
+              }`} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+
+  const renderStepContent = () => {
+    if (currentStep === 1) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-2">
+              <GitHubLogoIcon className="h-8 w-8 text-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold">Connect Your Repository</h3>
+            <p className="text-sm text-muted-foreground">
+              Connect to your GitHub repository to start exploring your codebase
+            </p>
+          </div>
+          
+          <div className="space-y-1">
+            <Label htmlFor="owner">Repository Owner</Label>
+            <Input
+              id="owner"
+              placeholder="e.g., TryGhost"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-1">
+            <Label htmlFor="repo">Repository Name</Label>
+            <Input
+              id="repo"
+              placeholder="e.g., Ghost"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+            />
+          </div>
+          
+          <div className="space-y-1">
+            <Label htmlFor="token">GitHub Personal Access Token</Label>
+            <Input
+              id="token"
+              type="password"
+              placeholder="ghp_..."
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Your token needs 'repo' scope permissions to access the repository
+            </p>
+          </div>
+          
+          <div className="flex justify-between items-center pt-4">
+            <Button variant="outline" onClick={handleSkipStep}>
+              Skip for now
+            </Button>
+            <Button 
+              onClick={handleConnectRepo} 
+              disabled={isConnectingRepo}
+              className="flex items-center gap-2"
+            >
+              {isConnectingRepo ? "Connecting..." : "Connect Repository"}
+              {!isConnectingRepo && <ArrowRight className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (currentStep === 2) {
+      return (
+        <div className="space-y-4">
+          <div className="text-center mb-6">
+            <div className="flex justify-center mb-2">
+              <KeyRound className="h-8 w-8 text-foreground" />
+            </div>
+            <h3 className="text-lg font-semibold">Add OpenAI API Key</h3>
+            <p className="text-sm text-muted-foreground">
+              Enable AI-powered code analysis and question answering
+            </p>
+          </div>
+          
+          <div className="space-y-1">
+            <Label htmlFor="apikey">OpenAI API Key</Label>
+            <Input
+              id="apikey"
+              type="password"
+              placeholder="sk-..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Your API key stays in browser memory and is never stored permanently
+            </p>
+          </div>
+          
+          <div className="flex justify-between items-center pt-4">
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleBack}>
+                Back
+              </Button>
+              <Button variant="outline" onClick={onSkip}>
+                Skip for now
+              </Button>
+            </div>
+            <Button 
+              onClick={handleSaveApiKey} 
+              disabled={isSavingApiKey}
+              className="flex items-center gap-2"
+            >
+              {isSavingApiKey ? "Saving..." : "Complete Setup"}
+              {!isSavingApiKey && <Check className="h-4 w-4" />}
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -119,106 +285,12 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="github" className="flex items-center gap-2">
-              <GitHubLogoIcon className="h-4 w-4" />
-              GitHub Repository
-            </TabsTrigger>
-            <TabsTrigger value="openai" className="flex items-center gap-2">
-              <KeyRound className="h-4 w-4" />
-              OpenAI API Key
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="github" className="pt-4">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="owner">Repository Owner</Label>
-                <Input
-                  id="owner"
-                  placeholder="e.g., TryGhost"
-                  value={owner}
-                  onChange={(e) => setOwner(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <Label htmlFor="repo">Repository Name</Label>
-                <Input
-                  id="repo"
-                  placeholder="e.g., Ghost"
-                  value={repo}
-                  onChange={(e) => setRepo(e.target.value)}
-                />
-              </div>
-              
-              <div className="space-y-1">
-                <Label htmlFor="token">GitHub Personal Access Token</Label>
-                <Input
-                  id="token"
-                  type="password"
-                  placeholder="ghp_..."
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your token needs 'repo' scope permissions to access the repository
-                </p>
-              </div>
-              
-              <div className="flex justify-between items-center pt-2">
-                <Button variant="outline" onClick={onSkip}>
-                  Skip for now
-                </Button>
-                <Button 
-                  onClick={handleConnectRepo} 
-                  disabled={isConnectingRepo}
-                  className="flex items-center gap-2"
-                >
-                  {isConnectingRepo ? "Connecting..." : "Connect Repository"}
-                  {!isConnectingRepo && <ArrowRight className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="openai" className="pt-4">
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label htmlFor="apikey">OpenAI API Key</Label>
-                <Input
-                  id="apikey"
-                  type="password"
-                  placeholder="sk-..."
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Your API key stays in browser memory and is never stored permanently
-                </p>
-              </div>
-              
-              <div className="flex justify-between items-center pt-2">
-                <Button variant="outline" onClick={onSkip}>
-                  Skip for now
-                </Button>
-                <Button 
-                  onClick={handleSaveApiKey} 
-                  disabled={isSavingApiKey}
-                  className="flex items-center gap-2"
-                >
-                  {isSavingApiKey ? "Saving..." : "Save API Key"}
-                  {!isSavingApiKey && <ArrowRight className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+        {renderStepIndicator()}
+        {renderStepContent()}
       </CardContent>
       <CardFooter className="flex flex-col space-y-2 border-t pt-4">
         <div className="text-sm text-center text-muted-foreground">
-          You can always configure these settings later from the Settings page
+          Step {currentStep} of {totalSteps} • You can always configure these settings later from the Settings page
         </div>
       </CardFooter>
     </Card>
