@@ -244,7 +244,9 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
     }
   };
 
-  const handleLogoClick = () => {
+  // Always use proper navigation for logo click to ensure consistency across all pages
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent default anchor behavior
     console.log("Logo clicked, navigating to homepage");
     navigate("/", { replace: true });
   };
@@ -255,10 +257,14 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          {/* Replace div with Link component for more reliable navigation */}
-          <Link to="/" className="flex items-center space-x-2 cursor-pointer">
+          {/* Replace Link with a proper navigation handler to ensure it always works */}
+          <a 
+            href="/"
+            onClick={handleLogoClick}
+            className="flex items-center space-x-2 cursor-pointer"
+          >
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">Unfold</span>
-          </Link>
+          </a>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
