@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -45,13 +44,14 @@ function loadFromCache(): boolean {
     // Load cached knowledge base
     knowledgeBase = cache.scanData.knowledgeBase || [...mockKnowledgeEntries];
     
-    // Update initialization state
-    initializationState.usingMockData = cache.scanData.usingMockData || false;
+    // Update initialization state - check if the cached data is real data
+    const hasRealData = cache.scanData.knowledgeBase && cache.scanData.knowledgeBase.length > 100; // Real data has many entries
+    initializationState.usingMockData = !hasRealData || cache.scanData.usingMockData || false;
     initializationState.initialized = true;
-    initializationState.fetchConfirmed = cache.scanData.fetchConfirmed || false;
+    initializationState.fetchConfirmed = cache.scanData.fetchConfirmed || hasRealData;
     initializationState.lastInitTime = cache.lastScanTime;
     
-    console.log(`Loaded knowledge base from cache: ${knowledgeBase.length} entries`);
+    console.log(`Loaded knowledge base from cache: ${knowledgeBase.length} entries, using mock data: ${initializationState.usingMockData}`);
     
     if (!initializationState.usingMockData) {
       toast.success(`Loaded cached repository data (${knowledgeBase.length} entries)`, {
@@ -278,6 +278,10 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
  * @returns {boolean} True if using mock data
  */
 export function isUsingMockData(): boolean {
+  // If we have more than 100 entries and they're not the mock entries, we're using real data
+  if (knowledgeBase.length > 100 && knowledgeBase !== mockKnowledgeEntries) {
+    return false;
+  }
   return initializationState.usingMockData;
 }
 

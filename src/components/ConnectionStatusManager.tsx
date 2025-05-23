@@ -49,9 +49,10 @@ export function useConnectionStatus(): [ConnectionStatus, () => void] {
     setIsConnected(hasConfig && isClientInitialized);
 
     // Check if we're actually using mock data or real data
-    // We consider truly connected if we have processed files > 0
-    const actuallyUsingMock = isUsingMockData() || stats.processedFiles === 0;
-    setUsingMockData(actuallyUsingMock);
+    // We consider using real data if we have a significant number of processed files
+    // and the knowledge base service confirms we're not using mock data
+    const isActuallyUsingMock = isUsingMockData() && stats.processedFiles === 0;
+    setUsingMockData(isActuallyUsingMock);
 
     // Show progress indicator when exploring
     setShowProgressIndicator(progress.status === "exploring");
@@ -68,7 +69,7 @@ export function useConnectionStatus(): [ConnectionStatus, () => void] {
     return {
       hasConfig,
       isClientInitialized,
-      actuallyUsingMock,
+      actuallyUsingMock: isActuallyUsingMock,
       stats,
       diagnostics,
       progress
