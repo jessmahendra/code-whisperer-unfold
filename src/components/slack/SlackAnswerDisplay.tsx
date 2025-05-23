@@ -1,9 +1,9 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, ExternalLink, Mail } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import ScreenshotGallery from "../ScreenshotGallery";
 import { Link } from "react-router-dom";
 
 interface Reference {
@@ -13,6 +13,14 @@ interface Reference {
   lastUpdated?: string;
   author?: string;
   authorEmail?: string;
+}
+
+interface Screenshot {
+  id: string;
+  url: string;
+  caption: string;
+  componentName?: string;
+  stepNumber?: number;
 }
 
 interface VisualContext {
@@ -27,6 +35,7 @@ interface SlackAnswerDisplayProps {
     text: string;
     confidence: number;
     references: Reference[];
+    screenshots?: Screenshot[];
     visualContext?: VisualContext;
   };
 }
@@ -44,6 +53,7 @@ export default function SlackAnswerDisplay({
   
   // Make sure we have a valid text content to display
   const answerText = answer && typeof answer.text === 'string' ? answer.text : "No answer available";
+  const screenshots = answer?.screenshots;
   const paragraphs = answerText.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
 
@@ -154,6 +164,13 @@ Best regards,
                 </div>
               )}
             </div>
+            
+            {/* Show screenshots if available and typing is complete */}
+            {!isTyping && screenshots && screenshots.length > 0 && (
+              <div className="my-3">
+                <ScreenshotGallery screenshots={screenshots} className="border-0 bg-transparent p-0" />
+              </div>
+            )}
             
             {!isTyping && (
               <>

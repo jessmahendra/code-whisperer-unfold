@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Mail } from "lucide-react";
@@ -6,6 +5,7 @@ import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
+import ScreenshotGallery from "./ScreenshotGallery";
 import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
 
 interface Reference {
@@ -17,6 +17,14 @@ interface Reference {
   authorEmail?: string;
 }
 
+interface Screenshot {
+  id: string;
+  url: string;
+  caption: string;
+  componentName?: string;
+  stepNumber?: number;
+}
+
 interface VisualContext {
   type: 'flowchart' | 'component' | 'state';
   syntax: string;
@@ -24,7 +32,7 @@ interface VisualContext {
 
 export interface AnswerDisplayProps {
   question?: string;
-  answer: string | { text: string; [key: string]: any };
+  answer: string | { text: string; screenshots?: Screenshot[]; [key: string]: any };
   confidence?: number;
   references?: Reference[];
   timestamp?: string;
@@ -46,10 +54,12 @@ export default function AnswerDisplay({
   const [showReferences, setShowReferences] = useState(false);
   const typingSpeed = 300; // milliseconds per paragraph
   
-  // Handle the answer text based on its type
+  // Handle the answer text and screenshots based on its type
   const answerContent = typeof answer === 'string' ? answer : 
                        (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
                        "No answer text available";
+
+  const screenshots = typeof answer === 'object' && answer && 'screenshots' in answer ? answer.screenshots : undefined;
                        
   const paragraphs = answerContent.split('\n\n').filter(p => p.trim() !== '');
   const fullTextRef = useRef(paragraphs);
@@ -158,6 +168,11 @@ Best regards,
             </div>
           )}
         </div>
+
+        {/* Show screenshots if available and typing is complete */}
+        {!isTyping && screenshots && screenshots.length > 0 && (
+          <ScreenshotGallery screenshots={screenshots} className="mt-4" />
+        )}
 
         {/* Action buttons inside card */}
         <div className="flex justify-end gap-2 mt-4 border-t pt-4">

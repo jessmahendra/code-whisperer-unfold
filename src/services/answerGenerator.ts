@@ -2,6 +2,7 @@ import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
 import { hasAICapabilities, generateAnswerWithAI } from "./aiAnalysis";
+import { screenshotService, Screenshot } from "./screenshotService";
 import { toast } from "sonner";
 
 interface Reference {
@@ -15,10 +16,69 @@ interface Answer {
   text: string;
   confidence: number;
   references: Reference[];
+  screenshots?: Screenshot[];
   visualContext?: {
     type: 'flowchart' | 'component' | 'state';
     syntax: string;
   };
+}
+
+/**
+ * Determines if a query would benefit from screenshots
+ */
+function shouldIncludeScreenshots(query: string): boolean {
+  const screenshotKeywords = [
+    'how to', 'how do', 'how can', 'where to', 'where is',
+    'navigate', 'click', 'button', 'settings', 'configure',
+    'setup', 'install', 'access', 'find', 'locate',
+    'dashboard', 'interface', 'ui', 'menu', 'panel'
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  return screenshotKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
+/**
+ * Generates relevant screenshots based on the query content
+ */
+async function generateRelevantScreenshots(query: string): Promise<Screenshot[]> {
+  const screenshots: Screenshot[] = [];
+  const lowerQuery = query.toLowerCase();
+  
+  try {
+    // Repository/Settings related questions
+    if (lowerQuery.includes('settings') || lowerQuery.includes('configure') || lowerQuery.includes('repository')) {
+      const settingsScreenshots = await screenshotService.captureRepositorySettings();
+      screenshots.push(...settingsScreenshots);
+    }
+    
+    // Question/Input related questions
+    if (lowerQuery.includes('ask') || lowerQuery.includes('question') || lowerQuery.includes('input')) {
+      const inputScreenshots = await screenshotService.captureQuestionInput();
+      screenshots.push(...inputScreenshots);
+    }
+    
+    // Generic UI capture for navigation questions
+    if (lowerQuery.includes('navigate') || lowerQuery.includes('find') || lowerQuery.includes('where')) {
+      const headerCapture = await screenshotService.captureBySelector(
+        'header, nav, .header',
+        'Main navigation area'
+      );
+      if (headerCapture) screenshots.push(headerCapture);
+      
+      const mainCapture = await screenshotService.captureBySelector(
+        'main, .main-content, [role="main"]',
+        'Main content area'
+      );
+      if (mainCapture) screenshots.push(mainCapture);
+    }
+    
+  } catch (error) {
+    console.warn('Failed to generate screenshots:', error);
+    // Don't fail the entire answer generation if screenshots fail
+  }
+  
+  return screenshots;
 }
 
 /**
@@ -43,6 +103,12 @@ export async function generateAnswer(query: string, options?: {
     if (results.length === 0) {
       console.log("No results found for query:", query);
       return null;
+    }
+    
+    // Generate screenshots if the query would benefit from them
+    let screenshots: Screenshot[] = [];
+    if (shouldIncludeScreenshots(query)) {
+      screenshots = await generateRelevantScreenshots(query);
     }
     
     // Check if AI capabilities are available
@@ -83,6 +149,7 @@ export async function generateAnswer(query: string, options?: {
             text: aiAnswer,
             confidence: 0.92, // AI answers have higher confidence
             references,
+            screenshots: screenshots.length > 0 ? screenshots : undefined,
             visualContext: visualContext
           };
         }
@@ -192,6 +259,7 @@ export async function generateAnswer(query: string, options?: {
       text: answerText,
       confidence: Math.min(0.3 + (results.length * 0.15), 0.95),
       references,
+      screenshots: screenshots.length > 0 ? screenshots : undefined,
       visualContext: visualContext
     };
   } catch (error) {
