@@ -27,6 +27,7 @@ export interface ScreenshotCapture {
 class ScreenshotService {
   private screenshots: Map<string, Screenshot> = new Map();
   private appIframe: HTMLIFrameElement | null = null;
+  private hasShownCrossOriginWarning = false;
 
   async captureElement(capture: ScreenshotCapture): Promise<Screenshot> {
     try {
@@ -70,6 +71,13 @@ class ScreenshotService {
     });
   }
 
+  private showCrossOriginError(): void {
+    if (this.hasShownCrossOriginWarning) return;
+    this.hasShownCrossOriginWarning = true;
+    
+    console.warn('Screenshots unavailable: Cannot capture from external applications due to browser security restrictions.');
+  }
+
   private async createHiddenIframe(url: string): Promise<HTMLIFrameElement> {
     return new Promise((resolve, reject) => {
       const iframe = document.createElement('iframe');
@@ -81,8 +89,18 @@ class ScreenshotService {
       iframe.style.border = 'none';
       
       iframe.onload = () => {
-        console.log('Iframe loaded successfully');
-        resolve(iframe);
+        // Test if we can access the iframe content
+        try {
+          const iframeDocument = iframe.contentDocument || iframe.contentWindow?.document;
+          if (!iframeDocument) {
+            throw new Error('Cannot access iframe content - cross-origin restriction');
+          }
+          console.log('Iframe loaded successfully');
+          resolve(iframe);
+        } catch (error) {
+          this.showCrossOriginError();
+          reject(new Error('Cross-origin access blocked by browser security policy'));
+        }
       };
       
       iframe.onerror = () => {
@@ -231,7 +249,11 @@ class ScreenshotService {
     } catch (error) {
       console.error('Failed to capture Ghost admin screenshots:', error);
       
-      // If iframe approach fails, try to detect if we're already on a Ghost site
+      if (error.message.includes('cross-origin') || error.message.includes('Cross-origin')) {
+        this.showCrossOriginError();
+      }
+      
+      // Try to detect if we're already on a Ghost site
       const isGhostSite = document.querySelector('meta[name="generator"]')?.getAttribute('content')?.includes('Ghost');
       if (isGhostSite) {
         console.log('Detected Ghost site, attempting local capture');

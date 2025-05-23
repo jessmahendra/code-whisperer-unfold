@@ -97,6 +97,11 @@ async function generateRelevantScreenshots(query: string): Promise<Screenshot[]>
             break; // Found working admin path
           }
         } catch (error) {
+          if (error.message.includes('cross-origin') || error.message.includes('Cross-origin')) {
+            console.warn('Screenshots unavailable due to browser security restrictions');
+            toast.error('Screenshots unavailable: Browser security prevents capturing from external applications. Try accessing your Ghost admin directly.');
+            break; // Don't try other paths if it's a cross-origin issue
+          }
           console.warn(`Failed to capture Ghost admin at path ${path}:`, error);
         }
       }
@@ -121,7 +126,11 @@ async function generateRelevantScreenshots(query: string): Promise<Screenshot[]>
     
   } catch (error) {
     console.warn('Failed to generate screenshots:', error);
-    toast.error('Could not capture screenshots from the application');
+    if (error.message.includes('cross-origin') || error.message.includes('Cross-origin')) {
+      toast.error('Screenshots unavailable: Browser security prevents capturing from external applications');
+    } else {
+      toast.error('Could not capture screenshots from the application');
+    }
   }
   
   return screenshots;
