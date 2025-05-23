@@ -39,6 +39,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
+  
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
@@ -65,6 +66,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       setShowProgressIndicator(false);
     }
   };
+
   useEffect(() => {
     updateRepoInfo();
 
@@ -103,6 +105,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
     }, 1000);
     return () => clearInterval(intervalId);
   }, []);
+
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
     setConnectionError(null);
@@ -201,6 +204,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       setShowProgressIndicator(false);
     }
   };
+
   const handleOpenAIKeySave = () => {
     if (openaiKey.trim()) {
       setOpenAIApiKey(openaiKey.trim());
@@ -210,6 +214,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       toast.error("Please enter a valid OpenAI API key");
     }
   };
+
   const getConnectionStatusInfo = () => {
     switch (connectionStatus) {
       case 'disconnected':
@@ -238,12 +243,16 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
         };
     }
   };
+
   const handleLogoClick = () => {
     console.log("Logo clicked, navigating to homepage");
     navigate("/", { replace: true });
   };
+
   const statusInfo = getConnectionStatusInfo();
-  return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+
+  return (
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           {/* Replace div with Link component for more reliable navigation */}
@@ -346,21 +355,9 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
                 </AlertDescription>
               </Alert>
             )}
-            
-            {!isOnboarding && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <RepoConfigModal onConfigChange={updateRepoInfo} />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Configure GitHub repository connection</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
           </nav>
         </div>
       </div>
-    </header>;
+    </header>
+  );
 }
