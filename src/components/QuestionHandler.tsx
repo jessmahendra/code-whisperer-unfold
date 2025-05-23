@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -6,6 +7,7 @@ import ShareSessionButton from "./ShareSessionButton";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
+import { getCurrentRepository } from "@/services/githubConnector";
 
 export default function QuestionHandler({
   className
@@ -19,9 +21,46 @@ export default function QuestionHandler({
   }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
+  
   // Create a ref for the most recent answer to scroll to
   const latestAnswerRef = useRef<HTMLDivElement>(null);
-  const suggestedQuestions = ["How does Ghost handle image uploads?", "What is the difference between a post and a page in Ghost?", "How can I integrate Ghost with other services?"];
+  
+  // Update repository info
+  useEffect(() => {
+    setCurrentRepo(getCurrentRepository());
+  }, []);
+
+  // Generate dynamic content based on repository
+  const getHeading = () => {
+    if (currentRepo) {
+      return `Ask anything about ${currentRepo.repo}`;
+    }
+    return "Ask anything about Ghost";
+  };
+
+  const getSubheading = () => {
+    if (currentRepo) {
+      return `Get instant answers based on the ${currentRepo.owner}/${currentRepo.repo} codebase`;
+    }
+    return "Get instant answers based on the codebase";
+  };
+
+  const getSuggestedQuestions = () => {
+    if (currentRepo) {
+      const repoName = currentRepo.repo;
+      return [
+        `How does ${repoName} handle authentication?`,
+        `What is the main architecture of ${repoName}?`,
+        `How can I contribute to ${repoName}?`
+      ];
+    }
+    return [
+      "How does Ghost handle image uploads?",
+      "What is the difference between a post and a page in Ghost?",
+      "How can I integrate Ghost with other services?"
+    ];
+  };
   
   const handleAskQuestion = async (question: string) => {
     try {
@@ -90,10 +129,10 @@ export default function QuestionHandler({
       {/* Initial view when no answers yet - search is at the top */}
       {!hasAnswers && (
         <div className="my-16 max-w-2xl mx-auto">
-          <h2 className="text-2xl font-semibold mb-2 text-center">Ask anything about Ghost</h2>
-          <p className="text-muted-foreground mb-8 text-center">Get instant answers based on the codebase</p>
+          <h2 className="text-2xl font-semibold mb-2 text-center">{getHeading()}</h2>
+          <p className="text-muted-foreground mb-8 text-center">{getSubheading()}</p>
           <QuestionInput onAskQuestion={handleAskQuestion} isProcessing={isProcessing} centered={true} />
-          <SuggestedQuestions questions={suggestedQuestions} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing} />
+          <SuggestedQuestions questions={getSuggestedQuestions()} onSelectQuestion={handleSelectQuestion} isProcessing={isProcessing} />
         </div>
       )}
 
