@@ -1,9 +1,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ArrowRight } from "lucide-react";
 import { toast } from "sonner";
+import QuestionAutoComplete from "./QuestionAutoComplete";
 
 interface QuestionInputProps {
   onAskQuestion: (question: string) => void;
@@ -28,6 +28,14 @@ export default function QuestionInput({
     setQuestion(""); // Clear input after submitting
   };
 
+  const handleSelectQuestion = (selectedQuestion: string) => {
+    // Auto-submit when user selects from suggestions
+    if (selectedQuestion.trim()) {
+      onAskQuestion(selectedQuestion);
+      setQuestion("");
+    }
+  };
+
   const handleEmptyButtonClick = () => {
     if (!question.trim()) {
       toast.error("Please enter a question");
@@ -37,13 +45,16 @@ export default function QuestionInput({
   return (
     <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
       <div className="relative">
-        <Input
-          className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} shadow-sm focus-visible:ring-sky-900`}
-          placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          disabled={isProcessing}
-        />
+        <div className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} border border-input rounded-md shadow-sm focus-within:ring-2 focus-within:ring-sky-900`}>
+          <QuestionAutoComplete
+            value={question}
+            onChange={setQuestion}
+            onSelect={handleSelectQuestion}
+            placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
+            disabled={isProcessing}
+            className="w-full"
+          />
+        </div>
         <Button 
           type="submit"
           className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-sky-900 hover:bg-sky-800 border-sky-900`}
