@@ -1,8 +1,10 @@
+
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
 import { hasAICapabilities, generateAnswerWithAI } from "./aiAnalysis";
 import { screenshotService, Screenshot } from "./screenshotService";
+import { getCurrentRepository } from "./githubConnector";
 import { toast } from "sonner";
 
 interface Reference {
@@ -31,11 +33,39 @@ function shouldIncludeScreenshots(query: string): boolean {
     'how to', 'how do', 'how can', 'where to', 'where is',
     'navigate', 'click', 'button', 'settings', 'configure',
     'setup', 'install', 'access', 'find', 'locate',
-    'dashboard', 'interface', 'ui', 'menu', 'panel'
+    'dashboard', 'interface', 'ui', 'menu', 'panel',
+    'dark mode', 'theme', 'appearance', 'design'
   ];
   
   const lowerQuery = query.toLowerCase();
   return screenshotKeywords.some(keyword => lowerQuery.includes(keyword));
+}
+
+/**
+ * Determines the likely URL for the connected repository's running application
+ */
+function getRepositoryAppUrl(): string | null {
+  const currentRepo = getCurrentRepository();
+  if (!currentRepo) return null;
+  
+  // Common patterns for repository URLs
+  const commonPatterns = [
+    `https://${currentRepo.repo}.herokuapp.com`,
+    `https://${currentRepo.repo}.vercel.app`,
+    `https://${currentRepo.repo}.netlify.app`,
+    `https://${currentRepo.owner}.github.io/${currentRepo.repo}`,
+    `https://${currentRepo.repo}.com`,
+    `http://localhost:2368`, // Ghost default
+    `http://localhost:3000`, // Common dev port
+  ];
+  
+  // For Ghost specifically, try the most common patterns
+  if (currentRepo.repo.toLowerCase().includes('ghost')) {
+    return `http://localhost:2368`; // Ghost's default port
+  }
+  
+  // Return the most likely URL (could be made configurable in the future)
+  return commonPatterns[0];
 }
 
 /**
@@ -44,38 +74,54 @@ function shouldIncludeScreenshots(query: string): boolean {
 async function generateRelevantScreenshots(query: string): Promise<Screenshot[]> {
   const screenshots: Screenshot[] = [];
   const lowerQuery = query.toLowerCase();
+  const appUrl = getRepositoryAppUrl();
+  
+  if (!appUrl) {
+    console.warn('No repository app URL available for screenshots');
+    return screenshots;
+  }
   
   try {
-    // Repository/Settings related questions
-    if (lowerQuery.includes('settings') || lowerQuery.includes('configure') || lowerQuery.includes('repository')) {
-      const settingsScreenshots = await screenshotService.captureRepositorySettings();
-      screenshots.push(...settingsScreenshots);
-    }
-    
-    // Question/Input related questions
-    if (lowerQuery.includes('ask') || lowerQuery.includes('question') || lowerQuery.includes('input')) {
-      const inputScreenshots = await screenshotService.captureQuestionInput();
-      screenshots.push(...inputScreenshots);
-    }
-    
-    // Generic UI capture for navigation questions
-    if (lowerQuery.includes('navigate') || lowerQuery.includes('find') || lowerQuery.includes('where')) {
-      const headerCapture = await screenshotService.captureBySelector(
-        'header, nav, .header',
-        'Main navigation area'
-      );
-      if (headerCapture) screenshots.push(headerCapture);
+    // Ghost-specific screenshot workflows
+    if (lowerQuery.includes('ghost')) {
+      console.log('Capturing Ghost admin interface screenshots');
       
-      const mainCapture = await screenshotService.captureBySelector(
-        'main, .main-content, [role="main"]',
-        'Main content area'
-      );
-      if (mainCapture) screenshots.push(mainCapture);
+      // Try different Ghost admin paths
+      const ghostPaths = ['/ghost', '/admin', '/ghost/admin'];
+      
+      for (const path of ghostPaths) {
+        try {
+          const ghostScreenshots = await screenshotService.captureGhostAdminFlow(appUrl, path);
+          if (ghostScreenshots.length > 0) {
+            screenshots.push(...ghostScreenshots);
+            break; // Found working admin path
+          }
+        } catch (error) {
+          console.warn(`Failed to capture Ghost admin at path ${path}:`, error);
+        }
+      }
+    }
+    
+    // Settings-related questions
+    if (lowerQuery.includes('settings') || lowerQuery.includes('configure')) {
+      if (screenshots.length === 0) {
+        // Fallback to current app screenshots
+        const settingsScreenshots = await screenshotService.captureRepositorySettings();
+        screenshots.push(...settingsScreenshots);
+      }
+    }
+    
+    // Navigation questions
+    if (lowerQuery.includes('navigate') || lowerQuery.includes('find') || lowerQuery.includes('where')) {
+      if (screenshots.length === 0) {
+        const navScreenshots = await screenshotService.captureQuestionInput();
+        screenshots.push(...navScreenshots);
+      }
     }
     
   } catch (error) {
     console.warn('Failed to generate screenshots:', error);
-    // Don't fail the entire answer generation if screenshots fail
+    toast.error('Could not capture screenshots from the application');
   }
   
   return screenshots;
