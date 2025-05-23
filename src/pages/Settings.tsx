@@ -1,13 +1,12 @@
 
 import { useEffect } from "react";
 import Header from "@/components/Header";
+import RepositoryManager from "@/components/RepositoryManager";
+import RepositoryRescan from "@/components/RepositoryRescan";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { KeyRound, AlertCircle } from "lucide-react";
 import { hasAICapabilities, wasAPIKeyPreviouslySet, getAPIKeyState } from "@/services/aiAnalysis";
-import { getCurrentRepository, getConnectionDiagnostics, getMostRelevantErrorMessage } from "@/services/githubConnector";
-import { isUsingMockData } from "@/services/knowledgeBase";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
 import { Link } from "react-router-dom";
 
@@ -29,23 +28,6 @@ export default function Settings() {
     return () => clearInterval(intervalId);
   }, [updateConnectionStatus]);
 
-  // Find the GitHub connection button from Header
-  const openGithubConnectDialog = () => {
-    // Find and click the GitHub config button in the header
-    const configButton = document.querySelector('header button:has(.CodeIcon)') as HTMLButtonElement;
-    if (configButton) {
-      configButton.click();
-    } else {
-      // Fallback to finding the RepoConfigModal button
-      const repoConfigButton = document.querySelector('header button.repo-config-trigger') as HTMLButtonElement;
-      if (repoConfigButton) {
-        repoConfigButton.click();
-      } else {
-        console.error('Could not find repository configuration button');
-      }
-    }
-  };
-
   // Find the API key dialog from Header
   const openAPIKeyDialog = () => {
     // Find and click the API key button in the header
@@ -55,23 +37,15 @@ export default function Settings() {
     }
   };
 
-  // Get repository info
-  const currentRepo = getCurrentRepository();
-  const isConnected = currentRepo !== null;
-  const usingMockData = isUsingMockData();
-  const diagnostics = getConnectionDiagnostics();
   const apiKeyStatus = getAPIKeyState();
   const isAIEnabled = hasAICapabilities();
-  
-  // Get the most relevant error message if any
-  const errorMessage = getMostRelevantErrorMessage();
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header />
       
       <main className="flex-1 container py-8">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <h1 className="text-3xl font-semibold">Settings</h1>
             <Link to="/">
@@ -80,57 +54,11 @@ export default function Settings() {
           </div>
           
           <div className="space-y-8">
-            {/* GitHub Connection Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GitHubLogoIcon className="h-5 w-5" />
-                  GitHub Repository Connection
-                </CardTitle>
-                <CardDescription>Connect to the Ghost CMS repository to retrieve accurate information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Status</p>
-                      <p className="text-sm text-muted-foreground">
-                        {isConnected 
-                          ? usingMockData 
-                            ? "Connected with mock data" 
-                            : "Fully connected"
-                          : "Not connected"
-                        }
-                      </p>
-                    </div>
-                    <Button 
-                      onClick={openGithubConnectDialog}
-                      variant={isConnected && !usingMockData ? "outline" : "default"}
-                      className="flex items-center gap-1"
-                    >
-                      <GitHubLogoIcon className="h-4 w-4" />
-                      {isConnected ? "Reconnect" : "Connect to Ghost"}
-                    </Button>
-                  </div>
-                  
-                  {currentRepo && (
-                    <div>
-                      <p className="font-medium">Repository</p>
-                      <p className="text-sm text-muted-foreground">
-                        {currentRepo.owner}/{currentRepo.repo}
-                      </p>
-                    </div>
-                  )}
-                  
-                  {errorMessage && (
-                    <div className="text-sm text-amber-600">
-                      <AlertCircle className="h-4 w-4 inline mr-1" />
-                      {errorMessage}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Repository Management Section */}
+            <RepositoryManager onRepositoryChange={updateConnectionStatus} />
+            
+            {/* Repository Scan Management Section */}
+            <RepositoryRescan onScanComplete={updateConnectionStatus} />
             
             {/* AI Configuration Section */}
             <Card>

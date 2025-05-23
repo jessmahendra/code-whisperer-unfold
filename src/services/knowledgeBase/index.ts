@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -9,6 +10,13 @@ import {
   getExplorationProgress,
   resetExplorationProgress 
 } from './pathExplorer';
+import { 
+  getCachedScanData, 
+  saveScanDataToCache, 
+  shouldScanRepository,
+  clearScanCache 
+} from '../scanScheduler';
+import { getActiveRepository } from '../userRepositories';
 
 // Knowledge base - initialized with mock data but will be populated with real data
 let knowledgeBase: KnowledgeEntry[] = [...mockKnowledgeEntries];
@@ -24,6 +32,60 @@ let initializationState = {
 };
 
 /**
+ * Load knowledge base from cache if available
+ */
+function loadFromCache(): boolean {
+  const activeRepo = getActiveRepository();
+  if (!activeRepo) return false;
+  
+  const cache = getCachedScanData(activeRepo.id);
+  if (!cache) return false;
+  
+  try {
+    // Load cached knowledge base
+    knowledgeBase = cache.scanData.knowledgeBase || [...mockKnowledgeEntries];
+    
+    // Update initialization state
+    initializationState.usingMockData = cache.scanData.usingMockData || false;
+    initializationState.initialized = true;
+    initializationState.fetchConfirmed = cache.scanData.fetchConfirmed || false;
+    initializationState.lastInitTime = cache.lastScanTime;
+    
+    console.log(`Loaded knowledge base from cache: ${knowledgeBase.length} entries`);
+    
+    if (!initializationState.usingMockData) {
+      toast.success(`Loaded cached repository data (${knowledgeBase.length} entries)`, {
+        description: 'Using cached scan from ' + new Date(cache.lastScanTime).toLocaleDateString(),
+        duration: 3000
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error loading from cache:', error);
+    clearScanCache(activeRepo.id);
+    return false;
+  }
+}
+
+/**
+ * Save current knowledge base to cache
+ */
+function saveToCache(): void {
+  const activeRepo = getActiveRepository();
+  if (!activeRepo) return;
+  
+  const scanData = {
+    knowledgeBase: [...knowledgeBase],
+    usingMockData: initializationState.usingMockData,
+    fetchConfirmed: initializationState.fetchConfirmed,
+    processedFiles: getProcessedFileCount()
+  };
+  
+  saveScanDataToCache(activeRepo.id, scanData);
+}
+
+/**
  * Initializes the knowledge base by extracting information from repository files
  * @param {boolean} forceRefresh - Whether to force refresh the knowledge base
  * @returns {Promise<void>}
@@ -31,11 +93,34 @@ let initializationState = {
 export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
   console.log('Initializing knowledge base...');
   
+  const activeRepo = getActiveRepository();
+  if (!activeRepo) {
+    console.log('No active repository, using mock data');
+    knowledgeBase = [...mockKnowledgeEntries];
+    initializationState.usingMockData = true;
+    initializationState.initialized = true;
+    return;
+  }
+  
   // Prevent multiple simultaneous initializations
   if (initializationState.inProgress) {
     console.log('Knowledge base initialization already in progress');
     toast.info('Knowledge base initialization already in progress');
     return;
+  }
+  
+  // Check if we should use cached data
+  if (!forceRefresh && !shouldScanRepository(activeRepo.id)) {
+    console.log('Using cached scan data...');
+    const loaded = loadFromCache();
+    if (loaded) {
+      return; // Successfully loaded from cache
+    }
+  }
+  
+  // If forced refresh, clear the cache
+  if (forceRefresh) {
+    clearScanCache(activeRepo.id);
   }
   
   // Import here to avoid circular dependency
@@ -97,10 +182,13 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       const stats = getKnowledgeBaseStats();
       const successMsg = `Knowledge base initialized with ${stats.totalEntries} entries from ${stats.processedFiles} files.`;
       toast.success(successMsg, {
-        description: 'Using real repository data.',
+        description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
       });
       console.log(successMsg);
+      
+      // Save successful scan to cache
+      saveToCache();
     }
   } catch (error) {
     console.error('Error initializing knowledge base:', error);

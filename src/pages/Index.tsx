@@ -8,6 +8,8 @@ import { Slack } from "lucide-react";
 import RepositoryStatus from "@/components/RepositoryStatus";
 import QuestionHandler from "@/components/QuestionHandler";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
+import { shouldScanRepository } from "@/services/scanScheduler";
+import { getActiveRepository } from "@/services/userRepositories";
 
 export default function Index() {
   const [connectionStatus, updateConnectionStatus] = useConnectionStatus();
@@ -19,8 +21,12 @@ export default function Index() {
         // Initialize the connection to GitHub
         await initializeConnection(updateConnectionStatus);
 
-        // Initialize the knowledge base with force refresh to ensure we get fresh data
-        await initializeKnowledgeBase(true);
+        // Check if we need to scan the repository
+        const activeRepo = getActiveRepository();
+        const needsScan = shouldScanRepository(activeRepo?.id);
+        
+        // Initialize the knowledge base (will use cache if available)
+        await initializeKnowledgeBase(needsScan);
 
         // Update connection status
         updateConnectionStatus();
