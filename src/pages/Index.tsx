@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
 import { Link } from "react-router-dom";
@@ -10,9 +10,11 @@ import QuestionHandler from "@/components/QuestionHandler";
 import { useConnectionStatus, initializeConnection } from "@/components/ConnectionStatusManager";
 import { shouldScanRepository } from "@/services/scanScheduler";
 import { getActiveRepository } from "@/services/userRepositories";
+import OnboardingPanel from "@/components/OnboardingPanel";
 
 export default function Index() {
   const [connectionStatus, updateConnectionStatus] = useConnectionStatus();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Initialize knowledge base on component mount
   useEffect(() => {
@@ -23,10 +25,15 @@ export default function Index() {
 
         // Check if we need to scan the repository
         const activeRepo = getActiveRepository();
-        const needsScan = shouldScanRepository(activeRepo?.id);
         
-        // Initialize the knowledge base (will use cache if available)
-        await initializeKnowledgeBase(needsScan);
+        // Determine if we should show onboarding
+        setShowOnboarding(!activeRepo);
+        
+        if (activeRepo) {
+          const needsScan = shouldScanRepository(activeRepo?.id);
+          // Initialize the knowledge base (will use cache if available)
+          await initializeKnowledgeBase(needsScan);
+        }
 
         // Update connection status
         updateConnectionStatus();
@@ -53,30 +60,52 @@ export default function Index() {
     }
   };
 
+  // Handle onboarding completion
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+    updateConnectionStatus();
+  };
+
+  // Handle onboarding skip
+  const handleOnboardingSkip = () => {
+    setShowOnboarding(false);
+  };
+
   // Determine if we should show the banner - consider exploration status
   const shouldShowWarningBanner = (!connectionStatus.isConnected || connectionStatus.usingMockData) && 
-    connectionStatus.explorationStatus !== "exploring" && !connectionStatus.showProgressIndicator;
+    connectionStatus.explorationStatus !== "exploring" && !connectionStatus.showProgressIndicator && !showOnboarding;
   
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <Header />
       
       <main className="flex-1 container py-4 px-4 pb-20">
-        {shouldShowWarningBanner && (
-          <div className="mb-6">
-            <RepositoryStatus 
-              bannerKey={connectionStatus.bannerKey} 
-              showProgressIndicator={connectionStatus.showProgressIndicator} 
-              shouldShowWarningBanner={shouldShowWarningBanner} 
-              isConnected={connectionStatus.isConnected} 
-              openConfigModal={openConfigModal} 
+        {showOnboarding ? (
+          <div className="py-10">
+            <OnboardingPanel 
+              onComplete={handleOnboardingComplete} 
+              onSkip={handleOnboardingSkip} 
             />
           </div>
+        ) : (
+          <>
+            {shouldShowWarningBanner && (
+              <div className="mb-6">
+                <RepositoryStatus 
+                  bannerKey={connectionStatus.bannerKey} 
+                  showProgressIndicator={connectionStatus.showProgressIndicator} 
+                  shouldShowWarningBanner={shouldShowWarningBanner} 
+                  isConnected={connectionStatus.isConnected} 
+                  openConfigModal={openConfigModal} 
+                />
+              </div>
+            )}
+            
+            <div className="max-w-3xl mx-auto">
+              <QuestionHandler />
+            </div>
+          </>
         )}
-        
-        <div className="max-w-3xl mx-auto">
-          <QuestionHandler />
-        </div>
       </main>
       
       <footer className="border-t py-4 text-sm text-muted-foreground mt-16">
