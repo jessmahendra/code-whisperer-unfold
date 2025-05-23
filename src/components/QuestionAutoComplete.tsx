@@ -95,21 +95,9 @@ export default function QuestionAutoComplete({
 
   return (
     <div className={`relative ${className}`}>
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        onFocus={handleInputFocus}
-        onBlur={handleInputBlur}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="w-full bg-transparent outline-none"
-      />
-      
+      {/* Position suggestions above the input */}
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute bottom-full left-0 right-0 z-50 mb-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
           {suggestions.map((suggestion, index) => (
             <Button
               key={index}
@@ -125,6 +113,19 @@ export default function QuestionAutoComplete({
           ))}
         </div>
       )}
+      
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={handleInputChange}
+        onKeyDown={handleKeyDown}
+        onFocus={handleInputFocus}
+        onBlur={handleInputBlur}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full bg-transparent outline-none"
+      />
     </div>
   );
 }
