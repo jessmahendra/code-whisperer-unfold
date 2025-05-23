@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -23,11 +22,23 @@ export default function QuestionHandler({
   // Create a ref for the most recent answer to scroll to
   const latestAnswerRef = useRef<HTMLDivElement>(null);
   const suggestedQuestions = ["How does Ghost handle image uploads?", "What is the difference between a post and a page in Ghost?", "How can I integrate Ghost with other services?"];
+  
   const handleAskQuestion = async (question: string) => {
     try {
       setIsProcessing(true);
       setError(null);
-      const answer = await generateAnswer(question);
+      
+      // Detect if it's a how-to question to modify the prompt approach
+      const isHowToQuestion = question.toLowerCase().includes("how to") || 
+                             question.toLowerCase().startsWith("how do") ||
+                             question.toLowerCase().startsWith("how can") ||
+                             question.toLowerCase().startsWith("how should");
+      
+      // Pass this context to the answer generator
+      const answer = await generateAnswer(question, { 
+        concise: isHowToQuestion,
+        skipBenefits: isHowToQuestion
+      });
 
       // Save to chat history after getting the answer
       if (answer) {
@@ -49,6 +60,7 @@ export default function QuestionHandler({
       setIsProcessing(false);
     }
   };
+  
   const handleSelectQuestion = (question: string) => {
     handleAskQuestion(question);
   };

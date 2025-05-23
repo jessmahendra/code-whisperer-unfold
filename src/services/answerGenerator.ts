@@ -1,4 +1,3 @@
-
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
@@ -25,9 +24,15 @@ interface Answer {
 /**
  * Generates an answer based on a user question
  * @param {string} query - User question
+ * @param {Object} [options] - Options for generating the answer
+ * @param {boolean} [options.concise] - Whether to generate a concise answer
+ * @param {boolean} [options.skipBenefits] - Whether to skip benefits sections
  * @returns {Promise<Answer|null>} Generated answer or null if no answer could be generated
  */
-export async function generateAnswer(query: string): Promise<Answer | null> {
+export async function generateAnswer(query: string, options?: { 
+  concise?: boolean, 
+  skipBenefits?: boolean 
+}): Promise<Answer | null> {
   // Simulate a slight processing delay
   await new Promise(resolve => setTimeout(resolve, 500));
   
