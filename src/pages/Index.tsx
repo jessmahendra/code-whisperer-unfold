@@ -77,7 +77,7 @@ export default function Index() {
   
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <Header />
+      <Header isOnboarding={showOnboarding} />
       
       <main className="flex-1 container py-4 px-4 pb-20">
         {showOnboarding ? (

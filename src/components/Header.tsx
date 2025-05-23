@@ -20,7 +20,11 @@ import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
 
-export default function Header() {
+interface HeaderProps {
+  isOnboarding?: boolean;
+}
+
+export default function Header({ isOnboarding = false }: HeaderProps) {
   const navigate = useNavigate();
   const [currentRepo, setCurrentRepo] = useState<{
     owner: string;
@@ -254,34 +258,37 @@ export default function Header() {
         
         <div className={`flex ${showProgressIndicator ? '' : 'flex-1'} items-center justify-between space-x-2 md:justify-end`}>
           <nav className="flex items-center space-x-4">
-            {/* Moved Connect to Ghost and API Key buttons to Settings page */}
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={() => navigate("/history")} className="flex items-center gap-1">
-                    <History className="h-4 w-4" />
-                    History
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View your chat history</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="flex items-center justify-center p-0 h-9 w-9">
-                    <Settings className="h-5 w-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Configure application settings</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* Only show navigation items if not in onboarding mode */}
+            {!isOnboarding && (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => navigate("/history")} className="flex items-center gap-1">
+                        <History className="h-4 w-4" />
+                        History
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View your chat history</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="flex items-center justify-center p-0 h-9 w-9">
+                        <Settings className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Configure application settings</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            )}
             
             {/* OpenAI API Key Dialog - keep this hidden but still available for the Settings page to trigger */}
             <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
@@ -331,23 +338,27 @@ export default function Header() {
             </Dialog>
             
             {/* Connection troubleshooting alert */}
-            {connectionError && !showProgressIndicator && <Alert variant="warning" className="hidden lg:flex max-w-xs items-center py-1 h-9">
+            {connectionError && !showProgressIndicator && !isOnboarding && (
+              <Alert variant="warning" className="hidden lg:flex max-w-xs items-center py-1 h-9">
                 <AlertDescription className="text-xs flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   {connectionError.length > 60 ? `${connectionError.substring(0, 60)}...` : connectionError}
                 </AlertDescription>
-              </Alert>}
+              </Alert>
+            )}
             
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <RepoConfigModal onConfigChange={updateRepoInfo} />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Configure GitHub repository connection</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {!isOnboarding && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <RepoConfigModal onConfigChange={updateRepoInfo} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Configure GitHub repository connection</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </nav>
         </div>
       </div>
