@@ -124,7 +124,7 @@ export default function QuestionAutoComplete({
         onBlur={handleInputBlur}
         placeholder={placeholder}
         disabled={disabled}
-        className="w-full bg-transparent outline-none"
+        className="w-full bg-transparent outline-none pl-2"
       />
     </div>
   );
