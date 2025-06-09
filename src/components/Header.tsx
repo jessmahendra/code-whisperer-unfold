@@ -19,12 +19,12 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
-
 interface HeaderProps {
   isOnboarding?: boolean;
 }
-
-export default function Header({ isOnboarding = false }: HeaderProps) {
+export default function Header({
+  isOnboarding = false
+}: HeaderProps) {
   const navigate = useNavigate();
   const [currentRepo, setCurrentRepo] = useState<{
     owner: string;
@@ -39,7 +39,6 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
-  
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
@@ -66,7 +65,6 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       setShowProgressIndicator(false);
     }
   };
-
   useEffect(() => {
     updateRepoInfo();
 
@@ -105,7 +103,6 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
     }, 1000);
     return () => clearInterval(intervalId);
   }, []);
-
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
     setConnectionError(null);
@@ -204,7 +201,6 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       setShowProgressIndicator(false);
     }
   };
-
   const handleOpenAIKeySave = () => {
     if (openaiKey.trim()) {
       setOpenAIApiKey(openaiKey.trim());
@@ -214,7 +210,6 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
       toast.error("Please enter a valid OpenAI API key");
     }
   };
-
   const getConnectionStatusInfo = () => {
     switch (connectionStatus) {
       case 'disconnected':
@@ -248,22 +243,17 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent default anchor behavior
     console.log("Logo clicked, navigating to homepage");
-    navigate("/", { replace: true });
+    navigate("/", {
+      replace: true
+    });
   };
-
   const statusInfo = getConnectionStatusInfo();
-
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           {/* Replace Link with a proper navigation handler to ensure it always works */}
-          <a 
-            href="/"
-            onClick={handleLogoClick}
-            className="flex items-center space-x-2 cursor-pointer"
-          >
-            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">Unfold</span>
+          <a href="/" onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
+            <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">story</span>
           </a>
         </div>
         
@@ -274,8 +264,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
         <div className={`flex ${showProgressIndicator ? '' : 'flex-1'} items-center justify-between space-x-2 md:justify-end`}>
           <nav className="flex items-center space-x-4">
             {/* Only show navigation items if not in onboarding mode */}
-            {!isOnboarding && (
-              <>
+            {!isOnboarding && <>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -302,8 +291,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </>
-            )}
+              </>}
             
             {/* OpenAI API Key Dialog - keep this hidden but still available for the Settings page to trigger */}
             <Dialog open={openaiDialogOpen} onOpenChange={setOpenaiDialogOpen}>
@@ -353,17 +341,14 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
             </Dialog>
             
             {/* Connection troubleshooting alert */}
-            {connectionError && !showProgressIndicator && !isOnboarding && (
-              <Alert variant="warning" className="hidden lg:flex max-w-xs items-center py-1 h-9">
+            {connectionError && !showProgressIndicator && !isOnboarding && <Alert variant="warning" className="hidden lg:flex max-w-xs items-center py-1 h-9">
                 <AlertDescription className="text-xs flex items-center gap-2">
                   <AlertCircle className="h-4 w-4" />
                   {connectionError.length > 60 ? `${connectionError.substring(0, 60)}...` : connectionError}
                 </AlertDescription>
-              </Alert>
-            )}
+              </Alert>}
           </nav>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 }
