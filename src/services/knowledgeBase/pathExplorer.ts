@@ -1,3 +1,4 @@
+
 import { getRepositoryContents, getCurrentRepository } from '../githubConnector';
 import { processFile, processModule } from './fileProcessor';
 import { KnowledgeEntry } from './types';
@@ -196,8 +197,9 @@ export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): P
             }
           }
         } else if (contents && typeof contents === 'object' && 'type' in contents && contents.type === 'file') {
-          // Single file
-          if ('name' in contents && isRelevantFile(contents.name as string)) {
+          // Single file - also need proper type assertion here
+          const typedContents = contents as { type: string; name: string; path: string };
+          if ('name' in typedContents && isRelevantFile(typedContents.name)) {
             try {
               await processFile(path, knowledgeBase);
               hasProcessedAnyFiles = true;
