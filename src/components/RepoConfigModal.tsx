@@ -342,14 +342,14 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
             <Label htmlFor="token">
               GitHub Personal Access Token 
               <span className="text-xs text-muted-foreground ml-1">
-                (needs repo scope)
+                (classic or fine-grained)
               </span>
             </Label>
             <div className="flex space-x-2">
               <Input
                 id="token"
                 type="password"
-                placeholder="ghp_..."
+                placeholder="ghp_... or github_pat_..."
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
@@ -385,16 +385,40 @@ export default function RepoConfigModal({ onConfigChange }: RepoConfigModalProps
               </Alert>
             )}
             
+            <div className="mt-2 text-sm text-muted-foreground border-l-4 border-blue-500 pl-4 py-2 bg-blue-50 rounded">
+              <p className="flex items-center mb-1">
+                <InfoIcon className="h-4 w-4 mr-1 inline" />
+                <strong>Token Requirements:</strong>
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <p className="font-medium text-blue-700">Fine-grained tokens (recommended):</p>
+                  <ul className="list-disc pl-5 space-y-1 text-xs">
+                    <li>Repository permissions: Contents (Read), Metadata (Read)</li>
+                    <li>More secure with specific repository access</li>
+                    <li>Better rate limits and permissions control</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="font-medium text-blue-700">Classic tokens:</p>
+                  <ul className="list-disc pl-5 space-y-1 text-xs">
+                    <li>Scope: 'repo' (full repository access)</li>
+                    <li>Works with all repositories you have access to</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            
             <div className="mt-2 text-sm text-muted-foreground border-l-4 border-amber-500 pl-4 py-2 bg-amber-50 rounded">
               <p className="flex items-center mb-1">
                 <InfoIcon className="h-4 w-4 mr-1 inline" />
                 <strong>Troubleshooting tips:</strong>
               </p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>Make sure the token has 'repo' scope permissions</li>
+                <li>For fine-grained tokens: Ensure Contents + Metadata permissions</li>
+                <li>For classic tokens: Make sure 'repo' scope is selected</li>
                 <li>For the Ghost repo, use owner "TryGhost" and repo "Ghost"</li>
-                <li>Check if the repository exists and is public</li>
-                <li>For private repos, ensure your token has access</li>
+                <li>Check if the repository exists and is accessible</li>
                 <li>Try refreshing if data doesn't appear immediately</li>
                 <li>If you hit rate limits, wait a few minutes and try again</li>
               </ul>

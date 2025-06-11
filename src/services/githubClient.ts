@@ -7,7 +7,7 @@ let octokitInstance: Octokit | null = null;
 
 /**
  * Initialize the GitHub client with a personal access token
- * @param token GitHub personal access token
+ * @param token GitHub personal access token (classic or fine-grained)
  * @returns Boolean indicating if initialization was successful
  */
 export function initGithubClient(token: string): boolean {
@@ -206,7 +206,7 @@ export async function fetchFileAuthor(owner: string, repo: string, path: string)
 
 /**
  * Validate GitHub token by attempting to get the authenticated user
- * @param token GitHub personal access token to validate
+ * @param token GitHub personal access token to validate (classic or fine-grained)
  * @returns User information if valid, null otherwise
  */
 export async function validateGithubToken(token: string) {
@@ -214,12 +214,43 @@ export async function validateGithubToken(token: string) {
     console.log("Validating GitHub token...");
     const tempClient = new Octokit({ auth: token });
     const response = await tempClient.users.getAuthenticated();
-    console.log("Token validation successful:", response.data.login);
+    
+    // Check if this is a fine-grained token by looking at the scopes
+    try {
+      const rateLimit = await tempClient.rateLimit.get();
+      console.log("Token validation successful:", response.data.login);
+      console.log("Rate limit info:", rateLimit.data.rate);
+      
+      // Fine-grained tokens typically have different rate limit structures
+      const isFineGrained = rateLimit.data.rate.limit > 5000 || response.data.type === 'User';
+      if (isFineGrained) {
+        console.log("Detected fine-grained personal access token");
+      } else {
+        console.log("Detected classic personal access token");
+      }
+    } catch (rateLimitError) {
+      console.log("Could not fetch rate limit info, proceeding with validation");
+    }
+    
     return response.data;
   } catch (error) {
     console.error("Token validation failed:", error);
+    
+    // Provide more specific error messages for common issues
+    let errorMessage = "Make sure your token is valid and has the required permissions.";
+    
+    if (error instanceof Error) {
+      if (error.message.includes('401')) {
+        errorMessage = "Invalid token. Please check your GitHub token.";
+      } else if (error.message.includes('403')) {
+        errorMessage = "Token doesn't have sufficient permissions. Ensure it has 'Contents' and 'Metadata' repository permissions.";
+      } else if (error.message.includes('404')) {
+        errorMessage = "Repository not found or token doesn't have access to it.";
+      }
+    }
+    
     toast.error("Invalid GitHub token", {
-      description: "Make sure your token has the 'repo' scope and is valid."
+      description: errorMessage
     });
     return null;
   }

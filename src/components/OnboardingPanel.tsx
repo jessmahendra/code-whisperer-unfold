@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -190,13 +189,14 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
             <Input
               id="token"
               type="password"
-              placeholder="ghp_..."
+              placeholder="ghp_... or github_pat_..."
               value={token}
               onChange={(e) => setToken(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Your token needs 'repo' scope permissions to access the repository
-            </p>
+            <div className="text-xs text-muted-foreground mt-1 space-y-1">
+              <p><strong>Fine-grained tokens (recommended):</strong> Contents + Metadata permissions</p>
+              <p><strong>Classic tokens:</strong> 'repo' scope permissions</p>
+            </div>
           </div>
           
           <div className="flex justify-between items-center pt-4">
