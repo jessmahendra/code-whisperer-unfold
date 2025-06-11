@@ -1,4 +1,3 @@
-
 import { getRepositoryContents, getCurrentRepository } from '../githubConnector';
 import { processFile, processModule } from './fileProcessor';
 import { KnowledgeEntry } from './types';
@@ -168,35 +167,37 @@ export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): P
               break;
             }
             
-            // Ensure item has the expected properties
+            // Ensure item has the expected properties with proper type assertion
             if (item && typeof item === 'object' && 'type' in item && 'name' in item && 'path' in item) {
-              if (item.type === 'file') {
+              const typedItem = item as { type: string; name: string; path: string };
+              
+              if (typedItem.type === 'file') {
                 // Process relevant files
-                if (isRelevantFile(item.name)) {
+                if (isRelevantFile(typedItem.name)) {
                   try {
-                    await processFile(item.path, knowledgeBase);
+                    await processFile(typedItem.path, knowledgeBase);
                     hasProcessedAnyFiles = true;
                     explorationProgress.filesProcessed++;
                     filesProcessedInDir++;
-                    console.log(`Successfully processed file: ${item.path}`);
+                    console.log(`Successfully processed file: ${typedItem.path}`);
                   } catch (error) {
-                    console.error(`Error processing file ${item.path}:`, error);
+                    console.error(`Error processing file ${typedItem.path}:`, error);
                   }
                 }
-              } else if (item.type === 'dir' && shouldExploreDirectory(item.name)) {
+              } else if (typedItem.type === 'dir' && shouldExploreDirectory(typedItem.name)) {
                 // Try to process important subdirectories
                 try {
-                  await processModule(item.path, knowledgeBase);
+                  await processModule(typedItem.path, knowledgeBase);
                   hasProcessedAnyFiles = true;
                 } catch (error) {
-                  console.error(`Error processing directory ${item.path}:`, error);
+                  console.error(`Error processing directory ${typedItem.path}:`, error);
                 }
               }
             }
           }
         } else if (contents && typeof contents === 'object' && 'type' in contents && contents.type === 'file') {
           // Single file
-          if ('name' in contents && isRelevantFile(contents.name)) {
+          if ('name' in contents && isRelevantFile(contents.name as string)) {
             try {
               await processFile(path, knowledgeBase);
               hasProcessedAnyFiles = true;
