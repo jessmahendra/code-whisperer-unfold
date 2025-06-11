@@ -31,6 +31,47 @@ let initializationState = {
 };
 
 /**
+ * Determines if the knowledge base contains real repository data
+ */
+function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
+  // If we have no entries, it's definitely not real data
+  if (entries.length === 0) return false;
+  
+  // If we only have the exact mock entries, it's mock data
+  if (entries.length === mockKnowledgeEntries.length) {
+    const mockPaths = new Set(mockKnowledgeEntries.map(e => e.filePath));
+    const currentPaths = new Set(entries.map(e => e.filePath));
+    
+    // Check if all paths match the mock data
+    if (mockPaths.size === currentPaths.size) {
+      let allMatch = true;
+      for (const path of mockPaths) {
+        if (!currentPaths.has(path)) {
+          allMatch = false;
+          break;
+        }
+      }
+      if (allMatch) return false; // It's mock data
+    }
+  }
+  
+  // Check for repository-specific file patterns that indicate real data
+  const realDataIndicators = [
+    'package.json', 'README.md', 'tsconfig.json', 'vite.config',
+    '.ts', '.tsx', '.js', '.jsx', 'components/', 'src/', 'app/', 'lib/'
+  ];
+  
+  const hasRealIndicators = entries.some(entry => 
+    realDataIndicators.some(indicator => 
+      entry.filePath.includes(indicator)
+    )
+  );
+  
+  // If we have more than 50 entries with real indicators, it's likely real data
+  return entries.length > 50 && hasRealIndicators;
+}
+
+/**
  * Load knowledge base from cache if available
  */
 function loadFromCache(): boolean {
@@ -44,9 +85,11 @@ function loadFromCache(): boolean {
     // Load cached knowledge base
     knowledgeBase = cache.scanData.knowledgeBase || [...mockKnowledgeEntries];
     
-    // Update initialization state - check if the cached data is real data
-    const hasRealData = cache.scanData.knowledgeBase && cache.scanData.knowledgeBase.length > 100; // Real data has many entries
-    initializationState.usingMockData = !hasRealData || cache.scanData.usingMockData || false;
+    // Properly determine if we have real data
+    const hasRealData = hasRealRepositoryData(knowledgeBase);
+    
+    // Update initialization state
+    initializationState.usingMockData = !hasRealData;
     initializationState.initialized = true;
     initializationState.fetchConfirmed = cache.scanData.fetchConfirmed || hasRealData;
     initializationState.lastInitTime = cache.lastScanTime;
@@ -216,26 +259,42 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     return [];
   }
   
+  console.log(`Searching knowledge base with keywords: ${keywords.join(', ')}`);
+  console.log(`Knowledge base has ${knowledgeBase.length} entries, using mock data: ${initializationState.usingMockData}`);
+  
   // Score each entry based on keyword matches
   const scoredEntries = knowledgeBase.map(entry => {
-    const matchCount = keywords.reduce((count, keyword) => {
+    let score = 0;
+    
+    // Check for exact keyword matches in content and file path
+    keywords.forEach(keyword => {
       if (entry.keywords.includes(keyword)) {
-        return count + 1;
+        score += 1;
       }
-      return count;
-    }, 0);
+      // Also check content and file path for partial matches
+      if (entry.content.toLowerCase().includes(keyword.toLowerCase())) {
+        score += 0.5;
+      }
+      if (entry.filePath.toLowerCase().includes(keyword.toLowerCase())) {
+        score += 0.3;
+      }
+    });
     
     return {
       entry,
-      score: matchCount / keywords.length // Normalize by number of keywords
+      score: score / keywords.length // Normalize by number of keywords
     };
   });
   
   // Sort by score and filter out low-scoring entries
-  return scoredEntries
-    .filter(item => item.score > 0.1) // At least some relevance
+  const results = scoredEntries
+    .filter(item => item.score > 0.05) // Lower threshold for better results
     .sort((a, b) => b.score - a.score) // Sort by descending score
     .map(item => item.entry); // Extract just the entries
+  
+  console.log(`Found ${results.length} relevant entries for query`);
+  
+  return results;
 }
 
 /**
@@ -278,10 +337,6 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
  * @returns {boolean} True if using mock data
  */
 export function isUsingMockData(): boolean {
-  // If we have more than 100 entries and they're not the mock entries, we're using real data
-  if (knowledgeBase.length > 100 && knowledgeBase !== mockKnowledgeEntries) {
-    return false;
-  }
   return initializationState.usingMockData;
 }
 

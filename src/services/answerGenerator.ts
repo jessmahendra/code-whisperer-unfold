@@ -5,6 +5,7 @@ import { generateVisualContext } from "./visualContextGenerator";
 import { hasAICapabilities, generateAnswerWithAI } from "./aiAnalysis";
 import { screenshotService, Screenshot } from "./screenshotService";
 import { getCurrentRepository } from "./githubConnector";
+import { isUsingMockData } from "./knowledgeBase";
 import { toast } from "sonner";
 
 interface Reference {
@@ -155,10 +156,19 @@ export async function generateAnswer(query: string, options?: {
     // Search the knowledge base with history information
     const results = await searchKnowledgeWithHistory(query);
     
+    console.log(`Search results: ${results.length} entries found`);
+    console.log(`Using mock data: ${isUsingMockData()}`);
+    
     if (results.length === 0) {
       console.log("No results found for query:", query);
       return null;
     }
+    
+    // Log the first few results for debugging
+    console.log("First few search results:");
+    results.slice(0, 3).forEach((result, index) => {
+      console.log(`${index + 1}. File: ${result.filePath}, Content length: ${result.content.length}`);
+    });
     
     // Generate screenshots if the query would benefit from them
     let screenshots: Screenshot[] = [];
@@ -169,20 +179,22 @@ export async function generateAnswer(query: string, options?: {
     // Check if AI capabilities are available
     if (hasAICapabilities()) {
       try {
-        // Prepare context from search results
-        const context = results.map(result => {
-          return `File: ${result.filePath}\n${result.content}`;
+        // Prepare context from search results with more detail
+        const context = results.slice(0, 10).map(result => {
+          return `File: ${result.filePath}\nType: ${result.type}\nContent: ${result.content}\n---`;
         });
+        
+        console.log(`Sending ${context.length} context items to AI`);
         
         // Use AI to generate an answer
         const aiAnswer = await generateAnswerWithAI(query, context);
         
         if (aiAnswer) {
           // Create references with version information
-          const references = results.slice(0, 3).map(result => {
+          const references = results.slice(0, 5).map(result => {
             return {
               filePath: result.filePath,
-              snippet: result.content.substring(0, 120) + (result.content.length > 120 ? '...' : ''),
+              snippet: result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''),
               lastUpdated: result.lastUpdated
             };
           });
@@ -191,9 +203,6 @@ export async function generateAnswer(query: string, options?: {
           let visualContext = null;
           if (query.toLowerCase().includes('flow') || 
               query.toLowerCase().includes('process') ||
-              query.toLowerCase().includes('subscription') ||
-              query.toLowerCase().includes('post') ||
-              query.toLowerCase().includes('content') ||
               query.toLowerCase().includes('component') ||
               query.toLowerCase().includes('state')) {
             visualContext = generateVisualContext(query, results);
@@ -215,83 +224,23 @@ export async function generateAnswer(query: string, options?: {
       }
     }
     
-    // Extract key topics from the results to generate a coherent answer
-    const topics = new Set<string>();
-    const fileTypes = new Set<string>();
-    const functions = new Set<string>();
-    const entityWords = ['member', 'subscription', 'post', 'page', 'author', 'tag', 'payment', 'theme'];
-    const actionWords = ['create', 'read', 'update', 'delete', 'authenticate', 'authorize', 'process', 'publish', 'schedule'];
-    
-    // Analyze results to identify key topics, entities, and actions
-    results.forEach(result => {
-      // Extract file name without extension for topic identification
-      const fileName = result.filePath.split('/').pop()?.split('.')[0];
-      if (fileName) topics.add(fileName);
-      
-      // Extract file type
-      const fileType = result.filePath.split('.').pop();
-      if (fileType) fileTypes.add(fileType);
-      
-      // Extract function names
-      if (result.metadata?.name) functions.add(result.metadata.name);
-      
-      // Extract content words
-      const contentWords = result.content.toLowerCase().split(/\W+/).filter(Boolean);
-      contentWords.forEach(word => {
-        if (entityWords.includes(word)) topics.add(word);
-        if (actionWords.includes(word)) topics.add(word);
+    // If we're using mock data, warn the user
+    if (isUsingMockData()) {
+      console.log("Using mock data for answer generation");
+      toast.warning("Using sample data - connect your repository for accurate answers", {
+        description: 'This answer is based on sample data, not your actual codebase.',
+        duration: 4000
       });
-    });
-    
-    // Generate answer based on identified topics and results
-    let answerText = '';
-    
-    // Generate specific answers based on identified topics
-    if (query.toLowerCase().includes('subscription') || topics.has('subscription')) {
-      answerText = "## Subscription Management\n\nGhost handles subscription payments through Stripe. When a customer's subscription ends, they automatically switch to a free membership. This means they can still log in and access free content, but premium content will require renewal of their subscription.\n\n**Key points:**\n\n* Payments processed securely via Stripe\n* Expired subscriptions become free members automatically\n* Free members retain access to non-premium content";
-    } else if (query.toLowerCase().includes('post') || topics.has('post')) {
-      answerText = "## Post Management\n\nThere's no limit to how many posts you can create in Ghost, regardless of which plan you're on. You can make some content available only to paying members by adjusting visibility settings.\n\n**Key features:**\n\n* Unlimited posts on all plans\n* Schedule posts for future publication\n* Control access with member-only visibility settings\n* SEO optimization tools built-in";
-    } else if (query.toLowerCase().includes('member') || topics.has('member')) {
-      answerText = "## Member Management\n\nGhost's membership feature lets your audience sign up, subscribe to emails, and access paid content. Members can join at different levels:\n\n* **Free members** - Access to basic content\n* **Paid members** - Premium access to all content\n* **Comped members** - Premium access granted manually\n\nAll member information is stored securely and can be exported if needed, in compliance with privacy regulations.";
-    } else if (query.toLowerCase().includes('auth') || topics.has('auth') || topics.has('authenticate')) {
-      answerText = "## Authentication Options\n\nGhost uses a secure login system for different types of users:\n\n* **Site administrators** - Username and password login\n* **Members** - Email/password or magic link authentication (no password needed)\n* **Service connections** - Secure access keys:\n  * Public keys for accessing published content\n  * Private admin keys for management functions";
-    } else if (query.toLowerCase().includes('payment') || topics.has('payment')) {
-      answerText = "## Payment Processing\n\nGhost works directly with Stripe to handle all payments securely. Your customers can make one-time payments or sign up for regular subscriptions.\n\n**If a payment doesn't go through:**\n\n* Stripe automatically retries based on their retry schedule\n* Notifications are sent to both the customer and site admin\n* Failed payment status is visible in the admin dashboard";
-    } else if (query.toLowerCase().includes('integration') || query.toLowerCase().includes('platform') || topics.has('integration')) {
-      answerText = "## Ghost Integration Options\n\nGhost connects seamlessly with many popular platforms and services:\n\n* **Email providers** - Mailgun, Amazon SES, SendGrid\n* **Payment processors** - Stripe (built-in)\n* **Social media** - Facebook, Twitter, LinkedIn (automatic sharing)\n* **Analytics** - Google Analytics, Plausible, Matomo\n* **Membership tools** - Discord, Slack (community access)\n* **Content tools** - Unsplash (built-in), Zapier (automation)\n\nIntegrations can be managed through the Ghost admin interface or via the custom integrations API for advanced needs.";
-    } else if (query.toLowerCase().includes('analytics') || query.toLowerCase().includes('dashboard') || query.toLowerCase().includes('stats')) {
-      answerText = "## Analytics Dashboard\n\nGhost provides a built-in analytics dashboard that offers valuable insights into your audience and content performance.\n\n**Key metrics available:**\n\n* **Member growth** - Track new sign-ups, conversions from free to paid, and churn rate\n* **Content performance** - See which posts receive the most views and engagement\n* **Revenue stats** - Monitor monthly recurring revenue (MRR) and other financial metrics\n* **Email engagement** - View open rates, click-through rates, and subscription statistics\n* **Retention data** - Analyze how long members stay subscribed and identify patterns\n\nAll analytics are available directly in your Ghost admin dashboard without requiring external tools, though you can integrate with services like Google Analytics for more advanced analysis.";
-    } else {
-      // Generic answer for other queries with markdown formatting
-      answerText = "## Ghost Platform Features\n\nBased on our review of Ghost's system, this feature is handled through specific services that work together to deliver a seamless experience for both you and your audience.\n\n";
-      
-      // Add some details based on what was found, in non-technical language
-      if (functions.size > 0) {
-        answerText += "The system includes components that handle " + Array.from(functions).slice(0, 3).join(', ') + " in user-friendly ways.\n\n";
-      }
-      
-      answerText += "For more specific information about how this works for your particular needs, please feel free to ask a more detailed question.";
     }
     
-    // Add version awareness to the answer
-    if (results.some(result => result.lastUpdated)) {
-      const mostRecentResult = [...results].sort((a, b) => {
-        if (!a.lastUpdated || a.lastUpdated === 'Unknown') return 1;
-        if (!b.lastUpdated || b.lastUpdated === 'Unknown') return -1;
-        return new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime();
-      })[0];
-      
-      // Add timestamp information to the answer
-      if (mostRecentResult.lastUpdated && mostRecentResult.lastUpdated !== 'Unknown') {
-        answerText += `\n\n**This information is current as of ${new Date(mostRecentResult.lastUpdated).toLocaleDateString()}.**`;
-      }
-    }
+    // Generate template-based answer with improved repository-specific logic
+    let answerText = generateRepositorySpecificAnswer(query, results);
     
     // Create references with version information
-    const references = results.slice(0, 3).map(result => {
+    const references = results.slice(0, 5).map(result => {
       return {
         filePath: result.filePath,
-        snippet: result.content.substring(0, 120) + (result.content.length > 120 ? '...' : ''),
+        snippet: result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''),
         lastUpdated: result.lastUpdated
       };
     });
@@ -300,19 +249,16 @@ export async function generateAnswer(query: string, options?: {
     let visualContext = null;
     if (query.toLowerCase().includes('flow') || 
         query.toLowerCase().includes('process') ||
-        query.toLowerCase().includes('subscription') ||
-        query.toLowerCase().includes('post') ||
-        query.toLowerCase().includes('content') ||
         query.toLowerCase().includes('component') ||
         query.toLowerCase().includes('state')) {
       visualContext = generateVisualContext(query, results);
     }
     
-    console.log("Generated template answer:", answerText.substring(0, 100) + "...");
+    console.log("Generated repository-specific answer:", answerText.substring(0, 100) + "...");
     
     return {
       text: answerText,
-      confidence: Math.min(0.3 + (results.length * 0.15), 0.95),
+      confidence: Math.min(0.4 + (results.length * 0.1), 0.85),
       references,
       screenshots: screenshots.length > 0 ? screenshots : undefined,
       visualContext: visualContext
@@ -321,4 +267,130 @@ export async function generateAnswer(query: string, options?: {
     console.error("Error in generateAnswer:", error);
     return null;
   }
+}
+
+/**
+ * Generates repository-specific answers based on actual code content
+ */
+function generateRepositorySpecificAnswer(query: string, results: any[]): string {
+  const lowerQuery = query.toLowerCase();
+  
+  // Extract actual information from the results
+  const fileTypes = new Set<string>();
+  const functionNames = new Set<string>();
+  const exports = new Set<string>();
+  const imports = new Set<string>();
+  const apiRoutes = new Set<string>();
+  
+  results.forEach(result => {
+    // Extract file extension
+    const ext = result.filePath.split('.').pop();
+    if (ext) fileTypes.add(ext);
+    
+    // Extract function names and exports from metadata
+    if (result.metadata?.name) functionNames.add(result.metadata.name);
+    if (result.metadata?.method && result.metadata?.path) {
+      apiRoutes.add(`${result.metadata.method} ${result.metadata.path}`);
+    }
+    
+    // Extract exports and imports from content
+    if (result.content.includes('export')) {
+      const exportMatches = result.content.match(/export\s+(?:const|function|class)\s+(\w+)/g);
+      if (exportMatches) {
+        exportMatches.forEach(match => {
+          const name = match.split(/\s+/).pop();
+          if (name) exports.add(name);
+        });
+      }
+    }
+  });
+  
+  // Generate answer based on what we actually found
+  let answerText = '';
+  
+  if (lowerQuery.includes('download') || lowerQuery.includes('link')) {
+    const downloadRelated = results.filter(r => 
+      r.content.toLowerCase().includes('download') || 
+      r.filePath.toLowerCase().includes('download') ||
+      r.content.includes('href=') ||
+      r.content.includes('link')
+    );
+    
+    if (downloadRelated.length > 0) {
+      answerText = `## Download Links\n\nBased on the codebase analysis, here are the download-related components found:\n\n`;
+      
+      downloadRelated.slice(0, 3).forEach(result => {
+        answerText += `**${result.filePath}**\n`;
+        answerText += `${result.content.substring(0, 150)}...\n\n`;
+      });
+      
+      if (apiRoutes.size > 0) {
+        answerText += `**API Endpoints:**\n`;
+        Array.from(apiRoutes).slice(0, 3).forEach(route => {
+          answerText += `- ${route}\n`;
+        });
+      }
+    } else {
+      answerText = `## Download Links\n\nNo specific download links were found in the current codebase scan. `;
+      answerText += `This could mean:\n\n- Download functionality might be in files not yet scanned\n`;
+      answerText += `- Downloads might be handled through external services\n`;
+      answerText += `- The feature might not be implemented yet\n\n`;
+      answerText += `**Files scanned:** ${results.length} entries from ${Array.from(fileTypes).join(', ')} files`;
+    }
+  } else if (lowerQuery.includes('api') || lowerQuery.includes('endpoint')) {
+    if (apiRoutes.size > 0) {
+      answerText = `## API Endpoints\n\nFound ${apiRoutes.size} API routes in the codebase:\n\n`;
+      Array.from(apiRoutes).forEach(route => {
+        answerText += `- ${route}\n`;
+      });
+    } else {
+      answerText = `## API Information\n\nNo specific API routes found in the scanned files. `;
+      answerText += `The application might use different API patterns or external services.`;
+    }
+  } else if (lowerQuery.includes('component') || lowerQuery.includes('ui')) {
+    const componentFiles = results.filter(r => 
+      r.filePath.includes('component') || 
+      r.filePath.includes('ui') ||
+      r.type === 'function'
+    );
+    
+    if (componentFiles.length > 0) {
+      answerText = `## Components\n\nFound ${componentFiles.length} component-related files:\n\n`;
+      componentFiles.slice(0, 5).forEach(comp => {
+        answerText += `**${comp.filePath}**\n`;
+        if (comp.metadata?.name) answerText += `Function: ${comp.metadata.name}\n`;
+        answerText += `${comp.content.substring(0, 100)}...\n\n`;
+      });
+    } else {
+      answerText = `## Components\n\nNo specific component files found in the current scan.`;
+    }
+  } else {
+    // Generic answer with actual repository information
+    answerText = `## Repository Analysis\n\nBased on the codebase scan, here's what I found:\n\n`;
+    
+    if (fileTypes.size > 0) {
+      answerText += `**File Types:** ${Array.from(fileTypes).join(', ')}\n`;
+    }
+    
+    if (functionNames.size > 0) {
+      answerText += `**Functions Found:** ${Array.from(functionNames).slice(0, 5).join(', ')}\n`;
+    }
+    
+    if (exports.size > 0) {
+      answerText += `**Exports Found:** ${Array.from(exports).slice(0, 5).join(', ')}\n`;
+    }
+    
+    answerText += `\n**Total Entries:** ${results.length} code entries analyzed\n\n`;
+    
+    // Add some specific content from the results
+    if (results.length > 0) {
+      answerText += `**Relevant Code:**\n`;
+      results.slice(0, 2).forEach(result => {
+        answerText += `\nFrom \`${result.filePath}\`:\n`;
+        answerText += `${result.content.substring(0, 200)}...\n`;
+      });
+    }
+  }
+  
+  return answerText;
 }
