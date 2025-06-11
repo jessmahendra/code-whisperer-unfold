@@ -8,8 +8,16 @@ let successfulPathPatterns: Set<string> = new Set();
 let explorationProgress = {
   pathsAttempted: 0,
   pathsSuccessful: 0,
-  filesProcessed: 0
+  filesProcessed: 0,
+  status: "idle" as "idle" | "exploring" | "complete" | "error",
+  progress: 0,
+  error: null as string | null,
+  totalAttempts: 0,
+  successfulPaths: 0
 };
+
+// Progress update callback
+let progressUpdateCallback: ((progress: number) => void) | null = null;
 
 // Common patterns for different types of repositories
 const COMMON_REPOSITORY_PATHS = [
@@ -80,6 +88,23 @@ const COMMON_REPOSITORY_PATHS = [
 ];
 
 /**
+ * Set progress update callback
+ */
+export function setProgressUpdateCallback(callback: (progress: number) => void): void {
+  progressUpdateCallback = callback;
+}
+
+/**
+ * Update progress and notify callback
+ */
+function updateProgress(progress: number): void {
+  explorationProgress.progress = progress;
+  if (progressUpdateCallback) {
+    progressUpdateCallback(progress);
+  }
+}
+
+/**
  * Explores repository paths to find and process files
  * @param {KnowledgeEntry[]} knowledgeBase - Reference to the knowledge base
  * @returns {Promise<boolean>} True if any files were processed successfully
@@ -88,6 +113,8 @@ export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): P
   const repo = getCurrentRepository();
   if (!repo) {
     console.log('No repository configured for path exploration');
+    explorationProgress.status = "error";
+    explorationProgress.error = "No repository configured";
     return false;
   }
 
@@ -97,88 +124,109 @@ export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): P
   explorationProgress = {
     pathsAttempted: 0,
     pathsSuccessful: 0,
-    filesProcessed: 0
+    filesProcessed: 0,
+    status: "exploring",
+    progress: 0,
+    error: null,
+    totalAttempts: 0,
+    successfulPaths: 0
   };
 
   let hasProcessedAnyFiles = false;
-  const MAX_PATH_ATTEMPTS = 40; // Increased from 20
-  const MAX_FILES_PER_DIRECTORY = 15; // Increased limit
+  const MAX_PATH_ATTEMPTS = 40;
+  const MAX_FILES_PER_DIRECTORY = 15;
+  const totalPaths = Math.min(COMMON_REPOSITORY_PATHS.length, MAX_PATH_ATTEMPTS);
 
-  // Try each common path pattern
-  for (const path of COMMON_REPOSITORY_PATHS) {
-    if (explorationProgress.pathsAttempted >= MAX_PATH_ATTEMPTS) {
-      console.log(`Reached maximum path attempt limit (${MAX_PATH_ATTEMPTS})`);
-      break;
-    }
-
-    explorationProgress.pathsAttempted++;
-    
-    try {
-      console.log(`Trying path: ${path}`);
+  try {
+    // Try each common path pattern
+    for (let i = 0; i < COMMON_REPOSITORY_PATHS.length && i < MAX_PATH_ATTEMPTS; i++) {
+      const path = COMMON_REPOSITORY_PATHS[i];
       
-      const contents = await getRepositoryContents(path);
+      explorationProgress.pathsAttempted++;
+      explorationProgress.totalAttempts = explorationProgress.pathsAttempted;
       
-      if (Array.isArray(contents)) {
-        console.log(`Found ${contents.length} items in path: ${path}`);
-        successfulPathPatterns.add(path);
-        explorationProgress.pathsSuccessful++;
+      // Update progress
+      const progress = Math.round((i / totalPaths) * 100);
+      updateProgress(progress);
+      
+      try {
+        console.log(`Trying path: ${path}`);
         
-        // Process files in this directory
-        let filesProcessedInDir = 0;
-        for (const item of contents) {
-          if (filesProcessedInDir >= MAX_FILES_PER_DIRECTORY) {
-            console.log(`Reached file limit for directory ${path}`);
-            break;
-          }
+        const contents = await getRepositoryContents(path);
+        
+        if (Array.isArray(contents)) {
+          console.log(`Found ${contents.length} items in path: ${path}`);
+          successfulPathPatterns.add(path);
+          explorationProgress.pathsSuccessful++;
+          explorationProgress.successfulPaths = explorationProgress.pathsSuccessful;
           
-          if (item.type === 'file') {
-            // Process relevant files
-            if (isRelevantFile(item.name)) {
+          // Process files in this directory
+          let filesProcessedInDir = 0;
+          for (const item of contents) {
+            if (filesProcessedInDir >= MAX_FILES_PER_DIRECTORY) {
+              console.log(`Reached file limit for directory ${path}`);
+              break;
+            }
+            
+            if (item.type === 'file') {
+              // Process relevant files
+              if (isRelevantFile(item.name)) {
+                try {
+                  await processFile(item.path, knowledgeBase);
+                  hasProcessedAnyFiles = true;
+                  explorationProgress.filesProcessed++;
+                  filesProcessedInDir++;
+                  console.log(`Successfully processed file: ${item.path}`);
+                } catch (error) {
+                  console.error(`Error processing file ${item.path}:`, error);
+                }
+              }
+            } else if (item.type === 'dir' && shouldExploreDirectory(item.name)) {
+              // Try to process important subdirectories
               try {
-                await processFile(item.path, knowledgeBase);
+                await processModule(item.path, knowledgeBase);
                 hasProcessedAnyFiles = true;
-                explorationProgress.filesProcessed++;
-                filesProcessedInDir++;
-                console.log(`Successfully processed file: ${item.path}`);
               } catch (error) {
-                console.error(`Error processing file ${item.path}:`, error);
+                console.error(`Error processing directory ${item.path}:`, error);
               }
             }
-          } else if (item.type === 'dir' && shouldExploreDirectory(item.name)) {
-            // Try to process important subdirectories
+          }
+        } else if (contents && typeof contents === 'object' && 'type' in contents && contents.type === 'file') {
+          // Single file
+          if (isRelevantFile(contents.name)) {
             try {
-              await processModule(item.path, knowledgeBase);
+              await processFile(path, knowledgeBase);
               hasProcessedAnyFiles = true;
+              explorationProgress.filesProcessed++;
+              successfulPathPatterns.add(path);
+              explorationProgress.pathsSuccessful++;
+              explorationProgress.successfulPaths = explorationProgress.pathsSuccessful;
+              console.log(`Successfully processed single file: ${path}`);
             } catch (error) {
-              console.error(`Error processing directory ${item.path}:`, error);
+              console.error(`Error processing single file ${path}:`, error);
             }
           }
         }
-      } else if (contents.type === 'file') {
-        // Single file
-        if (isRelevantFile(contents.name)) {
-          try {
-            await processFile(path, knowledgeBase);
-            hasProcessedAnyFiles = true;
-            explorationProgress.filesProcessed++;
-            successfulPathPatterns.add(path);
-            explorationProgress.pathsSuccessful++;
-            console.log(`Successfully processed single file: ${path}`);
-          } catch (error) {
-            console.error(`Error processing single file ${path}:`, error);
-          }
-        }
+      } catch (error) {
+        console.error(`Error exploring path ${path}:`, error);
+        // Continue to next path
       }
-    } catch (error) {
-      console.error(`Error exploring path ${path}:`, error);
-      // Continue to next path
     }
+
+    // Mark as complete
+    explorationProgress.status = "complete";
+    updateProgress(100);
+    
+    console.log(`Processed ${explorationProgress.pathsSuccessful} paths successfully out of ${explorationProgress.pathsAttempted} attempts`);
+    console.log(`Total files processed: ${explorationProgress.filesProcessed}`);
+
+    return hasProcessedAnyFiles;
+  } catch (error) {
+    explorationProgress.status = "error";
+    explorationProgress.error = error instanceof Error ? error.message : "Unknown error";
+    console.error("Error during repository exploration:", error);
+    return false;
   }
-
-  console.log(`Processed ${explorationProgress.pathsSuccessful} paths successfully out of ${explorationProgress.pathsAttempted} attempts`);
-  console.log(`Total files processed: ${explorationProgress.filesProcessed}`);
-
-  return hasProcessedAnyFiles;
 }
 
 /**
@@ -223,6 +271,11 @@ export function resetExplorationProgress(): void {
   explorationProgress = {
     pathsAttempted: 0,
     pathsSuccessful: 0,
-    filesProcessed: 0
+    filesProcessed: 0,
+    status: "idle",
+    progress: 0,
+    error: null,
+    totalAttempts: 0,
+    successfulPaths: 0
   };
 }
