@@ -1,11 +1,10 @@
-
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
 import { hasAICapabilities, generateAnswerWithAI } from "./aiAnalysis";
 import { screenshotService, Screenshot } from "./screenshotService";
 import { getCurrentRepository } from "./githubConnector";
-import { isUsingMockData } from "./knowledgeBase";
+import { isUsingMockData, getEnhancedDiagnostics } from "./knowledgeBase";
 import { toast } from "sonner";
 
 interface Reference {
@@ -24,6 +23,51 @@ interface Answer {
     type: 'flowchart' | 'component' | 'state';
     syntax: string;
   };
+}
+
+/**
+ * Enhanced query analysis for better answer targeting
+ */
+function analyzeQuery(query: string): {
+  type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'general';
+  keywords: string[];
+  needsScreenshots: boolean;
+  needsCode: boolean;
+} {
+  const lowerQuery = query.toLowerCase();
+  
+  // Determine query type
+  let type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'general' = 'general';
+  
+  if (lowerQuery.includes('how to') || lowerQuery.startsWith('how do') || lowerQuery.startsWith('how can')) {
+    type = 'how-to';
+  } else if (lowerQuery.startsWith('what is') || lowerQuery.startsWith('what are')) {
+    type = 'what-is';
+  } else if (lowerQuery.includes('where') || lowerQuery.includes('find') || lowerQuery.includes('locate')) {
+    type = 'where-is';
+  } else if (lowerQuery.includes('function') || lowerQuery.includes('component') || lowerQuery.includes('class')) {
+    type = 'code-search';
+  }
+  
+  // Extract keywords
+  const keywords = query.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2)
+    .filter(word => !['how', 'what', 'where', 'the', 'and', 'for', 'with'].includes(word));
+  
+  // Determine if screenshots needed
+  const screenshotKeywords = [
+    'navigate', 'click', 'button', 'settings', 'configure', 'setup',
+    'dashboard', 'interface', 'ui', 'menu', 'panel', 'theme'
+  ];
+  const needsScreenshots = screenshotKeywords.some(keyword => lowerQuery.includes(keyword));
+  
+  // Determine if code examples needed
+  const needsCode = lowerQuery.includes('code') || lowerQuery.includes('implement') || 
+                   lowerQuery.includes('function') || lowerQuery.includes('component');
+  
+  return { type, keywords, needsScreenshots, needsCode };
 }
 
 /**
@@ -49,23 +93,20 @@ function getRepositoryAppUrl(): string | null {
   const currentRepo = getCurrentRepository();
   if (!currentRepo) return null;
   
-  // Common patterns for repository URLs
   const commonPatterns = [
     `https://${currentRepo.repo}.herokuapp.com`,
     `https://${currentRepo.repo}.vercel.app`,
     `https://${currentRepo.repo}.netlify.app`,
     `https://${currentRepo.owner}.github.io/${currentRepo.repo}`,
     `https://${currentRepo.repo}.com`,
-    `http://localhost:2368`, // Ghost default
-    `http://localhost:3000`, // Common dev port
+    `http://localhost:2368`,
+    `http://localhost:3000`,
   ];
   
-  // For Ghost specifically, try the most common patterns
   if (currentRepo.repo.toLowerCase().includes('ghost')) {
-    return `http://localhost:2368`; // Ghost's default port
+    return `http://localhost:2368`;
   }
   
-  // Return the most likely URL (could be made configurable in the future)
   return commonPatterns[0];
 }
 
@@ -83,11 +124,9 @@ async function generateRelevantScreenshots(query: string): Promise<Screenshot[]>
   }
   
   try {
-    // Ghost-specific screenshot workflows
     if (lowerQuery.includes('ghost')) {
       console.log('Capturing Ghost admin interface screenshots');
       
-      // Try different Ghost admin paths
       const ghostPaths = ['/ghost', '/admin', '/ghost/admin'];
       
       for (const path of ghostPaths) {
@@ -95,29 +134,26 @@ async function generateRelevantScreenshots(query: string): Promise<Screenshot[]>
           const ghostScreenshots = await screenshotService.captureGhostAdminFlow(appUrl, path);
           if (ghostScreenshots.length > 0) {
             screenshots.push(...ghostScreenshots);
-            break; // Found working admin path
+            break;
           }
         } catch (error) {
           if (error.message.includes('cross-origin') || error.message.includes('Cross-origin')) {
             console.warn('Screenshots unavailable due to browser security restrictions');
             toast.error('Screenshots unavailable: Browser security prevents capturing from external applications. Try accessing your Ghost admin directly.');
-            break; // Don't try other paths if it's a cross-origin issue
+            break;
           }
           console.warn(`Failed to capture Ghost admin at path ${path}:`, error);
         }
       }
     }
     
-    // Settings-related questions
     if (lowerQuery.includes('settings') || lowerQuery.includes('configure')) {
       if (screenshots.length === 0) {
-        // Fallback to current app screenshots
         const settingsScreenshots = await screenshotService.captureRepositorySettings();
         screenshots.push(...settingsScreenshots);
       }
     }
     
-    // Navigation questions
     if (lowerQuery.includes('navigate') || lowerQuery.includes('find') || lowerQuery.includes('where')) {
       if (screenshots.length === 0) {
         const navScreenshots = await screenshotService.captureQuestionInput();
@@ -149,124 +185,372 @@ export async function generateAnswer(query: string, options?: {
   concise?: boolean, 
   skipBenefits?: boolean 
 }): Promise<Answer | null> {
-  // Simulate a slight processing delay
-  await new Promise(resolve => setTimeout(resolve, 500));
+  await new Promise(resolve => setTimeout(resolve, 300));
   
   try {
-    // Search the knowledge base with history information
-    const results = await searchKnowledgeWithHistory(query);
+    // Enhanced query analysis
+    const queryAnalysis = analyzeQuery(query);
+    console.log('Query analysis:', queryAnalysis);
     
-    console.log(`Search results: ${results.length} entries found`);
-    console.log(`Using mock data: ${isUsingMockData()}`);
+    // Get enhanced diagnostics
+    const diagnostics = getEnhancedDiagnostics();
+    console.log('Knowledge base diagnostics:', {
+      size: diagnostics.knowledgeBaseSize,
+      usingMock: diagnostics.usingMockData,
+      scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length
+    });
+    
+    // Search with enhanced keywords
+    const searchQuery = [query, ...queryAnalysis.keywords].join(' ');
+    const results = await searchKnowledgeWithHistory(searchQuery);
+    
+    console.log(`Enhanced search results: ${results.length} entries found for "${query}"`);
     
     if (results.length === 0) {
-      console.log("No results found for query:", query);
+      console.log("No results found for enhanced query:", query);
       return null;
     }
     
-    // Log the first few results for debugging
-    console.log("First few search results:");
+    // Log enhanced result information
+    console.log("Enhanced search results summary:");
     results.slice(0, 3).forEach((result, index) => {
-      console.log(`${index + 1}. File: ${result.filePath}, Content length: ${result.content.length}`);
+      console.log(`${index + 1}. File: ${result.filePath}, Content: ${result.content.substring(0, 100)}...`);
     });
     
-    // Generate screenshots if the query would benefit from them
+    // Generate screenshots if needed
     let screenshots: Screenshot[] = [];
-    if (shouldIncludeScreenshots(query)) {
+    if (queryAnalysis.needsScreenshots || shouldIncludeScreenshots(query)) {
       screenshots = await generateRelevantScreenshots(query);
     }
     
-    // Check if AI capabilities are available
+    // Enhanced AI processing with more context
     if (hasAICapabilities()) {
       try {
-        // Prepare context from search results with more detail
-        const context = results.slice(0, 10).map(result => {
-          return `File: ${result.filePath}\nType: ${result.type}\nContent: ${result.content}\n---`;
+        // Prepare enhanced context with more detail
+        const context = results.slice(0, 15).map(result => {
+          return `File: ${result.filePath}\nType: ${result.type}\nContent: ${result.content.substring(0, 800)}\n${result.metadata ? `Metadata: ${JSON.stringify(result.metadata)}` : ''}\n---`;
         });
         
-        console.log(`Sending ${context.length} context items to AI`);
+        console.log(`Sending ${context.length} enhanced context items to AI`);
         
-        // Use AI to generate an answer
         const aiAnswer = await generateAnswerWithAI(query, context);
         
         if (aiAnswer) {
-          // Create references with version information
-          const references = results.slice(0, 5).map(result => {
-            return {
-              filePath: result.filePath,
-              snippet: result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''),
-              lastUpdated: result.lastUpdated
-            };
-          });
+          const references = results.slice(0, 8).map(result => ({
+            filePath: result.filePath,
+            snippet: result.content.substring(0, 300) + (result.content.length > 300 ? '...' : ''),
+            lastUpdated: result.lastUpdated
+          }));
           
-          // Generate visual context if applicable
           let visualContext = null;
-          if (query.toLowerCase().includes('flow') || 
-              query.toLowerCase().includes('process') ||
-              query.toLowerCase().includes('component') ||
-              query.toLowerCase().includes('state')) {
+          if (queryAnalysis.type === 'code-search' || query.toLowerCase().includes('flow') || 
+              query.toLowerCase().includes('process') || query.toLowerCase().includes('component')) {
             visualContext = generateVisualContext(query, results);
           }
           
-          // Return AI-generated answer with high confidence
           return {
             text: aiAnswer,
-            confidence: 0.92, // AI answers have higher confidence
+            confidence: 0.94,
             references,
             screenshots: screenshots.length > 0 ? screenshots : undefined,
             visualContext: visualContext
           };
         }
       } catch (error) {
-        console.error("Error generating AI answer:", error);
-        toast.error("AI answer generation failed, falling back to template-based answers");
-        // Fall back to template-based answers
+        console.error("AI answer generation error:", error);
+        toast.error("AI answer generation failed, using enhanced template-based answers");
       }
     }
     
-    // If we're using mock data, warn the user
+    // Enhanced mock data warning
     if (isUsingMockData()) {
       console.log("Using mock data for answer generation");
       toast.warning("Using sample data - connect your repository for accurate answers", {
-        description: 'This answer is based on sample data, not your actual codebase.',
-        duration: 4000
+        description: `This answer is based on sample data. Scanned ${diagnostics.lastScanDiagnostics.scannedFiles.length} files from your repository.`,
+        duration: 6000
       });
     }
     
-    // Generate template-based answer with improved repository-specific logic
-    let answerText = generateRepositorySpecificAnswer(query, results);
+    // Enhanced repository-specific answer generation
+    let answerText = generateEnhancedRepositoryAnswer(query, results, queryAnalysis);
     
-    // Create references with version information
-    const references = results.slice(0, 5).map(result => {
-      return {
-        filePath: result.filePath,
-        snippet: result.content.substring(0, 200) + (result.content.length > 200 ? '...' : ''),
-        lastUpdated: result.lastUpdated
-      };
-    });
+    // Enhanced references with more content
+    const references = results.slice(0, 8).map(result => ({
+      filePath: result.filePath,
+      snippet: result.content.substring(0, 400) + (result.content.length > 400 ? '...' : ''),
+      lastUpdated: result.lastUpdated
+    }));
 
-    // Generate visual context if applicable
+    // Enhanced visual context generation
     let visualContext = null;
-    if (query.toLowerCase().includes('flow') || 
-        query.toLowerCase().includes('process') ||
-        query.toLowerCase().includes('component') ||
+    if (queryAnalysis.needsCode || query.toLowerCase().includes('flow') || 
+        query.toLowerCase().includes('process') || query.toLowerCase().includes('component') ||
         query.toLowerCase().includes('state')) {
       visualContext = generateVisualContext(query, results);
     }
     
-    console.log("Generated repository-specific answer:", answerText.substring(0, 100) + "...");
+    // Enhanced confidence calculation
+    const confidence = Math.min(0.3 + (results.length * 0.08) + (queryAnalysis.keywords.length * 0.05), 0.88);
+    
+    console.log("Generated enhanced answer:", answerText.substring(0, 150) + "...");
     
     return {
       text: answerText,
-      confidence: Math.min(0.4 + (results.length * 0.1), 0.85),
+      confidence,
       references,
       screenshots: screenshots.length > 0 ? screenshots : undefined,
       visualContext: visualContext
     };
   } catch (error) {
-    console.error("Error in generateAnswer:", error);
+    console.error("Error in enhanced generateAnswer:", error);
     return null;
   }
+}
+
+/**
+ * Enhanced repository-specific answer generation with better context awareness
+ */
+function generateEnhancedRepositoryAnswer(
+  query: string, 
+  results: any[], 
+  queryAnalysis: ReturnType<typeof analyzeQuery>
+): string {
+  const lowerQuery = query.toLowerCase();
+  
+  // Extract enhanced information from results
+  const fileTypes = new Set<string>();
+  const functionNames = new Set<string>();
+  const exports = new Set<string>();
+  const apiRoutes = new Set<string>();
+  const componentNames = new Set<string>();
+  
+  results.forEach(result => {
+    const ext = result.filePath.split('.').pop();
+    if (ext) fileTypes.add(ext);
+    
+    if (result.metadata?.name) functionNames.add(result.metadata.name);
+    if (result.metadata?.method && result.metadata?.path) {
+      apiRoutes.add(`${result.metadata.method} ${result.metadata.path}`);
+    }
+    
+    // Extract component names from file paths
+    if (result.filePath.includes('component')) {
+      const componentName = result.filePath.split('/').pop()?.replace(/\.(tsx|ts|js|jsx)$/, '');
+      if (componentName) componentNames.add(componentName);
+    }
+    
+    // Enhanced export extraction
+    const exportMatches = result.content.match(/export\s+(?:const|function|class|default)\s+(\w+)/g);
+    if (exportMatches) {
+      exportMatches.forEach(match => {
+        const name = match.split(/\s+/).pop();
+        if (name) exports.add(name);
+      });
+    }
+  });
+  
+  let answerText = '';
+  
+  // Enhanced answer generation based on query type and content
+  if (queryAnalysis.type === 'how-to') {
+    answerText = generateHowToAnswer(query, results, { functionNames, componentNames, apiRoutes });
+  } else if (queryAnalysis.type === 'what-is') {
+    answerText = generateWhatIsAnswer(query, results, { functionNames, exports, componentNames });
+  } else if (queryAnalysis.type === 'where-is') {
+    answerText = generateWhereIsAnswer(query, results);
+  } else if (queryAnalysis.type === 'code-search') {
+    answerText = generateCodeSearchAnswer(query, results, { functionNames, exports, componentNames });
+  } else {
+    // Enhanced general answer
+    answerText = generateGeneralAnswer(query, results, { fileTypes, functionNames, exports, apiRoutes, componentNames });
+  }
+  
+  return answerText;
+}
+
+/**
+ * Generate how-to specific answers
+ */
+function generateHowToAnswer(
+  query: string, 
+  results: any[], 
+  context: { functionNames: Set<string>; componentNames: Set<string>; apiRoutes: Set<string> }
+): string {
+  let answer = `## How-To Guide\n\n`;
+  
+  if (results.length === 0) {
+    return answer + `I couldn't find specific implementation details for "${query}" in the codebase.`;
+  }
+  
+  answer += `Based on the codebase analysis, here's how to accomplish this:\n\n`;
+  
+  // Show relevant code examples
+  results.slice(0, 3).forEach((result, index) => {
+    answer += `### ${index + 1}. From \`${result.filePath}\`\n\n`;
+    answer += `\`\`\`${result.filePath.split('.').pop()}\n`;
+    answer += result.content.substring(0, 300);
+    answer += result.content.length > 300 ? '\n// ... (truncated)\n' : '\n';
+    answer += `\`\`\`\n\n`;
+  });
+  
+  // Add function references if available
+  if (context.functionNames.size > 0) {
+    answer += `**Relevant Functions:** ${Array.from(context.functionNames).slice(0, 5).join(', ')}\n\n`;
+  }
+  
+  if (context.apiRoutes.size > 0) {
+    answer += `**API Endpoints:** ${Array.from(context.apiRoutes).slice(0, 3).join(', ')}\n\n`;
+  }
+  
+  return answer;
+}
+
+/**
+ * Generate what-is specific answers
+ */
+function generateWhatIsAnswer(
+  query: string, 
+  results: any[],
+  context: { functionNames: Set<string>; exports: Set<string>; componentNames: Set<string> }
+): string {
+  let answer = `## Definition and Overview\n\n`;
+  
+  // Extract the main subject from the query
+  const subject = query.replace(/what\s+is\s+/i, '').trim();
+  
+  const relevantResults = results.filter(r => 
+    r.content.toLowerCase().includes(subject.toLowerCase()) ||
+    r.filePath.toLowerCase().includes(subject.toLowerCase())
+  );
+  
+  if (relevantResults.length === 0) {
+    return answer + `I couldn't find specific information about "${subject}" in the codebase.`;
+  }
+  
+  answer += `**${subject}** appears in the following contexts:\n\n`;
+  
+  relevantResults.slice(0, 3).forEach((result, index) => {
+    answer += `### ${index + 1}. In \`${result.filePath}\`\n\n`;
+    
+    // Extract relevant sentences containing the subject
+    const sentences = result.content.split(/[.!?]+/);
+    const relevantSentences = sentences.filter(s => 
+      s.toLowerCase().includes(subject.toLowerCase())
+    ).slice(0, 2);
+    
+    if (relevantSentences.length > 0) {
+      answer += relevantSentences.join('. ') + '.\n\n';
+    } else {
+      answer += result.content.substring(0, 200) + '...\n\n';
+    }
+  });
+  
+  return answer;
+}
+
+/**
+ * Generate where-is specific answers
+ */
+function generateWhereIsAnswer(query: string, results: any[]): string {
+  let answer = `## Location Information\n\n`;
+  
+  if (results.length === 0) {
+    return answer + `I couldn't find the requested item in the scanned codebase.`;
+  }
+  
+  answer += `Found in the following locations:\n\n`;
+  
+  results.slice(0, 5).forEach((result, index) => {
+    answer += `**${index + 1}. \`${result.filePath}\`**\n`;
+    answer += `${result.content.substring(0, 150)}...\n\n`;
+  });
+  
+  return answer;
+}
+
+/**
+ * Generate code-search specific answers
+ */
+function generateCodeSearchAnswer(
+  query: string, 
+  results: any[],
+  context: { functionNames: Set<string>; exports: Set<string>; componentNames: Set<string> }
+): string {
+  let answer = `## Code Search Results\n\n`;
+  
+  if (results.length === 0) {
+    return answer + `No matching code elements found for "${query}".`;
+  }
+  
+  if (context.functionNames.size > 0) {
+    answer += `**Functions Found:** ${Array.from(context.functionNames).join(', ')}\n\n`;
+  }
+  
+  if (context.componentNames.size > 0) {
+    answer += `**Components Found:** ${Array.from(context.componentNames).join(', ')}\n\n`;
+  }
+  
+  answer += `**Code Examples:**\n\n`;
+  
+  results.slice(0, 3).forEach((result, index) => {
+    answer += `### ${result.filePath}\n\n`;
+    answer += `\`\`\`${result.filePath.split('.').pop()}\n`;
+    answer += result.content.substring(0, 400);
+    answer += result.content.length > 400 ? '\n// ... (truncated)\n' : '\n';
+    answer += `\`\`\`\n\n`;
+  });
+  
+  return answer;
+}
+
+/**
+ * Generate general answers with enhanced context
+ */
+function generateGeneralAnswer(
+  query: string, 
+  results: any[],
+  context: { 
+    fileTypes: Set<string>; 
+    functionNames: Set<string>; 
+    exports: Set<string>; 
+    apiRoutes: Set<string>;
+    componentNames: Set<string>;
+  }
+): string {
+  let answer = `## Analysis Results\n\n`;
+  
+  answer += `Based on the codebase analysis for "${query}":\n\n`;
+  
+  if (context.fileTypes.size > 0) {
+    answer += `**File Types:** ${Array.from(context.fileTypes).join(', ')}\n`;
+  }
+  
+  if (context.functionNames.size > 0) {
+    answer += `**Functions:** ${Array.from(context.functionNames).slice(0, 8).join(', ')}\n`;
+  }
+  
+  if (context.componentNames.size > 0) {
+    answer += `**Components:** ${Array.from(context.componentNames).slice(0, 5).join(', ')}\n`;
+  }
+  
+  if (context.apiRoutes.size > 0) {
+    answer += `**API Routes:** ${Array.from(context.apiRoutes).slice(0, 3).join(', ')}\n`;
+  }
+  
+  answer += `\n**Total Entries Analyzed:** ${results.length}\n\n`;
+  
+  if (results.length > 0) {
+    answer += `**Sample Code:**\n\n`;
+    results.slice(0, 2).forEach(result => {
+      answer += `**From \`${result.filePath}\`:**\n`;
+      answer += `\`\`\`${result.filePath.split('.').pop()}\n`;
+      answer += result.content.substring(0, 300);
+      answer += result.content.length > 300 ? '\n// ... (truncated)' : '';
+      answer += `\n\`\`\`\n\n`;
+    });
+  }
+  
+  return answer;
 }
 
 /**

@@ -7,7 +7,8 @@ import {
   exploreRepositoryPaths, 
   clearSuccessfulPathPatterns, 
   getExplorationProgress,
-  resetExplorationProgress 
+  resetExplorationProgress,
+  getScanDiagnostics
 } from './pathExplorer';
 import { 
   getCachedScanData, 
@@ -27,38 +28,30 @@ let initializationState = {
   usingMockData: true,
   initialized: false,
   fetchConfirmed: false,
-  error: null as string | null
+  error: null as string | null,
+  lastRepositoryFingerprint: null as string | null
 };
 
 /**
- * Determines if the knowledge base contains real repository data
+ * Enhanced detection of real repository data
  */
 function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
   // If we have no entries, it's definitely not real data
   if (entries.length === 0) return false;
   
-  // If we only have the exact mock entries, it's mock data
-  if (entries.length === mockKnowledgeEntries.length) {
-    const mockPaths = new Set(mockKnowledgeEntries.map(e => e.filePath));
-    const currentPaths = new Set(entries.map(e => e.filePath));
-    
-    // Check if all paths match the mock data
-    if (mockPaths.size === currentPaths.size) {
-      let allMatch = true;
-      for (const path of mockPaths) {
-        if (!currentPaths.has(path)) {
-          allMatch = false;
-          break;
-        }
-      }
-      if (allMatch) return false; // It's mock data
-    }
+  // Get scan diagnostics for more accurate detection
+  const diagnostics = getScanDiagnostics();
+  
+  // If we have scanned files from the path explorer, it's likely real data
+  if (diagnostics.scannedFiles.length > 0) {
+    console.log(`Real data detected: ${diagnostics.scannedFiles.length} files scanned`);
+    return true;
   }
   
-  // Check for repository-specific file patterns that indicate real data
+  // Check for repository-specific patterns that indicate real data
   const realDataIndicators = [
-    'package.json', 'README.md', 'tsconfig.json', 'vite.config',
-    '.ts', '.tsx', '.js', '.jsx', 'components/', 'src/', 'app/', 'lib/'
+    'package.json', 'tsconfig.json', 'vite.config', 'next.config',
+    'src/', 'app/', 'components/', 'pages/', 'services/', 'utils/'
   ];
   
   const hasRealIndicators = entries.some(entry => 
@@ -67,12 +60,39 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
     )
   );
   
-  // If we have more than 50 entries with real indicators, it's likely real data
-  return entries.length > 50 && hasRealIndicators;
+  // If we have significantly more entries than mock data with real indicators
+  const significantlyMoreData = entries.length > (mockKnowledgeEntries.length * 2);
+  
+  // More sophisticated detection
+  if (significantlyMoreData && hasRealIndicators) {
+    console.log(`Real data detected: ${entries.length} entries with real indicators`);
+    return true;
+  }
+  
+  // Check if all entries match mock data exactly
+  if (entries.length === mockKnowledgeEntries.length) {
+    const mockPaths = new Set(mockKnowledgeEntries.map(e => e.filePath));
+    const currentPaths = new Set(entries.map(e => e.filePath));
+    
+    let allMatch = true;
+    for (const path of mockPaths) {
+      if (!currentPaths.has(path)) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) {
+      console.log('Mock data detected: exact match with mock entries');
+      return false;
+    }
+  }
+  
+  console.log(`Data evaluation: ${entries.length} entries, real indicators: ${hasRealIndicators}`);
+  return hasRealIndicators && entries.length > 20;
 }
 
 /**
- * Load knowledge base from cache if available
+ * Enhanced cache loading with fingerprint validation
  */
 function loadFromCache(): boolean {
   const activeRepo = getActiveRepository();
@@ -85,7 +105,7 @@ function loadFromCache(): boolean {
     // Load cached knowledge base
     knowledgeBase = cache.scanData.knowledgeBase || [...mockKnowledgeEntries];
     
-    // Properly determine if we have real data
+    // Enhanced real data detection
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
     // Update initialization state
@@ -93,8 +113,9 @@ function loadFromCache(): boolean {
     initializationState.initialized = true;
     initializationState.fetchConfirmed = cache.scanData.fetchConfirmed || hasRealData;
     initializationState.lastInitTime = cache.lastScanTime;
+    initializationState.lastRepositoryFingerprint = `${activeRepo.owner}/${activeRepo.repo}`;
     
-    console.log(`Loaded knowledge base from cache: ${knowledgeBase.length} entries, using mock data: ${initializationState.usingMockData}`);
+    console.log(`Cache loaded: ${knowledgeBase.length} entries, real data: ${hasRealData}`);
     
     if (!initializationState.usingMockData) {
       toast.success(`Loaded cached repository data (${knowledgeBase.length} entries)`, {
@@ -112,20 +133,25 @@ function loadFromCache(): boolean {
 }
 
 /**
- * Save current knowledge base to cache
+ * Enhanced cache saving with diagnostics
  */
 function saveToCache(): void {
   const activeRepo = getActiveRepository();
   if (!activeRepo) return;
   
+  const diagnostics = getScanDiagnostics();
+  
   const scanData = {
     knowledgeBase: [...knowledgeBase],
     usingMockData: initializationState.usingMockData,
     fetchConfirmed: initializationState.fetchConfirmed,
-    processedFiles: getProcessedFileCount()
+    processedFiles: getProcessedFileCount(),
+    scannedFiles: diagnostics.scannedFiles,
+    repositoryFingerprint: diagnostics.repositoryFingerprint
   };
   
   saveScanDataToCache(activeRepo.id, scanData);
+  console.log(`Cache saved: ${knowledgeBase.length} entries, ${diagnostics.scannedFiles.length} files`);
 }
 
 /**
@@ -134,7 +160,7 @@ function saveToCache(): void {
  * @returns {Promise<void>}
  */
 export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
-  console.log('Initializing knowledge base...');
+  console.log('Initializing enhanced knowledge base...');
   
   const activeRepo = getActiveRepository();
   if (!activeRepo) {
@@ -152,6 +178,15 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     return;
   }
   
+  // Check repository fingerprint change
+  const currentFingerprint = `${activeRepo.owner}/${activeRepo.repo}`;
+  const repositoryChanged = initializationState.lastRepositoryFingerprint !== currentFingerprint;
+  
+  if (repositoryChanged) {
+    console.log('Repository changed, forcing refresh');
+    forceRefresh = true;
+  }
+  
   // Check if we should use cached data
   if (!forceRefresh && !shouldScanRepository(activeRepo.id)) {
     console.log('Using cached scan data...');
@@ -161,84 +196,80 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     }
   }
   
-  // If forced refresh, clear the cache
-  if (forceRefresh) {
+  // Clear cache if forced refresh or repository changed
+  if (forceRefresh || repositoryChanged) {
     clearScanCache(activeRepo.id);
   }
   
-  // Import here to avoid circular dependency
   const { resetConnectionState, hasConfirmedSuccessfulFetch } = await import('../githubConnector');
   
   initializationState.inProgress = true;
   initializationState.error = null;
   
-  // Reset exploration progress
   resetExplorationProgress();
   
-  // Reset connection tracking for fresh start
   if (forceRefresh) {
     resetConnectionState();
-  }
-  
-  // Clear cache if forced refresh
-  if (forceRefresh) {
     clearProcessedFilesCache();
     clearSuccessfulPathPatterns();
   }
   
   try {
-    // Reset knowledge base if it's a refresh
     if (forceRefresh) {
       knowledgeBase = [];
     }
     
-    // Try to process repository files
+    console.log('Starting enhanced repository exploration...');
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
     
-    // Update state with fetch confirmation
+    // Get scan diagnostics
+    const diagnostics = getScanDiagnostics();
+    
     initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
     initializationState.initialized = true;
+    initializationState.lastRepositoryFingerprint = currentFingerprint;
     
-    // If we couldn't process any files or no confirmed fetch, use mock data
-    if (!processedAny || !initializationState.fetchConfirmed) {
-      console.log('Could not process any paths or no confirmed fetch, falling back to mock data');
+    // Enhanced success detection
+    const hasRealData = hasRealRepositoryData(knowledgeBase);
+    
+    if (!processedAny || !initializationState.fetchConfirmed || !hasRealData) {
+      console.log('Enhanced scan failed or insufficient data, using mock data');
       
-      // If we couldn't process any files, use mock data
       if (knowledgeBase.length === 0) {
         knowledgeBase = [...mockKnowledgeEntries];
       }
       
       initializationState.usingMockData = true;
       
-      const errorMsg = initializationState.fetchConfirmed ? 
-        'Could not process repository files.' : 
-        'Could not connect to GitHub API.';
+      const errorMsg = !initializationState.fetchConfirmed ? 
+        'Could not connect to GitHub API.' : 
+        'Repository scan found insufficient data.';
       
       toast.warning(`Using mock data - ${errorMsg}`, {
-        description: 'Please check repository configuration, token permissions, and that the repository exists.',
-        duration: 6000
+        description: `Scanned ${diagnostics.scannedFiles.length} files. Check repository permissions and content.`,
+        duration: 8000
       });
     } else {
       initializationState.usingMockData = false;
       
       const stats = getKnowledgeBaseStats();
-      const successMsg = `Knowledge base initialized with ${stats.totalEntries} entries from ${stats.processedFiles} files.`;
+      const successMsg = `Enhanced scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
       toast.success(successMsg, {
         description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
       });
       console.log(successMsg);
+      console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 5));
       
-      // Save successful scan to cache
       saveToCache();
     }
   } catch (error) {
-    console.error('Error initializing knowledge base:', error);
+    console.error('Error in enhanced knowledge base initialization:', error);
     initializationState.error = error instanceof Error ? error.message : 'Unknown error';
     initializationState.usingMockData = true;
     
-    toast.error('Error initializing knowledge base', {
+    toast.error('Enhanced scan failed', {
       description: initializationState.error,
       duration: 5000
     });
@@ -259,40 +290,61 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     return [];
   }
   
-  console.log(`Searching knowledge base with keywords: ${keywords.join(', ')}`);
-  console.log(`Knowledge base has ${knowledgeBase.length} entries, using mock data: ${initializationState.usingMockData}`);
+  console.log(`Enhanced search: ${keywords.join(', ')} across ${knowledgeBase.length} entries`);
+  console.log(`Using mock data: ${initializationState.usingMockData}`);
   
-  // Score each entry based on keyword matches
+  // Enhanced scoring algorithm
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
     
-    // Check for exact keyword matches in content and file path
+    // Exact keyword matches (highest weight)
     keywords.forEach(keyword => {
       if (entry.keywords.includes(keyword)) {
-        score += 1;
+        score += 2.0;
       }
-      // Also check content and file path for partial matches
-      if (entry.content.toLowerCase().includes(keyword.toLowerCase())) {
+      
+      // Content matches (medium weight)
+      const lowerContent = entry.content.toLowerCase();
+      const lowerKeyword = keyword.toLowerCase();
+      
+      if (lowerContent.includes(lowerKeyword)) {
+        score += 1.0;
+        
+        // Bonus for exact word matches
+        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword}\\b`, 'i');
+        if (wordBoundaryRegex.test(lowerContent)) {
+          score += 0.5;
+        }
+      }
+      
+      // File path matches (lower weight)
+      if (entry.filePath.toLowerCase().includes(lowerKeyword)) {
         score += 0.5;
       }
-      if (entry.filePath.toLowerCase().includes(keyword.toLowerCase())) {
-        score += 0.3;
+      
+      // Metadata matches (if available)
+      if (entry.metadata && typeof entry.metadata === 'object') {
+        const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
+        if (metadataStr.includes(lowerKeyword)) {
+          score += 0.3;
+        }
       }
     });
     
     return {
       entry,
-      score: score / keywords.length // Normalize by number of keywords
+      score: score / keywords.length
     };
   });
   
-  // Sort by score and filter out low-scoring entries
+  // Enhanced filtering and sorting
   const results = scoredEntries
-    .filter(item => item.score > 0.05) // Lower threshold for better results
-    .sort((a, b) => b.score - a.score) // Sort by descending score
-    .map(item => item.entry); // Extract just the entries
+    .filter(item => item.score > 0.02) // Lower threshold for better recall
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 20) // Increase result limit
+    .map(item => item.entry);
   
-  console.log(`Found ${results.length} relevant entries for query`);
+  console.log(`Enhanced search found ${results.length} results (scores: ${scoredEntries.filter(s => s.score > 0.02).slice(0, 3).map(s => s.score.toFixed(2)).join(', ')})`);
   
   return results;
 }
@@ -312,7 +364,8 @@ export function clearKnowledgeBase(): void {
     usingMockData: true,
     initialized: false,
     fetchConfirmed: false,
-    error: null
+    error: null,
+    lastRepositoryFingerprint: null
   };
 }
 
@@ -356,5 +409,24 @@ export function isInitializing(): boolean {
   return initializationState.inProgress;
 }
 
+/**
+ * Get enhanced diagnostic information
+ */
+export function getEnhancedDiagnostics(): {
+  knowledgeBaseSize: number;
+  usingMockData: boolean;
+  lastScanDiagnostics: ReturnType<typeof getScanDiagnostics>;
+  initializationState: typeof initializationState;
+} {
+  return {
+    knowledgeBaseSize: knowledgeBase.length,
+    usingMockData: initializationState.usingMockData,
+    lastScanDiagnostics: getScanDiagnostics(),
+    initializationState: { ...initializationState }
+  };
+}
+
 // Re-export types for external use - fix the isolatedModules issue by using 'export type'
 export type { KnowledgeEntry, KnowledgeBaseStats } from './types';
+
+}
