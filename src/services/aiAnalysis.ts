@@ -1,4 +1,3 @@
-
 // AI Analysis Service to enhance repository search with OpenAI
 import { toast } from "sonner";
 
@@ -276,30 +275,30 @@ export async function generateAnswerWithAI(question: string, codeContext: string
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant for account managers who need to answer customer questions about the Ghost CMS platform. Your goal is to provide helpful, accurate information in clear, non-technical language.
+            content: `You are an AI assistant that answers specific questions about code repositories. Your goal is to provide precise, accurate answers that directly address the user's question.
 
-IMPORTANT GUIDELINES:
-1. Be direct and concise. Skip unnecessary introductions or pleasantries.
-2. Start with the most relevant information first.
-3. Avoid technical jargon and code terminology. Explain concepts in simple, everyday language.
-4. Frame answers from a user benefits perspective, not technical implementation.
-5. Break down complex topics into simple explanations that non-technical people can understand.
-6. Focus on what customers can do with features, not how they are built.
-7. If you reference a feature name, briefly explain what it does.
-8. Use analogies to explain technical concepts when helpful.
-9. Format your responses with clear headings and bullet points when appropriate.
-10. If you don't have enough information, clearly say so rather than guessing.
-11. Always provide practical, action-oriented advice when possible.
+CRITICAL GUIDELINES:
+1. Answer ONLY what is specifically asked. If they ask about "download links", only mention actual download functionality.
+2. Be extremely precise - don't include tangentially related information.
+3. If the question asks for specific items (like "download links"), only list those exact items that match the criteria.
+4. Start with a direct answer to the question, then provide supporting details.
+5. If you don't find exactly what they're asking for, say so clearly rather than providing similar but different information.
+6. Use clear, specific language - avoid generic terms when precise ones exist.
+7. When listing items, only include items that directly match what was requested.
+8. If the question is about a specific feature or functionality, focus only on that feature.
+9. Distinguish between different types of links/functionality - don't group unrelated items together.
+10. Provide code examples only when they directly answer the question.
 
-Based on the provided context, create a response that an account manager can directly share with their customer.`
+Example: If asked "What download links are available?", only mention actual file download functionality, not general navigation links or API endpoints unless they specifically handle downloads.
+`
           },
           {
             role: "user", 
-            content: `A customer has asked this question: ${question}\n\nHere's information from our knowledge base:\n${formattedContext}`
+            content: `Question: ${question}\n\nCode context from repository:\n${formattedContext}\n\nPlease answer the specific question based on the code context provided. Be precise and only include information that directly answers what was asked.`
           }
         ],
-        temperature: 0.3,
-        max_tokens: 1000
+        temperature: 0.1, // Lower temperature for more focused responses
+        max_tokens: 800
       })
     });
 
