@@ -247,10 +247,11 @@ export default function Header({
     }
   };
 
-  // Fix the logo click handler with proper navigation
-  const handleLogoClick = () => {
+  // Handle logo click with explicit navigation
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
     console.log("Logo clicked, navigating to homepage");
-    navigate("/", { replace: false });
+    navigate("/");
   };
 
   const statusInfo = getConnectionStatusInfo();
@@ -258,10 +259,13 @@ export default function Header({
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          {/* Use Link component for proper React Router navigation */}
-          <Link to="/" className="flex items-center space-x-2 cursor-pointer no-underline">
+          {/* Use button with click handler for more reliable navigation */}
+          <button 
+            onClick={handleLogoClick}
+            className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
+          >
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">story</span>
-          </Link>
+          </button>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
