@@ -18,9 +18,9 @@ export default function QuestionHandler({
     question: string;
     answer: any;
     timestamp: string;
+    hasError?: boolean;
   }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
   
   // Create a ref for the most recent answer to scroll to
@@ -65,7 +65,8 @@ export default function QuestionHandler({
   const handleAskQuestion = async (question: string) => {
     try {
       setIsProcessing(true);
-      setError(null);
+      
+      console.log(`Processing question: "${question}"`);
       
       // Detect if it's a how-to question to modify the prompt approach
       const isHowToQuestion = question.toLowerCase().includes("how to") || 
@@ -79,22 +80,41 @@ export default function QuestionHandler({
         skipBenefits: isHowToQuestion
       });
 
-      // Save to chat history after getting the answer
+      console.log(`Answer received:`, answer ? 'Success' : 'No answer');
+
       if (answer) {
+        // Save to chat history after getting the answer
         addChatEntry(question, answer);
 
         // Add the new answer to the END of our answers array to maintain oldest-to-newest ordering
         setAnswers(prev => [...prev, {
           question,
           answer,
-          timestamp: new Date().toLocaleString()
+          timestamp: new Date().toLocaleString(),
+          hasError: false
         }]);
+        
+        console.log(`Answer added to display for question: "${question}"`);
       } else {
-        setError(`I couldn't find information related to "${question}".`);
+        // Add error answer to display
+        console.log(`No answer found for question: "${question}"`);
+        setAnswers(prev => [...prev, {
+          question,
+          answer: null,
+          timestamp: new Date().toLocaleString(),
+          hasError: true
+        }]);
       }
     } catch (error) {
       console.error("Error processing question:", error);
-      setError(`Error: ${error instanceof Error ? error.message : "Unknown error occurred"}`);
+      
+      // Add error answer to display
+      setAnswers(prev => [...prev, {
+        question,
+        answer: null,
+        timestamp: new Date().toLocaleString(),
+        hasError: true
+      }]);
     } finally {
       setIsProcessing(false);
     }
@@ -122,7 +142,7 @@ export default function QuestionHandler({
       {/* Header with share button - only show when there are answers */}
       {hasAnswers && (
         <div className="flex justify-end mb-6">
-          <ShareSessionButton answers={answers} />
+          <ShareSessionButton answers={answers.filter(a => !a.hasError)} />
         </div>
       )}
 
@@ -142,7 +162,7 @@ export default function QuestionHandler({
           <div className="space-y-8 mb-8">
             {answers.map((item, index) => (
               <div key={index} className="max-w-3xl mx-auto" ref={index === answers.length - 1 ? latestAnswerRef : null}>
-                {error && index === answers.length - 1 ? (
+                {item.hasError || !item.answer ? (
                   <NoAnswerFallback question={item.question} />
                 ) : (
                   <AnswerDisplay 
