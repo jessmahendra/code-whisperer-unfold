@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -37,11 +36,17 @@ let initializationState = {
  * Enhanced detection of real repository data
  */
 function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
+  console.log(`Checking if data is real: ${entries.length} entries`);
+  
   // If we have no entries, it's definitely not real data
-  if (entries.length === 0) return false;
+  if (entries.length === 0) {
+    console.log('No entries found - not real data');
+    return false;
+  }
   
   // Get scan diagnostics for more accurate detection
   const diagnostics = getScanDiagnostics();
+  console.log(`Scan diagnostics: ${diagnostics.scannedFiles.length} files scanned`);
   
   // If we have scanned files from the path explorer, it's likely real data
   if (diagnostics.scannedFiles.length > 0) {
@@ -61,35 +66,19 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
     )
   );
   
-  // If we have significantly more entries than mock data with real indicators
-  const significantlyMoreData = entries.length > (mockKnowledgeEntries.length * 2);
+  console.log(`Real indicators found: ${hasRealIndicators}`);
   
-  // More sophisticated detection
-  if (significantlyMoreData && hasRealIndicators) {
-    console.log(`Real data detected: ${entries.length} entries with real indicators`);
+  // If we have significantly more entries than mock data with real indicators
+  const significantlyMoreData = entries.length > (mockKnowledgeEntries.length * 1.5);
+  
+  // More sophisticated detection - lower the threshold
+  if (hasRealIndicators || significantlyMoreData) {
+    console.log(`Real data detected: ${entries.length} entries, indicators: ${hasRealIndicators}, more data: ${significantlyMoreData}`);
     return true;
   }
   
-  // Check if all entries match mock data exactly
-  if (entries.length === mockKnowledgeEntries.length) {
-    const mockPaths = new Set(mockKnowledgeEntries.map(e => e.filePath));
-    const currentPaths = new Set(entries.map(e => e.filePath));
-    
-    let allMatch = true;
-    for (const path of mockPaths) {
-      if (!currentPaths.has(path)) {
-        allMatch = false;
-        break;
-      }
-    }
-    if (allMatch) {
-      console.log('Mock data detected: exact match with mock entries');
-      return false;
-    }
-  }
-  
   console.log(`Data evaluation: ${entries.length} entries, real indicators: ${hasRealIndicators}`);
-  return hasRealIndicators && entries.length > 20;
+  return entries.length > 15; // Lower threshold
 }
 
 /**
@@ -225,16 +214,17 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     
     // Get scan diagnostics
     const diagnostics = getScanDiagnostics();
+    console.log(`Exploration complete. Processed any: ${processedAny}, KB size: ${knowledgeBase.length}`);
     
     initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
     initializationState.initialized = true;
     initializationState.lastRepositoryFingerprint = currentFingerprint;
     
-    // Enhanced success detection
+    // Enhanced success detection with more lenient criteria
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
-    if (!processedAny || !initializationState.fetchConfirmed || !hasRealData) {
+    if (!hasRealData && knowledgeBase.length < 5) {
       console.log('Enhanced scan failed or insufficient data, using mock data');
       
       if (knowledgeBase.length === 0) {
@@ -280,72 +270,78 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
 }
 
 /**
- * Searches the knowledge base for relevant entries
+ * Searches the knowledge base for relevant entries with improved scoring
  * @param {string} query - Search query
  * @returns {KnowledgeEntry[]} Array of relevant knowledge entries
  */
 export function searchKnowledge(query: string): KnowledgeEntry[] {
+  console.log(`=== SEARCH DEBUG ===`);
+  console.log(`Query: "${query}"`);
+  console.log(`Knowledge base size: ${knowledgeBase.length}`);
+  console.log(`Using mock data: ${initializationState.usingMockData}`);
+  
   const keywords = extractKeywords(query);
+  console.log(`Extracted keywords: ${keywords.join(', ')}`);
   
   if (keywords.length === 0) {
+    console.log('No keywords extracted, returning empty results');
     return [];
   }
   
-  console.log(`Enhanced search: ${keywords.join(', ')} across ${knowledgeBase.length} entries`);
-  console.log(`Using mock data: ${initializationState.usingMockData}`);
-  
-  // Enhanced scoring algorithm
+  // Enhanced scoring algorithm with lower thresholds
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
     
     // Exact keyword matches (highest weight)
     keywords.forEach(keyword => {
       if (entry.keywords.includes(keyword)) {
-        score += 2.0;
+        score += 3.0;
       }
       
-      // Content matches (medium weight)
+      // Content matches (medium weight) - case insensitive
       const lowerContent = entry.content.toLowerCase();
       const lowerKeyword = keyword.toLowerCase();
       
       if (lowerContent.includes(lowerKeyword)) {
-        score += 1.0;
+        score += 2.0;
         
         // Bonus for exact word matches
-        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword}\\b`, 'i');
+        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
         if (wordBoundaryRegex.test(lowerContent)) {
-          score += 0.5;
+          score += 1.0;
         }
       }
       
       // File path matches (lower weight)
       if (entry.filePath.toLowerCase().includes(lowerKeyword)) {
-        score += 0.5;
+        score += 1.0;
       }
       
       // Metadata matches (if available)
       if (entry.metadata && typeof entry.metadata === 'object') {
         const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
         if (metadataStr.includes(lowerKeyword)) {
-          score += 0.3;
+          score += 0.5;
         }
       }
     });
     
     return {
       entry,
-      score: score / keywords.length
+      score: score
     };
   });
   
-  // Enhanced filtering and sorting
+  // Much more lenient filtering and sorting
   const results = scoredEntries
-    .filter(item => item.score > 0.02) // Lower threshold for better recall
+    .filter(item => item.score > 0.01) // Very low threshold
     .sort((a, b) => b.score - a.score)
-    .slice(0, 20) // Increase result limit
+    .slice(0, 25) // More results
     .map(item => item.entry);
   
-  console.log(`Enhanced search found ${results.length} results (scores: ${scoredEntries.filter(s => s.score > 0.02).slice(0, 3).map(s => s.score.toFixed(2)).join(', ')})`);
+  console.log(`Search results: ${results.length} entries found`);
+  console.log(`Top 3 scores: ${scoredEntries.filter(s => s.score > 0.01).slice(0, 3).map(s => s.score.toFixed(2)).join(', ')}`);
+  console.log(`Sample results:`, results.slice(0, 3).map(r => ({ file: r.filePath, type: r.type, contentPreview: r.content.substring(0, 50) })));
   
   return results;
 }

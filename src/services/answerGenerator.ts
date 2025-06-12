@@ -1,3 +1,4 @@
+
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
@@ -185,6 +186,9 @@ export async function generateAnswer(query: string, options?: {
   concise?: boolean, 
   skipBenefits?: boolean 
 }): Promise<Answer | null> {
+  console.log(`=== ANSWER GENERATION DEBUG ===`);
+  console.log(`Query: "${query}"`);
+  
   await new Promise(resolve => setTimeout(resolve, 300));
   
   try {
@@ -197,24 +201,43 @@ export async function generateAnswer(query: string, options?: {
     console.log('Knowledge base diagnostics:', {
       size: diagnostics.knowledgeBaseSize,
       usingMock: diagnostics.usingMockData,
-      scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length
+      scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length,
+      initialized: diagnostics.initializationState.initialized
     });
     
     // Search with enhanced keywords
     const searchQuery = [query, ...queryAnalysis.keywords].join(' ');
+    console.log(`Searching with: "${searchQuery}"`);
+    
     const results = await searchKnowledgeWithHistory(searchQuery);
     
     console.log(`Enhanced search results: ${results.length} entries found for "${query}"`);
     
     if (results.length === 0) {
       console.log("No results found for enhanced query:", query);
+      console.log("Knowledge base state:", {
+        size: diagnostics.knowledgeBaseSize,
+        usingMock: diagnostics.usingMockData,
+        initialized: diagnostics.initializationState.initialized
+      });
+      
+      // Provide debugging information to user
+      if (!diagnostics.initializationState.initialized) {
+        toast.error("Knowledge base not initialized. Please wait for scanning to complete.");
+        return null;
+      }
+      
+      if (diagnostics.usingMockData) {
+        toast.warning("Using sample data - try connecting your repository for better results");
+      }
+      
       return null;
     }
     
     // Log enhanced result information
     console.log("Enhanced search results summary:");
     results.slice(0, 3).forEach((result, index) => {
-      console.log(`${index + 1}. File: ${result.filePath}, Content: ${result.content.substring(0, 100)}...`);
+      console.log(`${index + 1}. File: ${result.filePath}, Type: ${result.type}, Content: ${result.content.substring(0, 100)}...`);
     });
     
     // Generate screenshots if needed

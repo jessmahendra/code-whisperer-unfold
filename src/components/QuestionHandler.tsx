@@ -8,6 +8,7 @@ import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
 import { getCurrentRepository } from "@/services/githubConnector";
+import { getEnhancedDiagnostics } from "@/services/knowledgeBase";
 
 export default function QuestionHandler({
   className
@@ -67,6 +68,17 @@ export default function QuestionHandler({
       setIsProcessing(true);
       setError(null);
       
+      // Add debugging information
+      const diagnostics = getEnhancedDiagnostics();
+      console.log('=== QUESTION HANDLER DEBUG ===');
+      console.log('Question:', question);
+      console.log('Knowledge base state:', {
+        size: diagnostics.knowledgeBaseSize,
+        usingMock: diagnostics.usingMockData,
+        initialized: diagnostics.initializationState.initialized,
+        scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length
+      });
+      
       // Detect if it's a how-to question to modify the prompt approach
       const isHowToQuestion = question.toLowerCase().includes("how to") || 
                              question.toLowerCase().startsWith("how do") ||
@@ -90,7 +102,8 @@ export default function QuestionHandler({
           timestamp: new Date().toLocaleString()
         }]);
       } else {
-        setError(`I couldn't find information related to "${question}".`);
+        console.log('No answer generated for question:', question);
+        setError(`I couldn't find information related to "${question}". The knowledge base may not be fully initialized or may not contain relevant content.`);
       }
     } catch (error) {
       console.error("Error processing question:", error);
