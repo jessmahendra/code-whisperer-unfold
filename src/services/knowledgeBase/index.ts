@@ -239,7 +239,7 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
         duration: 4000
       });
       console.log(successMsg);
-      console.log('📂 Sample scanned files:', diagnostics.scannedFiles.slice(0, 10));
+      console.log('📂 Sample scanned files:', diagnostics.scannedFiles);
       console.log('📝 Sample knowledge entries:', knowledgeBase.slice(0, 3).map(e => ({ 
         id: e.id, 
         type: e.type, 
