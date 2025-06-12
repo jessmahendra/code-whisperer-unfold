@@ -33,7 +33,7 @@ let initializationState = {
 };
 
 /**
- * Improved detection of real repository data
+ * FIXED: Better detection of real repository data
  */
 function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
   console.log(`Checking if data is real: ${entries.length} entries`);
@@ -44,33 +44,34 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
     return false;
   }
   
-  // Get scan diagnostics for more accurate detection
+  // Check for mock data patterns - if ALL entries are mock, it's not real
+  const mockEntries = entries.filter(entry => 
+    entry.id.includes('mock-') || 
+    entry.content.includes('Ghost') ||
+    entry.filePath === 'mock'
+  );
+  
+  const realEntries = entries.length - mockEntries.length;
+  console.log(`Mock entries: ${mockEntries.length}, Real entries: ${realEntries}`);
+  
+  // If we have any real entries (non-mock), it's real data
+  if (realEntries > 0) {
+    console.log(`Real data detected: ${realEntries} non-mock entries found`);
+    return true;
+  }
+  
+  // Get scan diagnostics for more context
   const diagnostics = getScanDiagnostics();
   console.log(`Scan diagnostics: ${diagnostics.scannedFiles.length} files scanned`);
   
-  // If we have scanned files from the path explorer, and actual entries, it's likely real data
-  if (diagnostics.scannedFiles.length > 0 && entries.length > 0) {
-    console.log(`Real data detected: ${diagnostics.scannedFiles.length} files scanned, ${entries.length} entries`);
-    return true;
+  // If we scanned files but only have mock entries, something went wrong
+  if (diagnostics.scannedFiles.length > 0 && realEntries === 0) {
+    console.log(`Warning: ${diagnostics.scannedFiles.length} files scanned but no real entries created`);
+    return false;
   }
   
-  // Check for any entries that don't match mock data patterns
-  const hasNonMockEntries = entries.some(entry => 
-    !entry.id.includes('mock-') && 
-    !entry.content.includes('Ghost') &&
-    entry.filePath !== 'mock'
-  );
-  
-  console.log(`Non-mock entries found: ${hasNonMockEntries}`);
-  
-  // Even lower threshold - if we have any entries at all, consider it real if we scanned files
-  if (entries.length > 0 && diagnostics.scannedFiles.length > 0) {
-    console.log(`Real data detected: ${entries.length} entries from scanned files`);
-    return true;
-  }
-  
-  console.log(`Data evaluation: ${entries.length} entries, likely mock data`);
-  return false;
+  console.log(`Data evaluation: ${entries.length} total entries, ${realEntries} real entries`);
+  return realEntries > 0;
 }
 
 /**
@@ -197,9 +198,9 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   }
   
   try {
-    if (forceRefresh) {
-      knowledgeBase = [];
-    }
+    // IMPORTANT: Clear knowledge base to start fresh
+    knowledgeBase = [];
+    console.log('Starting fresh scan - knowledge base cleared');
     
     console.log('Starting adaptive repository exploration...');
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
@@ -217,12 +218,11 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     // Enhanced success detection
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
-    if (!hasRealData) {
-      console.log('Adaptive scan found insufficient data, using mock data as fallback');
+    if (!hasRealData || knowledgeBase.length === 0) {
+      console.log('Adaptive scan found insufficient real data, adding mock data as fallback');
       
-      if (knowledgeBase.length === 0) {
-        knowledgeBase = [...mockKnowledgeEntries];
-      }
+      // Add mock data as fallback
+      knowledgeBase.push(...mockKnowledgeEntries);
       
       initializationState.usingMockData = true;
       
@@ -238,7 +238,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       initializationState.usingMockData = false;
       
       const stats = getKnowledgeBaseStats();
-      const successMsg = `Repository scan successful: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
+      const realEntries = knowledgeBase.filter(e => !e.id.includes('mock-')).length;
+      const successMsg = `Repository scan successful: ${realEntries} real entries from ${diagnostics.scannedFiles.length} files.`;
       toast.success(successMsg, {
         description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
@@ -253,6 +254,9 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     console.error('Error in adaptive knowledge base initialization:', error);
     initializationState.error = error instanceof Error ? error.message : 'Unknown error';
     initializationState.usingMockData = true;
+    
+    // Add mock data as fallback
+    knowledgeBase = [...mockKnowledgeEntries];
     
     toast.error('Adaptive scan failed', {
       description: initializationState.error,
