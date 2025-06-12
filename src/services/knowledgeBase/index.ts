@@ -380,7 +380,10 @@ export function getKnowledgeBaseStats(): KnowledgeBaseStats {
     byType: {
       comment: knowledgeBase.filter(entry => entry.type === 'comment').length,
       function: knowledgeBase.filter(entry => entry.type === 'function').length,
-      export: knowledgeBase.filter(entry => entry.type === 'export').length
+      export: knowledgeBase.filter(entry => entry.type === 'export').length,
+      content: knowledgeBase.filter(entry => entry.type === 'content').length,
+      page: knowledgeBase.filter(entry => entry.type === 'page').length,
+      config: knowledgeBase.filter(entry => entry.type === 'config').length,
     },
     processedFiles: getProcessedFileCount()
   };
