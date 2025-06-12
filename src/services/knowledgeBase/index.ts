@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -130,7 +129,7 @@ function saveToCache(): void {
   };
   
   saveScanDataToCache(activeRepo.id, scanData);
-  console.log(`Cache saved: ${knowledgeBase.length} entries, ${diagnostics.scannedFiles.length} files`);
+  console.log(`Cache saved: ${knowledgeBase.length} entries, ${diagnostics.scannedFiles} files`);
 }
 
 /**
