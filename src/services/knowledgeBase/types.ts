@@ -20,6 +20,7 @@ export interface KnowledgeEntry {
     location?: string;
     contentType?: string;
     dataType?: string;
+    commentType?: string;
   };
 }
 

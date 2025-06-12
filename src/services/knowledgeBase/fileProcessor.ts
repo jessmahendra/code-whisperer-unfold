@@ -1,4 +1,3 @@
-
 import { getCurrentRepository, getRepositoryContents } from '../githubConnector';
 import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { extractKeywords } from './keywordUtils';
