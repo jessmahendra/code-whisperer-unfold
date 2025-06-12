@@ -382,11 +382,6 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
         {renderStepIndicator()}
         {renderStepContent()}
       </CardContent>
-      <CardFooter className="flex flex-col space-y-2 border-t pt-4">
-        <div className="text-sm text-center text-muted-foreground">
-          Step {currentStep} of {totalSteps} • You can always configure these settings later from the Settings page
-        </div>
-      </CardFooter>
     </Card>
   );
 }
