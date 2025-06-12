@@ -48,9 +48,9 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
   const diagnostics = getScanDiagnostics();
   console.log(`Scan diagnostics: ${diagnostics.scannedFiles.length} files scanned`);
   
-  // If we have scanned files from the path explorer, it's likely real data
-  if (diagnostics.scannedFiles.length > 0) {
-    console.log(`Real data detected: ${diagnostics.scannedFiles.length} files scanned`);
+  // If we have scanned files from the path explorer, and actual entries, it's likely real data
+  if (diagnostics.scannedFiles.length > 0 && entries.length > 0) {
+    console.log(`Real data detected: ${diagnostics.scannedFiles.length} files scanned, ${entries.length} entries`);
     return true;
   }
   
@@ -63,9 +63,9 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
   
   console.log(`Non-mock entries found: ${hasNonMockEntries}`);
   
-  // Lower threshold - if we have any reasonable amount of data, consider it real
-  if (entries.length > 20 || hasNonMockEntries) {
-    console.log(`Real data detected: ${entries.length} entries, has non-mock: ${hasNonMockEntries}`);
+  // Even lower threshold - if we have any entries at all, consider it real if we scanned files
+  if (entries.length > 0 && diagnostics.scannedFiles.length > 0) {
+    console.log(`Real data detected: ${entries.length} entries from scanned files`);
     return true;
   }
   
@@ -214,10 +214,10 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     initializationState.initialized = true;
     initializationState.lastRepositoryFingerprint = currentFingerprint;
     
-    // Enhanced success detection with more lenient criteria
+    // Enhanced success detection
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
-    if (!hasRealData || knowledgeBase.length === 0) {
+    if (!hasRealData) {
       console.log('Adaptive scan found insufficient data, using mock data as fallback');
       
       if (knowledgeBase.length === 0) {
@@ -238,13 +238,14 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       initializationState.usingMockData = false;
       
       const stats = getKnowledgeBaseStats();
-      const successMsg = `Adaptive scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
+      const successMsg = `Repository scan successful: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
       toast.success(successMsg, {
         description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
       });
       console.log(successMsg);
       console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 10));
+      console.log('Sample knowledge entries:', knowledgeBase.slice(0, 3).map(e => ({ id: e.id, type: e.type, content: e.content.substring(0, 100) })));
       
       saveToCache();
     }

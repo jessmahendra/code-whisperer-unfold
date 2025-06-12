@@ -39,6 +39,11 @@ export function extractInlineComments(code: string): string[] {
 export function extractStructuredData(code: string): Record<string, any> {
   const data = {};
   
+  // For any file, treat the content as structured data
+  if (code.trim().length > 0) {
+    data['fileContent'] = code.substring(0, 5000); // Store substantial content
+  }
+  
   // Extract arrays with meaningful names
   const arrayRegex = /(?:const|let|var)\s+(\w+)\s*=\s*\[([^\]]*)\]/g;
   let match;
@@ -61,11 +66,20 @@ export function extractStructuredData(code: string): Record<string, any> {
   }
 
   // Extract multi-line template literals and strings that might contain content
-  const templateLiteralRegex = /`([^`]{20,}?)`/g;
+  const templateLiteralRegex = /`([^`]{10,}?)`/g;
   while ((match = templateLiteralRegex.exec(code)) !== null) {
     const content = match[1].trim();
-    if (content.length > 20) {
+    if (content.length > 10) {
       data[`template_${Object.keys(data).length}`] = content;
+    }
+  }
+  
+  // Extract string literals that might contain important information
+  const stringLiteralRegex = /["']([^"']{20,}?)["']/g;
+  while ((match = stringLiteralRegex.exec(code)) !== null) {
+    const content = match[1].trim();
+    if (content.length > 20 && !content.startsWith('http') && !content.includes('\\')) {
+      data[`string_${Object.keys(data).length}`] = content;
     }
   }
   
@@ -395,6 +409,8 @@ export interface ExtractedKnowledge {
  * @returns {ExtractedKnowledge} Extracted knowledge
  */
 export function extractKnowledge(code: string, filePath: string): ExtractedKnowledge {
+  console.log(`Extracting knowledge from ${filePath}, content length: ${code.length}`);
+  
   // Extract file type from path
   const fileType = filePath.split('.').pop()?.toLowerCase() || '';
   
@@ -409,11 +425,11 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
     fileType
   };
   
+  // Always extract structured data for better content detection
+  knowledge['structuredData'] = extractStructuredData(code);
+  
   // Enhanced extraction based on file type or content patterns
   if (fileType === 'js' || fileType === 'ts' || fileType === 'jsx' || fileType === 'tsx') {
-    // Always extract structured data for better content detection
-    knowledge['structuredData'] = extractStructuredData(code);
-    
     // Extract JSX text content for React components
     if (fileType === 'jsx' || fileType === 'tsx') {
       knowledge['jsxTextContent'] = extractJSXTextContent(code);
@@ -447,13 +463,14 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
     knowledge['classes'] = extractClassDefs(code);
   }
 
-  // Also extract content from other file types that might contain useful information
-  if (fileType === 'md' || fileType === 'txt' || fileType === 'html') {
-    // For markdown and text files, treat the whole content as structured data
-    knowledge['structuredData'] = {
-      fileContent: code.substring(0, 2000) // Limit to prevent too much data
-    };
-  }
+  console.log(`Knowledge extracted from ${filePath}:`, {
+    jsDocComments: knowledge.jsDocComments.length,
+    inlineComments: knowledge.inlineComments.length,
+    functions: knowledge.functions.length,
+    exports: Object.keys(knowledge.exports).length,
+    structuredDataKeys: Object.keys(knowledge.structuredData || {}).length,
+    jsxTextContent: knowledge.jsxTextContent?.length || 0
+  });
   
   return knowledge;
 }
