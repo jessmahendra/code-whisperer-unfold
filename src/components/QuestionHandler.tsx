@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -8,6 +7,7 @@ import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
 import { getCurrentRepository } from "@/services/githubConnector";
+import { initializeKnowledgeBase, isUsingMockData, getEnhancedDiagnostics } from "@/services/knowledgeBase";
 
 export default function QuestionHandler({
   className
@@ -26,9 +26,35 @@ export default function QuestionHandler({
   // Create a ref for the most recent answer to scroll to
   const latestAnswerRef = useRef<HTMLDivElement>(null);
   
-  // Update repository info
+  // Update repository info and check knowledge base status
   useEffect(() => {
-    setCurrentRepo(getCurrentRepository());
+    const repo = getCurrentRepository();
+    setCurrentRepo(repo);
+    
+    // Check if we're using mock data and log diagnostics
+    const usingMock = isUsingMockData();
+    const diagnostics = getEnhancedDiagnostics();
+    
+    console.log("QuestionHandler diagnostics:", {
+      repository: repo,
+      usingMockData: usingMock,
+      knowledgeBaseSize: diagnostics.knowledgeBaseSize,
+      scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length,
+      initState: diagnostics.initializationState
+    });
+    
+    // If we have a repository but are still using mock data, try to reinitialize
+    if (repo && usingMock && diagnostics.knowledgeBaseSize <= 50) {
+      console.log("Repository detected but using mock data, attempting to reinitialize knowledge base");
+      initializeKnowledgeBase(true).then(() => {
+        const newDiagnostics = getEnhancedDiagnostics();
+        console.log("After reinitialization:", {
+          usingMockData: isUsingMockData(),
+          knowledgeBaseSize: newDiagnostics.knowledgeBaseSize,
+          scannedFiles: newDiagnostics.lastScanDiagnostics.scannedFiles.length
+        });
+      });
+    }
   }, []);
 
   // Generate dynamic content based on repository
@@ -67,6 +93,14 @@ export default function QuestionHandler({
       setIsProcessing(true);
       
       console.log(`Processing question: "${question}"`);
+      
+      // Log current knowledge base status before generating answer
+      const preDiagnostics = getEnhancedDiagnostics();
+      console.log("Pre-answer diagnostics:", {
+        usingMockData: isUsingMockData(),
+        knowledgeBaseSize: preDiagnostics.knowledgeBaseSize,
+        repository: getCurrentRepository()
+      });
       
       // Detect if it's a how-to question to modify the prompt approach
       const isHowToQuestion = question.toLowerCase().includes("how to") || 
