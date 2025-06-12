@@ -1,8 +1,9 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
 import { Button } from "@/components/ui/button";
-import { Copy, Twitter, Linkedin, Mail, ExternalLink, BookOpen } from "lucide-react";
+import { Copy, Twitter, Linkedin, Mail, ExternalLink, BookOpen, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
@@ -23,7 +24,17 @@ export default function SharePage() {
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [storageStatus, setStorageStatus] = useState<{local: boolean, session: boolean}>({local: false, session: false});
+  const [debugInfo, setDebugInfo] = useState<{
+    hasLocalStorage: boolean;
+    hasSessionStorage: boolean;
+    availableIds: string[];
+    searchedId: string;
+  }>({
+    hasLocalStorage: false,
+    hasSessionStorage: false,
+    availableIds: [],
+    searchedId: ''
+  });
 
   // Handle logo click with explicit navigation
   const handleLogoClick = (e: React.MouseEvent) => {
@@ -32,54 +43,78 @@ export default function SharePage() {
     navigate("/");
   };
 
-  useEffect(() => {
-    // Load the answer data
+  // Function to retry loading the answer
+  const retryLoadAnswer = () => {
     if (id) {
-      try {
-        console.log("Attempting to load shared answer with ID:", id);
-        
-        // Check what's in storage to aid debugging
+      setLoading(true);
+      setError(null);
+      loadAnswer(id);
+    }
+  };
+
+  // Separate function to load answer for reusability
+  const loadAnswer = (shareId: string) => {
+    try {
+      console.log("Loading shared answer with ID:", shareId);
+      
+      // Get debug information about storage
+      const localData = localStorage.getItem('unfold_shareableAnswers');
+      const sessionData = sessionStorage.getItem('unfold_shareableAnswers');
+      
+      let availableIds: string[] = [];
+      
+      if (localData) {
         try {
-          const localData = localStorage.getItem('unfold_shareableAnswers');
-          const sessionData = sessionStorage.getItem('unfold_shareableAnswers');
-          
-          setStorageStatus({
-            local: !!localData,
-            session: !!sessionData
-          });
-          
-          console.log("localStorage has data:", !!localData);
-          console.log("sessionStorage has data:", !!sessionData);
-          
-          if (localData) {
-            const parsed = JSON.parse(localData);
-            console.log("Available IDs in localStorage:", Object.keys(parsed));
-          }
-          
-          if (sessionData) {
-            const parsed = JSON.parse(sessionData);
-            console.log("Available IDs in sessionStorage:", Object.keys(parsed));
-          }
-        } catch (storageError) {
-          console.error("Error checking storage:", storageError);
+          const parsed = JSON.parse(localData);
+          availableIds = Object.keys(parsed);
+          console.log("Available IDs in localStorage:", availableIds);
+        } catch (e) {
+          console.error("Error parsing localStorage data:", e);
         }
-        
-        // Try to get the answer
-        const sharedAnswer = getShareableAnswer(id);
-        
-        if (sharedAnswer) {
-          console.log("Successfully loaded shared answer:", sharedAnswer.id);
-          setAnswer(sharedAnswer);
-        } else {
-          console.log("No answer found for ID:", id);
-          setError("The shared answer could not be found");
-        }
-      } catch (err) {
-        console.error("Error loading shared answer:", err);
-        setError("Failed to load the shared answer");
-      } finally {
-        setLoading(false);
       }
+      
+      if (sessionData && !localData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          availableIds = Object.keys(parsed);
+          console.log("Available IDs in sessionStorage:", availableIds);
+        } catch (e) {
+          console.error("Error parsing sessionStorage data:", e);
+        }
+      }
+      
+      setDebugInfo({
+        hasLocalStorage: !!localData,
+        hasSessionStorage: !!sessionData,
+        availableIds,
+        searchedId: shareId
+      });
+      
+      // Try to get the answer
+      const sharedAnswer = getShareableAnswer(shareId);
+      
+      if (sharedAnswer) {
+        console.log("Successfully loaded shared answer:", sharedAnswer.id);
+        setAnswer(sharedAnswer);
+        setError(null);
+      } else {
+        console.log("No answer found for ID:", shareId);
+        setError(`The shared answer with ID "${shareId}" could not be found`);
+      }
+    } catch (err) {
+      console.error("Error loading shared answer:", err);
+      setError("Failed to load the shared answer");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (id) {
+      loadAnswer(id);
+    } else {
+      setError("No share ID provided");
+      setLoading(false);
     }
   }, [id]);
 
@@ -87,7 +122,6 @@ export default function SharePage() {
     navigator.clipboard.writeText(window.location.href)
       .then(() => {
         toast.success("Link copied to clipboard");
-        // Track the share
         if (id) trackShare(id, 'copy');
       })
       .catch(err => {
@@ -97,7 +131,6 @@ export default function SharePage() {
   };
 
   const handleShare = (platform: string) => {
-    // Track the share
     if (id) trackShare(id, platform);
   };
 
@@ -125,7 +158,6 @@ export default function SharePage() {
       <div className="min-h-screen flex flex-col bg-background">
         <div className="border-b bg-white shadow-sm">
           <div className="container flex h-16 items-center justify-between">
-            {/* Updated logo to use button with click handler */}
             <button 
               onClick={handleLogoClick}
               className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
@@ -161,6 +193,7 @@ export default function SharePage() {
                 <li>Your browser's storage was cleared or is restricted</li>
                 <li>The answer has expired or was removed</li>
               </ul>
+              
               <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
                 <p className="text-sm text-amber-800">
                   <strong>Note:</strong> In this current demo version, shared answers are stored in your browser's storage.
@@ -168,20 +201,31 @@ export default function SharePage() {
                 </p>
               </div>
               
-              {/* Debug information */}
+              {/* Enhanced debug information */}
               <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
                 <p className="text-sm text-gray-700 font-medium mb-2">Debug Information:</p>
                 <ul className="text-xs text-gray-600 space-y-1">
-                  <li>ID parameter: {id || "Not provided"}</li>
-                  <li>localStorage available: {storageStatus.local ? "Yes" : "No"}</li>
-                  <li>sessionStorage available: {storageStatus.session ? "Yes" : "No"}</li>
+                  <li>Searched ID: {debugInfo.searchedId || "Not provided"}</li>
+                  <li>localStorage available: {debugInfo.hasLocalStorage ? "Yes" : "No"}</li>
+                  <li>sessionStorage available: {debugInfo.hasSessionStorage ? "Yes" : "No"}</li>
+                  <li>Available IDs ({debugInfo.availableIds.length}): {
+                    debugInfo.availableIds.length > 0 
+                      ? debugInfo.availableIds.join(', ')
+                      : "None found"
+                  }</li>
                 </ul>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex gap-2">
               <Button asChild variant="default">
                 <Link to="/">Return to Home</Link>
               </Button>
+              {id && (
+                <Button variant="outline" onClick={retryLoadAnswer}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Try Again
+                </Button>
+              )}
             </CardFooter>
           </Card>
         </main>
@@ -201,7 +245,6 @@ export default function SharePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="border-b bg-white shadow-sm">
         <div className="container flex h-16 items-center justify-between">
-          {/* Updated logo to use button with click handler */}
           <button 
             onClick={handleLogoClick}
             className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
@@ -231,8 +274,6 @@ export default function SharePage() {
                 <p key={index}>{paragraph}</p>
               ))}
             </div>
-            
-            {/* Visual Context Display removed */}
             
             <div className="border-t pt-4 mt-6">
               {/* Confidence Score */}
