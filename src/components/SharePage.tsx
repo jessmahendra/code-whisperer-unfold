@@ -19,17 +19,17 @@ interface Reference {
 
 export default function SharePage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate(); // Add the navigate hook
+  const navigate = useNavigate();
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [storageStatus, setStorageStatus] = useState<{local: boolean, session: boolean}>({local: false, session: false});
 
-  // Add function to handle logo click
+  // Handle logo click with explicit navigation
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
     console.log("Logo clicked from SharePage, navigating to homepage");
-    navigate("/", { replace: true });
+    navigate("/");
   };
 
   useEffect(() => {
@@ -125,17 +125,16 @@ export default function SharePage() {
       <div className="min-h-screen flex flex-col bg-background">
         <div className="border-b bg-white shadow-sm">
           <div className="container flex h-16 items-center justify-between">
-            {/* Updated logo to use our click handler */}
-            <a 
-              href="/"
+            {/* Updated logo to use button with click handler */}
+            <button 
               onClick={handleLogoClick}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
             >
               <BookOpen className="h-6 w-6 text-unfold-purple" />
               <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
                 Unfold
               </span>
-            </a>
+            </button>
             <Link 
               to="/"
               className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
@@ -202,17 +201,16 @@ export default function SharePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <div className="border-b bg-white shadow-sm">
         <div className="container flex h-16 items-center justify-between">
-          {/* Updated logo to use our click handler */}
-          <a 
-            href="/"
+          {/* Updated logo to use button with click handler */}
+          <button 
             onClick={handleLogoClick}
-            className="flex items-center space-x-2"
+            className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
           >
             <BookOpen className="h-6 w-6 text-unfold-purple" />
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-transparent">
               Unfold
             </span>
-          </a>
+          </button>
           <Link 
             to="/"
             className="text-sm font-medium text-muted-foreground hover:text-foreground flex items-center gap-1"
