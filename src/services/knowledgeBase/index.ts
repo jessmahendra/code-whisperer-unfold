@@ -263,61 +263,76 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
 }
 
 /**
- * Searches the knowledge base for relevant entries with improved scoring
+ * Searches the knowledge base for relevant entries with much more flexible scoring
  * @param {string} query - Search query
  * @returns {KnowledgeEntry[]} Array of relevant knowledge entries
  */
 export function searchKnowledge(query: string): KnowledgeEntry[] {
-  console.log(`=== SEARCH DEBUG ===`);
+  console.log(`=== FLEXIBLE SEARCH DEBUG ===`);
   console.log(`Query: "${query}"`);
   console.log(`Knowledge base size: ${knowledgeBase.length}`);
   console.log(`Using mock data: ${initializationState.usingMockData}`);
   
-  const keywords = extractKeywords(query);
-  console.log(`Extracted keywords: ${keywords.join(', ')}`);
-  
-  if (keywords.length === 0) {
-    console.log('No keywords extracted, returning empty results');
+  if (knowledgeBase.length === 0) {
+    console.log('Knowledge base is empty');
     return [];
   }
   
-  // Enhanced scoring algorithm with very low thresholds
+  // Much more flexible keyword extraction - include more words
+  const words = query.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 1); // Allow 2+ character words
+  
+  console.log(`Search words: ${words.join(', ')}`);
+  
+  if (words.length === 0) {
+    console.log('No search words extracted');
+    return knowledgeBase.slice(0, 10); // Return some results anyway
+  }
+  
+  // Very flexible scoring - give points for any match
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
     
-    // Exact keyword matches (highest weight)
-    keywords.forEach(keyword => {
-      if (entry.keywords.includes(keyword)) {
-        score += 5.0;
+    const lowerContent = entry.content.toLowerCase();
+    const lowerFilePath = entry.filePath.toLowerCase();
+    const lowerKeywords = entry.keywords.map(k => k.toLowerCase());
+    
+    words.forEach(word => {
+      // File path matches (high value)
+      if (lowerFilePath.includes(word)) {
+        score += 3;
       }
       
-      // Content matches (medium weight) - case insensitive
-      const lowerContent = entry.content.toLowerCase();
-      const lowerKeyword = keyword.toLowerCase();
-      
-      if (lowerContent.includes(lowerKeyword)) {
-        score += 3.0;
-        
-        // Bonus for exact word matches
-        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-        if (wordBoundaryRegex.test(lowerContent)) {
-          score += 2.0;
-        }
+      // Content matches (medium value)
+      if (lowerContent.includes(word)) {
+        score += 2;
       }
       
-      // File path matches (lower weight)
-      if (entry.filePath.toLowerCase().includes(lowerKeyword)) {
-        score += 1.5;
+      // Keyword matches (high value)
+      if (lowerKeywords.some(k => k.includes(word))) {
+        score += 3;
+      }
+      
+      // Type matches
+      if (entry.type.toLowerCase().includes(word)) {
+        score += 2;
       }
       
       // Metadata matches
-      if (entry.metadata && typeof entry.metadata === 'object') {
+      if (entry.metadata) {
         const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
-        if (metadataStr.includes(lowerKeyword)) {
-          score += 1.0;
+        if (metadataStr.includes(word)) {
+          score += 1;
         }
       }
     });
+    
+    // Bonus for entries with more content (likely more useful)
+    if (entry.content.length > 200) {
+      score += 0.5;
+    }
     
     return {
       entry,
@@ -325,21 +340,35 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     };
   });
   
-  // Very lenient filtering and sorting
-  const results = scoredEntries
-    .filter(item => item.score > 0) // Accept any score > 0
+  // Very lenient filtering - accept any score > 0, or if no matches, return top entries anyway
+  let results = scoredEntries
+    .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 30) // More results
+    .slice(0, 20)
     .map(item => item.entry);
   
-  console.log(`Search results: ${results.length} entries found`);
-  console.log(`Top 5 scores: ${scoredEntries.filter(s => s.score > 0).slice(0, 5).map(s => s.score.toFixed(2)).join(', ')}`);
-  console.log(`Sample results:`, results.slice(0, 3).map(r => ({ 
-    file: r.filePath, 
-    type: r.type, 
-    score: scoredEntries.find(s => s.entry.id === r.id)?.score || 0,
-    contentPreview: r.content.substring(0, 100)
-  })));
+  // If no matches found, return some entries anyway (fallback)
+  if (results.length === 0) {
+    console.log('No scored matches found, returning fallback entries');
+    results = knowledgeBase.slice(0, 5);
+  }
+  
+  console.log(`Flexible search results: ${results.length} entries found`);
+  
+  if (results.length > 0) {
+    const topScores = scoredEntries
+      .filter(s => s.score > 0)
+      .slice(0, 5)
+      .map(s => s.score.toFixed(2));
+    console.log(`Top 5 scores: ${topScores.join(', ')}`);
+    
+    console.log(`Sample results:`, results.slice(0, 3).map(r => ({ 
+      file: r.filePath, 
+      type: r.type, 
+      score: scoredEntries.find(s => s.entry.id === r.id)?.score || 0,
+      contentPreview: r.content.substring(0, 100)
+    })));
+  }
   
   return results;
 }
