@@ -28,6 +28,7 @@ export default function Header({
   isOnboarding = false
 }: HeaderProps) {
   const navigate = useNavigate();
+  
   const [currentRepo, setCurrentRepo] = useState<{
     owner: string;
     repo: string;
@@ -41,6 +42,7 @@ export default function Header({
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'partial' | 'connected'>('disconnected');
   const [showProgressIndicator, setShowProgressIndicator] = useState(false);
   const [apiKeyStatus, setApiKeyStatus] = useState<ReturnType<typeof getAPIKeyState> | null>(null);
+  
   const updateRepoInfo = () => {
     setCurrentRepo(getCurrentRepository());
     setUsingMockData(isUsingMockData());
@@ -67,6 +69,7 @@ export default function Header({
       setShowProgressIndicator(false);
     }
   };
+
   useEffect(() => {
     updateRepoInfo();
 
@@ -105,6 +108,7 @@ export default function Header({
     }, 1000);
     return () => clearInterval(intervalId);
   }, []);
+
   const connectToGhostRepo = async () => {
     setIsConnecting(true);
     setConnectionError(null);
@@ -203,6 +207,7 @@ export default function Header({
       setShowProgressIndicator(false);
     }
   };
+
   const handleOpenAIKeySave = () => {
     if (openaiKey.trim()) {
       setOpenAIApiKey(openaiKey.trim());
@@ -212,6 +217,7 @@ export default function Header({
       toast.error("Please enter a valid OpenAI API key");
     }
   };
+
   const getConnectionStatusInfo = () => {
     switch (connectionStatus) {
       case 'disconnected':
@@ -241,12 +247,10 @@ export default function Header({
     }
   };
 
-  // Fix the logo click handler to ensure it always navigates properly
-  const handleLogoClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // Fix the logo click handler with proper navigation
+  const handleLogoClick = () => {
     console.log("Logo clicked, navigating to homepage");
-    navigate("/");
+    navigate("/", { replace: false });
   };
 
   const statusInfo = getConnectionStatusInfo();
@@ -254,10 +258,10 @@ export default function Header({
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          {/* Fixed logo with proper click handler */}
-          <button onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0">
+          {/* Use Link component for proper React Router navigation */}
+          <Link to="/" className="flex items-center space-x-2 cursor-pointer no-underline">
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">story</span>
-          </button>
+          </Link>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
