@@ -203,7 +203,7 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     // Get scan diagnostics
     const diagnostics = getScanDiagnostics();
     console.log(`🎯 Exploration complete. Processed any: ${processedAny}, KB size: ${knowledgeBase.length}`);
-    console.log(`📁 Scanned files: ${diagnostics.scannedFiles.length}`);
+    console.log(`📁 Scanned files: ${diagnostics.scannedFiles}`);
     
     initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
@@ -226,14 +226,14 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
         'Repository scan found insufficient data.';
       
       toast.warning(`Using mock data - ${errorMsg}`, {
-        description: `Scanned ${diagnostics.scannedFiles.length} files. Check repository permissions and content.`,
+        description: `Scanned ${diagnostics.scannedFiles} files. Check repository permissions and content.`,
         duration: 8000
       });
     } else {
       initializationState.usingMockData = false;
       
       const realEntries = knowledgeBase.filter(e => !e.id.includes('mock-')).length;
-      const successMsg = `✅ Repository scan successful: ${realEntries} real entries from ${diagnostics.scannedFiles.length} files.`;
+      const successMsg = `✅ Repository scan successful: ${realEntries} real entries from ${diagnostics.scannedFiles} files.`;
       toast.success(successMsg, {
         description: 'Repository data loaded successfully.',
         duration: 4000
