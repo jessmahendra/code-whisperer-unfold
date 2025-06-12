@@ -21,6 +21,7 @@ export interface KnowledgeEntry {
     contentType?: string;
     dataType?: string;
     commentType?: string;
+    originalLength?: number;
   };
 }
 
