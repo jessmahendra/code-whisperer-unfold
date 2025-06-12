@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
@@ -30,13 +31,15 @@ export default function SharePage() {
     searchedId: string;
     currentUrl: string;
     extractedId: string;
+    storageContents: any;
   }>({
     hasLocalStorage: false,
     hasSessionStorage: false,
     availableIds: [],
     searchedId: '',
     currentUrl: '',
-    extractedId: ''
+    extractedId: '',
+    storageContents: null
   });
 
   // Handle logo click with explicit navigation
@@ -58,106 +61,112 @@ export default function SharePage() {
   // Separate function to load answer for reusability
   const loadAnswer = (shareId: string) => {
     try {
-      console.log("=== SHARE PAGE DEBUG START ===");
-      console.log("Current URL:", window.location.href);
-      console.log("URL params ID:", shareId);
-      console.log("Raw ID from useParams:", id);
+      console.log("🔍 === SHARE PAGE LOAD START ===");
+      console.log("📍 Current URL:", window.location.href);
+      console.log("🆔 Share ID from params:", shareId);
+      console.log("🆔 Raw useParams ID:", id);
       
-      // Get debug information about storage with more detail
+      // Get comprehensive debug information
       const STORAGE_KEY = 'unfold_shareableAnswers';
       const localData = localStorage.getItem(STORAGE_KEY);
       const sessionData = sessionStorage.getItem(STORAGE_KEY);
       
-      console.log("Storage key being used:", STORAGE_KEY);
-      console.log("localStorage raw data:", localData);
-      console.log("sessionStorage raw data:", sessionData);
+      console.log("🔑 Storage key:", STORAGE_KEY);
+      console.log("📦 localStorage raw:", localData ? `${localData.length} chars` : "EMPTY");
+      console.log("🗂️ sessionStorage raw:", sessionData ? `${sessionData.length} chars` : "EMPTY");
       
       let availableIds: string[] = [];
-      let localStorageIds: string[] = [];
-      let sessionStorageIds: string[] = [];
+      let storageContents: any = null;
       
+      // Parse and analyze localStorage
       if (localData) {
         try {
           const parsed = JSON.parse(localData);
-          localStorageIds = Object.keys(parsed);
-          availableIds = localStorageIds;
-          console.log("localStorage parsed successfully:", parsed);
-          console.log("Available IDs in localStorage:", localStorageIds);
+          availableIds = Object.keys(parsed);
+          storageContents = parsed;
+          console.log("✅ localStorage parsed successfully");
+          console.log("📋 Available IDs:", availableIds);
+          console.log("📦 Full storage contents:", parsed);
           
-          // Check if our specific ID exists
+          // Check for exact match
           if (parsed[shareId]) {
-            console.log("Found answer in localStorage:", parsed[shareId]);
+            console.log("✅ Found exact match in localStorage!");
+            console.log("📄 Matched data:", parsed[shareId]);
           } else {
-            console.log("Answer NOT found in localStorage for ID:", shareId);
+            console.log("❌ No exact match in localStorage");
+            
+            // Check for partial matches
+            const partialMatches = availableIds.filter(id => 
+              id.includes(shareId) || shareId.includes(id)
+            );
+            if (partialMatches.length > 0) {
+              console.log("🔍 Partial matches found:", partialMatches);
+            }
           }
-        } catch (e) {
-          console.error("Error parsing localStorage data:", e);
+        } catch (parseError) {
+          console.error("💥 localStorage parse error:", parseError);
         }
-      } else {
-        console.log("No localStorage data found");
       }
       
+      // Parse sessionStorage if localStorage didn't work
       if (sessionData && availableIds.length === 0) {
         try {
           const parsed = JSON.parse(sessionData);
-          sessionStorageIds = Object.keys(parsed);
-          availableIds = sessionStorageIds;
-          console.log("sessionStorage parsed successfully:", parsed);
-          console.log("Available IDs in sessionStorage:", sessionStorageIds);
+          availableIds = Object.keys(parsed);
+          storageContents = parsed;
+          console.log("✅ sessionStorage parsed successfully");
+          console.log("📋 Available IDs:", availableIds);
           
-          // Check if our specific ID exists
           if (parsed[shareId]) {
-            console.log("Found answer in sessionStorage:", parsed[shareId]);
+            console.log("✅ Found exact match in sessionStorage!");
           } else {
-            console.log("Answer NOT found in sessionStorage for ID:", shareId);
+            console.log("❌ No exact match in sessionStorage");
           }
-        } catch (e) {
-          console.error("Error parsing sessionStorage data:", e);
+        } catch (parseError) {
+          console.error("💥 sessionStorage parse error:", parseError);
         }
       }
       
+      // Update debug info
       setDebugInfo({
         hasLocalStorage: !!localData,
         hasSessionStorage: !!sessionData,
         availableIds,
         searchedId: shareId,
         currentUrl: window.location.href,
-        extractedId: id || 'undefined'
+        extractedId: id || 'undefined',
+        storageContents
       });
       
       // Try to get the answer using the service
-      console.log("Calling getShareableAnswer with ID:", shareId);
+      console.log("🔄 Calling getShareableAnswer service...");
       const sharedAnswer = getShareableAnswer(shareId);
-      console.log("getShareableAnswer returned:", sharedAnswer);
+      console.log("📤 Service returned:", sharedAnswer);
       
       if (sharedAnswer) {
-        console.log("✅ Successfully loaded shared answer:", sharedAnswer.id);
+        console.log("✅ Successfully loaded shared answer");
         setAnswer(sharedAnswer);
         setError(null);
       } else {
-        console.log("❌ No answer found for ID:", shareId);
-        console.log("Available IDs were:", availableIds);
+        console.log("❌ Service returned null");
         
-        // Try direct access to see if data exists
-        if (localData) {
-          try {
-            const directAccess = JSON.parse(localData)[shareId];
-            if (directAccess) {
-              console.log("🔍 Found data via direct access:", directAccess);
-              setAnswer(directAccess);
-              setError(null);
-              return;
-            }
-          } catch (e) {
-            console.error("Direct access failed:", e);
-          }
+        // Try direct access as last resort
+        if (storageContents && storageContents[shareId]) {
+          console.log("🔧 Found via direct access, using that");
+          setAnswer(storageContents[shareId]);
+          setError(null);
+        } else {
+          const errorMsg = availableIds.length > 0 
+            ? `Share ID "${shareId}" not found. Available: ${availableIds.join(', ')}`
+            : `Share ID "${shareId}" not found. No shared answers in storage.`;
+          console.log("❌ Setting error:", errorMsg);
+          setError(errorMsg);
         }
-        
-        setError(`The shared answer with ID "${shareId}" could not be found. Available IDs: ${availableIds.join(', ')}`);
       }
-      console.log("=== SHARE PAGE DEBUG END ===");
+      
+      console.log("🔍 === SHARE PAGE LOAD END ===");
     } catch (err) {
-      console.error("Error loading shared answer:", err);
+      console.error("💥 Error in loadAnswer:", err);
       setError("Failed to load the shared answer");
     } finally {
       setLoading(false);
@@ -165,14 +174,14 @@ export default function SharePage() {
   };
 
   useEffect(() => {
-    console.log("SharePage useEffect triggered");
-    console.log("ID from params:", id);
-    console.log("Current location:", window.location.pathname);
+    console.log("📍 SharePage useEffect triggered");
+    console.log("🆔 ID from params:", id);
+    console.log("📍 Current pathname:", window.location.pathname);
     
     if (id) {
       loadAnswer(id);
     } else {
-      console.error("No ID found in URL params");
+      console.error("❌ No ID found in URL params");
       setError("No share ID provided in URL");
       setLoading(false);
     }
@@ -238,7 +247,7 @@ export default function SharePage() {
         </div>
 
         <main className="flex-1 container py-8">
-          <Card className="max-w-3xl mx-auto">
+          <Card className="max-w-4xl mx-auto">
             <CardHeader>
               <CardTitle>Answer Not Found</CardTitle>
               <CardDescription>
@@ -264,18 +273,32 @@ export default function SharePage() {
               {/* Enhanced debug information */}
               <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
                 <p className="text-sm text-gray-700 font-medium mb-2">Detailed Debug Information:</p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li><strong>Current URL:</strong> {debugInfo.currentUrl}</li>
-                  <li><strong>Extracted ID from params:</strong> {debugInfo.extractedId}</li>
-                  <li><strong>Searched ID:</strong> {debugInfo.searchedId || "Not provided"}</li>
-                  <li><strong>localStorage available:</strong> {debugInfo.hasLocalStorage ? "Yes" : "No"}</li>
-                  <li><strong>sessionStorage available:</strong> {debugInfo.hasSessionStorage ? "Yes" : "No"}</li>
-                  <li><strong>Available IDs ({debugInfo.availableIds.length}):</strong> {
-                    debugInfo.availableIds.length > 0 
-                      ? debugInfo.availableIds.join(', ')
-                      : "None found"
-                  }</li>
-                </ul>
+                <div className="text-xs text-gray-600 space-y-1">
+                  <div><strong>Current URL:</strong> {debugInfo.currentUrl}</div>
+                  <div><strong>Extracted ID from params:</strong> {debugInfo.extractedId}</div>
+                  <div><strong>Searched ID:</strong> {debugInfo.searchedId || "Not provided"}</div>
+                  <div><strong>localStorage available:</strong> {debugInfo.hasLocalStorage ? "Yes" : "No"}</div>
+                  <div><strong>sessionStorage available:</strong> {debugInfo.hasSessionStorage ? "Yes" : "No"}</div>
+                  <div><strong>Available IDs ({debugInfo.availableIds.length}):</strong></div>
+                  {debugInfo.availableIds.length > 0 ? (
+                    <ul className="ml-4 list-disc">
+                      {debugInfo.availableIds.map(availableId => (
+                        <li key={availableId}>{availableId}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="ml-4 text-red-600">No shared answers found in storage</div>
+                  )}
+                  
+                  {debugInfo.storageContents && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer font-medium">Full Storage Contents</summary>
+                      <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                        {JSON.stringify(debugInfo.storageContents, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+                </div>
               </div>
             </CardContent>
             <CardFooter className="flex gap-2">
