@@ -1,4 +1,3 @@
-
 import { getCurrentRepository, getRepositoryContents } from '../githubConnector';
 import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { extractKeywords } from './keywordUtils';
@@ -27,13 +26,13 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
     // Handle file content
     if (contents && typeof contents === 'object' && 'content' in contents) {
       // Decode base64 content
-      const content = atob(contents.content);
+      const content = atob(contents.content as string);
       
       // Extract knowledge using enhanced parser
       const knowledge = extractKnowledge(content, filePath);
       
-      // Create enhanced knowledge entries
-      await createEnhancedKnowledgeEntries(knowledge, knowledgeBase);
+      // Create knowledge entries
+      await createKnowledgeEntries(knowledge, knowledgeBase);
       
       processedFilesCache.add(filePath);
       return true;
@@ -47,167 +46,86 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
 }
 
 /**
- * Enhanced knowledge entry creation with better job extraction
+ * Create knowledge entries from extracted content
  */
-async function createEnhancedKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBase: KnowledgeEntry[]): Promise<void> {
+async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBase: KnowledgeEntry[]): Promise<void> {
   const { filePath } = knowledge;
   
-  // Process job listings with high priority
-  if (knowledge.jobListings && knowledge.jobListings.length > 0) {
-    console.log(`Found ${knowledge.jobListings.length} job listings in ${filePath}`);
+  // Process JSX/HTML text content
+  if (knowledge.jsxTextContent && knowledge.jsxTextContent.length > 0) {
+    console.log(`Found ${knowledge.jsxTextContent.length} text content items in ${filePath}`);
     
-    knowledge.jobListings.forEach(job => {
-      const jobContent = `Job Title: ${job.title}\nDescription: ${job.description}${job.location ? `\nLocation: ${job.location}` : ''}${job.type ? `\nType: ${job.type}` : ''}`;
-      
+    knowledge.jsxTextContent.forEach((text, index) => {
       knowledgeBase.push({
-        id: `${filePath}-job-${job.title.replace(/\s+/g, '-').toLowerCase()}`,
-        content: jobContent,
-        type: 'job-listing',
+        id: `${filePath}-text-${index}`,
+        content: text,
+        type: 'text-content',
         filePath,
-        keywords: extractKeywords(jobContent),
+        keywords: extractKeywords(text),
         lastUpdated: new Date().toISOString(),
         metadata: {
-          name: job.title,
-          category: 'jobs',
-          type: job.type || 'unknown',
-          location: job.location
+          name: `Text content from ${filePath}`,
+          contentType: 'text'
         }
       });
     });
   }
   
-  // Process JSX text content for job-related information
-  if (knowledge.jsxTextContent && knowledge.jsxTextContent.length > 0) {
-    const jobRelatedTexts = knowledge.jsxTextContent.filter(text => 
-      text.toLowerCase().includes('job') ||
-      text.toLowerCase().includes('position') ||
-      text.toLowerCase().includes('role') ||
-      text.toLowerCase().includes('engineer') ||
-      text.toLowerCase().includes('developer') ||
-      text.toLowerCase().includes('designer') ||
-      text.toLowerCase().includes('manager') ||
-      text.toLowerCase().includes('hiring') ||
-      text.toLowerCase().includes('career')
-    );
-    
-    if (jobRelatedTexts.length > 0) {
-      console.log(`Found ${jobRelatedTexts.length} job-related text content in ${filePath}`);
-      
-      jobRelatedTexts.forEach((text, index) => {
-        knowledgeBase.push({
-          id: `${filePath}-job-text-${index}`,
-          content: text,
-          type: 'job-content',
-          filePath,
-          keywords: extractKeywords(text),
-          lastUpdated: new Date().toISOString(),
-          metadata: {
-            name: `Job content from ${filePath}`,
-            category: 'jobs',
-            contentType: 'text'
-          }
-        });
-      });
-    }
-  }
-  
-  // Process structured data for job information
+  // Process structured data
   if (knowledge.structuredData) {
     Object.entries(knowledge.structuredData).forEach(([key, value]) => {
-      if (key.toLowerCase().includes('job') || 
-          key.toLowerCase().includes('role') || 
-          key.toLowerCase().includes('position') ||
-          key.toLowerCase().includes('career')) {
-        
-        knowledgeBase.push({
-          id: `${filePath}-data-${key}`,
-          content: `Data structure: ${key}\nContent: ${value}`,
-          type: 'job-data',
-          filePath,
-          keywords: extractKeywords(`${key} ${value}`),
-          lastUpdated: new Date().toISOString(),
-          metadata: {
-            name: key,
-            category: 'jobs',
-            dataType: 'structured'
-          }
-        });
-      }
+      knowledgeBase.push({
+        id: `${filePath}-data-${key}`,
+        content: `Data structure: ${key}\nContent: ${value}`,
+        type: 'structured-data',
+        filePath,
+        keywords: extractKeywords(`${key} ${value}`),
+        lastUpdated: new Date().toISOString(),
+        metadata: {
+          name: key,
+          dataType: 'structured'
+        }
+      });
     });
   }
   
-  // Process comments for job-related information
-  const allComments = [...knowledge.jsDocComments, ...knowledge.inlineComments];
-  allComments.forEach((comment, index) => {
-    if (comment.toLowerCase().includes('job') ||
-        comment.toLowerCase().includes('position') ||
-        comment.toLowerCase().includes('role') ||
-        comment.toLowerCase().includes('hiring')) {
-      
-      knowledgeBase.push({
-        id: `${filePath}-job-comment-${index}`,
-        content: comment,
-        type: 'job-comment',
-        filePath,
-        keywords: extractKeywords(comment),
-        lastUpdated: new Date().toISOString(),
-        metadata: {
-          name: `Job comment from ${filePath}`,
-          category: 'jobs'
-        }
-      });
-    }
-  });
-  
-  // Regular comment processing
+  // Process comments
   knowledge.jsDocComments.forEach((comment, index) => {
-    if (!comment.toLowerCase().includes('job')) { // Skip job comments already processed
-      knowledgeBase.push({
-        id: `${filePath}-comment-${index}`,
-        content: comment,
-        type: 'comment',
-        filePath,
-        keywords: extractKeywords(comment),
-        lastUpdated: new Date().toISOString()
-      });
-    }
+    knowledgeBase.push({
+      id: `${filePath}-comment-${index}`,
+      content: comment,
+      type: 'comment',
+      filePath,
+      keywords: extractKeywords(comment),
+      lastUpdated: new Date().toISOString()
+    });
   });
 
   knowledge.inlineComments.forEach((comment, index) => {
-    if (!comment.toLowerCase().includes('job')) { // Skip job comments already processed
-      knowledgeBase.push({
-        id: `${filePath}-inline-${index}`,
-        content: comment,
-        type: 'comment',
-        filePath,
-        keywords: extractKeywords(comment),
-        lastUpdated: new Date().toISOString()
-      });
-    }
+    knowledgeBase.push({
+      id: `${filePath}-inline-${index}`,
+      content: comment,
+      type: 'comment',
+      filePath,
+      keywords: extractKeywords(comment),
+      lastUpdated: new Date().toISOString()
+    });
   });
 
-  // Function processing with job detection
+  // Function processing
   knowledge.functions.forEach((func, index) => {
     const funcContent = `Function: ${func.name}\nParameters: ${func.params}\nBody: ${func.body.substring(0, 500)}...`;
-    
-    const isJobRelated = func.name.toLowerCase().includes('job') ||
-                        func.name.toLowerCase().includes('position') ||
-                        func.name.toLowerCase().includes('role') ||
-                        func.body.toLowerCase().includes('job') ||
-                        func.body.toLowerCase().includes('position') ||
-                        func.body.toLowerCase().includes('role');
     
     knowledgeBase.push({
       id: `${filePath}-function-${index}`,
       content: funcContent,
-      type: isJobRelated ? 'job-function' : 'function',
+      type: 'function',
       filePath,
       keywords: extractKeywords(funcContent),
       lastUpdated: new Date().toISOString(),
       metadata: {
         name: func.name,
-        params: func.params,
-        category: isJobRelated ? 'jobs' : 'general'
+        params: func.params
       }
     });
   });

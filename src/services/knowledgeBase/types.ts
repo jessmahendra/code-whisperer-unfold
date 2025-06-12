@@ -2,7 +2,7 @@
 export interface KnowledgeEntry {
   id: string;
   content: string;
-  type: 'comment' | 'function' | 'export' | 'class' | 'api-route' | 'job-listing' | 'job-content' | 'job-data' | 'job-comment' | 'job-function';
+  type: 'comment' | 'function' | 'export' | 'class' | 'api-route' | 'text-content' | 'structured-data';
   filePath: string;
   keywords: string[];
   lastUpdated: string;

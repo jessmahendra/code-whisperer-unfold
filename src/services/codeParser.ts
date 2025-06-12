@@ -1,4 +1,3 @@
-
 /**
  * Extracts JSDoc comments from code
  * @param {string} code - Source code to parse
@@ -33,71 +32,6 @@ export function extractInlineComments(code: string): string[] {
 }
 
 /**
- * Extracts job listings and structured data from code
- * @param {string} code - Source code to parse
- * @returns {object[]} Array of job information
- */
-export function extractJobListings(code: string): { title: string, description: string, location?: string, type?: string }[] {
-  const jobs = [];
-  
-  // Look for job data arrays or objects
-  const jobArrayRegex = /(?:jobs|positions|roles|openings)\s*[=:]\s*\[([^\]]*)\]/gi;
-  const jobObjectRegex = /{\s*(?:title|role|position)\s*:\s*["']([^"']+)["'][^}]*}/gi;
-  
-  // Extract job arrays
-  let match;
-  while ((match = jobArrayRegex.exec(code)) !== null) {
-    const arrayContent = match[1];
-    
-    // Extract individual job objects from the array
-    const jobObjRegex = /{\s*[^}]*title\s*:\s*["']([^"']+)["'][^}]*}/gi;
-    let jobMatch;
-    while ((jobMatch = jobObjRegex.exec(arrayContent)) !== null) {
-      jobs.push({
-        title: jobMatch[1],
-        description: extractJobDescription(arrayContent, jobMatch[1])
-      });
-    }
-  }
-  
-  // Extract individual job objects
-  while ((match = jobObjectRegex.exec(code)) !== null) {
-    jobs.push({
-      title: match[1],
-      description: extractJobDescription(code, match[1])
-    });
-  }
-  
-  // Look for job titles in string literals or constants
-  const jobTitleRegex = /(?:engineer|developer|designer|manager|analyst|lead|senior|junior|intern)\s+[a-zA-Z\s]+/gi;
-  const titleMatches = code.match(jobTitleRegex) || [];
-  
-  titleMatches.forEach(title => {
-    if (title.length > 5 && title.length < 50 && !jobs.some(j => j.title.toLowerCase().includes(title.toLowerCase()))) {
-      jobs.push({
-        title: title.trim(),
-        description: `Role: ${title.trim()}`
-      });
-    }
-  });
-  
-  return jobs;
-}
-
-/**
- * Extract job description context around a job title
- */
-function extractJobDescription(code: string, title: string): string {
-  const titleIndex = code.toLowerCase().indexOf(title.toLowerCase());
-  if (titleIndex === -1) return '';
-  
-  // Extract surrounding context (200 chars before and after)
-  const start = Math.max(0, titleIndex - 200);
-  const end = Math.min(code.length, titleIndex + title.length + 200);
-  return code.substring(start, end).trim();
-}
-
-/**
  * Extracts structured data like arrays and objects
  * @param {string} code - Source code to parse
  * @returns {object} Extracted structured data
@@ -111,27 +45,15 @@ export function extractStructuredData(code: string): Record<string, any> {
   while ((match = arrayRegex.exec(code)) !== null) {
     const varName = match[1];
     const arrayContent = match[2];
-    
-    if (varName.toLowerCase().includes('job') || 
-        varName.toLowerCase().includes('role') || 
-        varName.toLowerCase().includes('position') ||
-        varName.toLowerCase().includes('opening') ||
-        varName.toLowerCase().includes('career')) {
-      data[varName] = arrayContent;
-    }
+    data[varName] = arrayContent;
   }
   
-  // Extract object literals with job-related keys
+  // Extract object literals
   const objectRegex = /(?:const|let|var)\s+(\w+)\s*=\s*{([^}]*)}/g;
   while ((match = objectRegex.exec(code)) !== null) {
     const varName = match[1];
     const objectContent = match[2];
-    
-    if (objectContent.toLowerCase().includes('title') || 
-        objectContent.toLowerCase().includes('role') ||
-        objectContent.toLowerCase().includes('position')) {
-      data[varName] = objectContent;
-    }
+    data[varName] = objectContent;
   }
   
   return data;
@@ -155,13 +77,11 @@ export function extractJSXTextContent(code: string): string[] {
     }
   }
   
-  // Extract string literals that might contain job titles or descriptions
+  // Extract string literals that might contain important content
   const stringLiteralRegex = /["'`]([^"'`]{10,}?)["'`]/g;
   while ((match = stringLiteralRegex.exec(code)) !== null) {
     const text = match[1].trim();
-    if (text.includes('engineer') || text.includes('developer') || 
-        text.includes('designer') || text.includes('manager') ||
-        text.includes('position') || text.includes('role')) {
+    if (text.length > 10) {
       textContent.push(text);
     }
   }
@@ -431,7 +351,6 @@ export interface ExtractedKnowledge {
   apiRoutes?: { method: string, path: string, handler: string }[];
   databaseSchemas?: Record<string, { fields: string[], relationships: string[] }>;
   classes?: { name: string, methods: string[], extends: string | null }[];
-  jobListings?: { title: string, description: string, location?: string, type?: string }[];
   structuredData?: Record<string, any>;
   jsxTextContent?: string[];
 }
@@ -481,18 +400,8 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
     // Extract class definitions for all JS/TS files
     knowledge['classes'] = extractClassDefs(code);
     
-    // Enhanced job extraction for job-related files
-    if (
-      filePath.toLowerCase().includes('job') || 
-      filePath.toLowerCase().includes('career') || 
-      filePath.toLowerCase().includes('hiring') ||
-      code.toLowerCase().includes('job') ||
-      code.toLowerCase().includes('position') ||
-      code.toLowerCase().includes('role')
-    ) {
-      knowledge['jobListings'] = extractJobListings(code);
-      knowledge['structuredData'] = extractStructuredData(code);
-    }
+    // Extract structured data for all files
+    knowledge['structuredData'] = extractStructuredData(code);
     
     // Extract JSX text content for React components
     if (fileType === 'jsx' || fileType === 'tsx') {
