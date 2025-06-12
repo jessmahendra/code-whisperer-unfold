@@ -1,32 +1,20 @@
 
+// Interface for knowledge entries
 export interface KnowledgeEntry {
-  id: string;
+  type: 'comment' | 'function' | 'export';
   content: string;
-  type: 'comment' | 'function' | 'export' | 'class' | 'api-route' | 'text-content' | 'structured-data' | 'documentation';
   filePath: string;
+  metadata?: Record<string, any>;
   keywords: string[];
-  lastUpdated: string;
-  metadata?: {
-    name?: string;
-    params?: string;
-    value?: string;
-    extends?: string | null;
-    methods?: string[];
-    method?: string;
-    path?: string;
-    handler?: string;
-    category?: string;
-    type?: string;
-    location?: string;
-    contentType?: string;
-    dataType?: string;
-    commentType?: string;
-    originalLength?: number;
-  };
 }
 
+// Knowledge base statistics interface
 export interface KnowledgeBaseStats {
   totalEntries: number;
-  byType: Record<string, number>;
+  byType: {
+    comment: number;
+    function: number;
+    export: number;
+  };
   processedFiles: number;
 }
