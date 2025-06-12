@@ -1,10 +1,11 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { KeyRound, ArrowRight, X, Check } from "lucide-react";
+import { KeyRound, ArrowRight, X, Check, ExternalLink, Info } from "lucide-react";
 import { initGithubClient, validateGithubToken } from "@/services/githubClient";
 import { saveRepositoryConfig } from "@/services/repositoryConfig";
 import { setOpenAIApiKey, hasAICapabilities } from "@/services/aiAnalysis";
@@ -80,7 +81,6 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
     }
   };
 
-  // Handle API key setup
   const handleSaveApiKey = () => {
     if (!apiKey.trim()) {
       toast.error("Please enter your OpenAI API key");
@@ -189,13 +189,47 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
             <Input
               id="token"
               type="password"
-              placeholder="ghp_... or github_pat_..."
+              placeholder="github_pat_..."
               value={token}
               onChange={(e) => setToken(e.target.value)}
             />
-            <div className="text-xs text-muted-foreground mt-1 space-y-1">
-              <p><strong>Fine-grained tokens (recommended):</strong> Contents + Metadata permissions</p>
-              <p><strong>Classic tokens:</strong> 'repo' scope permissions</p>
+            
+            <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-900 mb-2">Recommended: Use Fine-Grained Personal Access Tokens</p>
+                  <div className="space-y-2 text-blue-800">
+                    <p>1. Go to GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens</p>
+                    <p>2. Create a new token with <strong>read-only access</strong> to your repository</p>
+                    <p>3. Grant these permissions: <strong>Contents (Read)</strong> and <strong>Metadata (Read)</strong></p>
+                  </div>
+                  <Button
+                    variant="link" 
+                    className="h-auto p-0 text-blue-600 text-sm mt-2"
+                    onClick={() => window.open("https://github.com/settings/personal-access-tokens/new", "_blank")}
+                  >
+                    Create fine-grained token <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-medium mb-1">For best results, ensure your repository contains:</p>
+                  <ul className="list-disc pl-4 space-y-1">
+                    <li>Source code files (.js, .ts, .jsx, .tsx, .py, etc.)</li>
+                    <li>Documentation files (README.md, docs/, etc.)</li>
+                    <li>Configuration files (package.json, requirements.txt, etc.)</li>
+                    <li>API definitions or route files</li>
+                    <li>Component and service files</li>
+                  </ul>
+                  <p className="mt-2 text-xs">The more comprehensive your codebase, the better our AI can understand and answer questions about it.</p>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -238,8 +272,28 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Your API key stays in browser memory and is never stored permanently
+            
+            <div className="mt-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-green-900 mb-2">Get your OpenAI API Key</p>
+                  <p className="text-green-800 mb-2">1. Sign in to your OpenAI account</p>
+                  <p className="text-green-800 mb-2">2. Navigate to API keys section</p>
+                  <p className="text-green-800 mb-2">3. Create a new API key with appropriate usage limits</p>
+                  <Button
+                    variant="link" 
+                    className="h-auto p-0 text-green-600 text-sm"
+                    onClick={() => window.open("https://platform.openai.com/settings/organization/api-keys", "_blank")}
+                  >
+                    Get your API key <ExternalLink className="h-3 w-3 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-2">
+              Your API key stays in browser memory and is never stored permanently on our servers
             </p>
           </div>
           
