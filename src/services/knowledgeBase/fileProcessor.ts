@@ -1,5 +1,4 @@
 
-
 import { getFileContent, getRepositoryContents } from '../githubConnector';
 import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { KnowledgeEntry } from './types';
@@ -104,6 +103,65 @@ export async function processFile(
       }
     }
     
+    // Add markdown content if available
+    if (knowledge.markdownMetadata) {
+      const metadata = knowledge.markdownMetadata;
+      const contentType = filePath.includes('/posts/') || filePath.includes('/blog/') ? 'blog post' : 'page';
+      
+      knowledgeBase.push({
+        type: 'export',
+        content: `${contentType}: ${metadata.title || 'Untitled'} ${metadata.description ? '- ' + metadata.description : ''}`,
+        filePath,
+        metadata: { ...metadata, contentType },
+        keywords: extractKeywords(`${contentType} ${metadata.title || ''} ${metadata.description || ''} ${metadata.tags?.join(' ') || ''}`),
+      });
+    }
+    
+    // Add page routing information if available
+    if (knowledge.pageRouting) {
+      const routing = knowledge.pageRouting;
+      knowledgeBase.push({
+        type: 'export',
+        content: `${routing.type || 'file'}: ${routing.route || filePath} ${routing.dynamic ? '(dynamic)' : ''}`,
+        filePath,
+        metadata: routing,
+        keywords: extractKeywords(`page route ${routing.type || ''} ${routing.route || ''} ${routing.dynamic ? 'dynamic' : ''}`),
+      });
+    }
+    
+    // Add CMS configuration if available
+    if (knowledge.cmsConfig) {
+      const config = knowledge.cmsConfig;
+      knowledgeBase.push({
+        type: 'export',
+        content: `CMS: ${config.platform || 'Unknown'} with content types: ${config.contentTypes?.join(', ') || 'none'} ${config.collections ? 'collections: ' + config.collections.join(', ') : ''}`,
+        filePath,
+        metadata: config,
+        keywords: extractKeywords(`cms ${config.platform || ''} ${config.contentTypes?.join(' ') || ''} ${config.collections?.join(' ') || ''}`),
+      });
+    }
+    
+    // Add content counts if available
+    if (knowledge.contentCounts) {
+      const counts = knowledge.contentCounts;
+      const countContent = [];
+      
+      if (counts.posts) countContent.push(`${counts.posts} posts`);
+      if (counts.pages) countContent.push(`${counts.pages} pages`);
+      if (counts.files) countContent.push(`${counts.files} files`);
+      if (counts.directories) countContent.push(`${counts.directories} directories`);
+      
+      if (countContent.length > 0) {
+        knowledgeBase.push({
+          type: 'comment',
+          content: `Content count: ${countContent.join(', ')}`,
+          filePath,
+          metadata: counts,
+          keywords: extractKeywords(`content count ${countContent.join(' ')} posts pages files`),
+        });
+      }
+    }
+    
     // Log successful file processing
     console.log(`Successfully processed file: ${filePath}`);
   } catch (error) {
@@ -128,8 +186,11 @@ export async function processModule(
     // Process each item (file or directory)
     for (const item of contents) {
       if (item.type === 'file') {
-        // Process JavaScript/TypeScript files
-        if (item.name.endsWith('.js') || item.name.endsWith('.ts')) {
+        // Process a wider range of files including markdown and config files
+        const supportedExtensions = ['.js', '.ts', '.tsx', '.jsx', '.md', '.mdx', '.json', '.yml', '.yaml'];
+        const hasValidExtension = supportedExtensions.some(ext => item.name.endsWith(ext));
+        
+        if (hasValidExtension) {
           await processFile(item.path, knowledgeBase);
         }
       } else if (item.type === 'dir') {

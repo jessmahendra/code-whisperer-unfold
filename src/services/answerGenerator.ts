@@ -29,15 +29,16 @@ interface Answer {
  * Enhanced query analysis for better answer targeting
  */
 function analyzeQuery(query: string): {
-  type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'general';
+  type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'content-count' | 'general';
   keywords: string[];
   needsScreenshots: boolean;
   needsCode: boolean;
+  isContentQuery: boolean;
 } {
   const lowerQuery = query.toLowerCase();
   
   // Determine query type
-  let type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'general' = 'general';
+  let type: 'how-to' | 'what-is' | 'where-is' | 'code-search' | 'content-count' | 'general' = 'general';
   
   if (lowerQuery.includes('how to') || lowerQuery.startsWith('how do') || lowerQuery.startsWith('how can')) {
     type = 'how-to';
@@ -47,6 +48,9 @@ function analyzeQuery(query: string): {
     type = 'where-is';
   } else if (lowerQuery.includes('function') || lowerQuery.includes('component') || lowerQuery.includes('class')) {
     type = 'code-search';
+  } else if (lowerQuery.includes('how many') || lowerQuery.includes('count') || 
+             lowerQuery.includes('number of') || lowerQuery.includes('total')) {
+    type = 'content-count';
   }
   
   // Extract keywords
@@ -54,7 +58,14 @@ function analyzeQuery(query: string): {
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 2)
-    .filter(word => !['how', 'what', 'where', 'the', 'and', 'for', 'with'].includes(word));
+    .filter(word => !['how', 'what', 'where', 'the', 'and', 'for', 'with', 'many', 'are', 'there'].includes(word));
+  
+  // Determine if it's a content-related query
+  const contentKeywords = [
+    'post', 'posts', 'blog', 'page', 'pages', 'article', 'articles', 
+    'content', 'site', 'website', 'count', 'number', 'total'
+  ];
+  const isContentQuery = contentKeywords.some(keyword => lowerQuery.includes(keyword));
   
   // Determine if screenshots needed
   const screenshotKeywords = [
@@ -67,7 +78,68 @@ function analyzeQuery(query: string): {
   const needsCode = lowerQuery.includes('code') || lowerQuery.includes('implement') || 
                    lowerQuery.includes('function') || lowerQuery.includes('component');
   
-  return { type, keywords, needsScreenshots, needsCode };
+  return { type, keywords, needsScreenshots, needsCode, isContentQuery };
+}
+
+/**
+ * Extracts content counts from knowledge base entries
+ */
+function extractContentCounts(results: any[]): {
+  posts: number;
+  pages: number;
+  files: number;
+  totalContent: number;
+} {
+  let posts = 0;
+  let pages = 0;
+  let files = 0;
+  
+  results.forEach(result => {
+    // Check metadata for content counts
+    if (result.metadata) {
+      if (result.metadata.posts) posts += result.metadata.posts;
+      if (result.metadata.pages) pages += result.metadata.pages;
+      if (result.metadata.files) files += result.metadata.files;
+      
+      // Check content type
+      if (result.metadata.contentType === 'blog post') posts++;
+      if (result.metadata.contentType === 'page') pages++;
+    }
+    
+    // Check content for count patterns
+    const countMatches = result.content.match(/(\d+)\s+(posts?|pages?|articles?|files?)/gi);
+    if (countMatches) {
+      countMatches.forEach(match => {
+        const number = parseInt(match.match(/\d+/)[0]);
+        if (match.toLowerCase().includes('post')) posts += number;
+        if (match.toLowerCase().includes('page')) pages += number;
+        if (match.toLowerCase().includes('file')) files += number;
+      });
+    }
+    
+    // Count markdown files by file path
+    if (result.filePath.endsWith('.md') || result.filePath.endsWith('.mdx')) {
+      if (result.filePath.includes('/posts/') || result.filePath.includes('/blog/')) {
+        posts++;
+      } else if (result.filePath.includes('/pages/')) {
+        pages++;
+      } else {
+        files++;
+      }
+    }
+    
+    // Count page routes
+    if (result.metadata?.type === 'page' && result.metadata?.route) {
+      pages++;
+    }
+  });
+  
+  return {
+    posts,
+    pages,
+    files,
+    totalContent: posts + pages + files
+  };
 }
 
 /**
@@ -200,8 +272,15 @@ export async function generateAnswer(query: string, options?: {
       scannedFiles: diagnostics.lastScanDiagnostics.scannedFiles.length
     });
     
-    // Search with enhanced keywords
-    const searchQuery = [query, ...queryAnalysis.keywords].join(' ');
+    // Enhanced search for content queries
+    let searchQuery = query;
+    if (queryAnalysis.isContentQuery) {
+      // Add content-specific keywords to improve search
+      searchQuery = [query, ...queryAnalysis.keywords, 'content', 'page', 'post', 'count'].join(' ');
+    } else {
+      searchQuery = [query, ...queryAnalysis.keywords].join(' ');
+    }
+    
     const results = await searchKnowledgeWithHistory(searchQuery);
     
     console.log(`Enhanced search results: ${results.length} entries found for "${query}"`);
@@ -352,7 +431,9 @@ function generateEnhancedRepositoryAnswer(
   let answerText = '';
   
   // Enhanced answer generation based on query type and content
-  if (queryAnalysis.type === 'how-to') {
+  if (queryAnalysis.type === 'content-count') {
+    answerText = generateContentCountAnswer(query, results);
+  } else if (queryAnalysis.type === 'how-to') {
     answerText = generateHowToAnswer(query, results, { functionNames, componentNames, apiRoutes });
   } else if (queryAnalysis.type === 'what-is') {
     answerText = generateWhatIsAnswer(query, results, { functionNames, exports, componentNames });
@@ -366,6 +447,70 @@ function generateEnhancedRepositoryAnswer(
   }
   
   return answerText;
+}
+
+/**
+ * Generate content count specific answers
+ */
+function generateContentCountAnswer(query: string, results: any[]): string {
+  let answer = `## Content Analysis\n\n`;
+  
+  const contentCounts = extractContentCounts(results);
+  const lowerQuery = query.toLowerCase();
+  
+  if (contentCounts.totalContent === 0) {
+    answer += `I couldn't find specific content count information in the scanned codebase.\n\n`;
+    answer += `This could mean:\n`;
+    answer += `- Content files might be in directories not yet scanned\n`;
+    answer += `- Content might be managed through a CMS or external service\n`;
+    answer += `- The repository might not contain content files directly\n\n`;
+    
+    if (results.length > 0) {
+      answer += `However, I found ${results.length} related entries in the codebase that might contain relevant information.\n`;
+    }
+    
+    return answer;
+  }
+  
+  if (lowerQuery.includes('blog') || lowerQuery.includes('post')) {
+    answer += `**Blog Posts:** ${contentCounts.posts}\n\n`;
+  }
+  
+  if (lowerQuery.includes('page')) {
+    answer += `**Pages:** ${contentCounts.pages}\n\n`;
+  }
+  
+  if (lowerQuery.includes('file')) {
+    answer += `**Content Files:** ${contentCounts.files}\n\n`;
+  }
+  
+  if (lowerQuery.includes('total') || lowerQuery.includes('all') || 
+      (!lowerQuery.includes('blog') && !lowerQuery.includes('page') && !lowerQuery.includes('file'))) {
+    answer += `**Total Content Summary:**\n`;
+    answer += `- Blog Posts: ${contentCounts.posts}\n`;
+    answer += `- Pages: ${contentCounts.pages}\n`;
+    answer += `- Other Content Files: ${contentCounts.files}\n`;
+    answer += `- **Total:** ${contentCounts.totalContent}\n\n`;
+  }
+  
+  // Add source information
+  if (results.length > 0) {
+    answer += `**Sources analyzed:** ${results.length} entries from the codebase\n\n`;
+    
+    const relevantFiles = results.filter(r => 
+      r.filePath.includes('.md') || r.filePath.includes('content') || 
+      r.filePath.includes('post') || r.filePath.includes('page')
+    ).slice(0, 3);
+    
+    if (relevantFiles.length > 0) {
+      answer += `**Sample content files:**\n`;
+      relevantFiles.forEach(file => {
+        answer += `- \`${file.filePath}\`\n`;
+      });
+    }
+  }
+  
+  return answer;
 }
 
 /**

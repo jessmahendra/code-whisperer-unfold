@@ -32,6 +32,179 @@ export function extractInlineComments(code: string): string[] {
 }
 
 /**
+ * Extracts content metadata from markdown files
+ * @param {string} content - Markdown file content
+ * @returns {object} Metadata including title, date, tags, etc.
+ */
+export function extractMarkdownMetadata(content: string): {
+  title?: string;
+  date?: string;
+  tags?: string[];
+  description?: string;
+  frontmatter?: Record<string, any>;
+} {
+  const metadata: any = {};
+  
+  // Extract frontmatter (YAML between --- blocks)
+  const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+  if (frontmatterMatch) {
+    const frontmatter = frontmatterMatch[1];
+    const lines = frontmatter.split('\n');
+    
+    for (const line of lines) {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const key = line.substring(0, colonIndex).trim();
+        const value = line.substring(colonIndex + 1).trim().replace(/['"]/g, '');
+        
+        if (key === 'tags' && value.includes(',')) {
+          metadata[key] = value.split(',').map(tag => tag.trim());
+        } else {
+          metadata[key] = value;
+        }
+      }
+    }
+    metadata.frontmatter = metadata;
+  }
+  
+  // Extract title from first h1 if not in frontmatter
+  if (!metadata.title) {
+    const titleMatch = content.match(/^#\s+(.+)$/m);
+    if (titleMatch) {
+      metadata.title = titleMatch[1];
+    }
+  }
+  
+  return metadata;
+}
+
+/**
+ * Extracts page routing information from Next.js app directory
+ * @param {string} filePath - File path
+ * @returns {object} Page route information
+ */
+export function extractPageRouting(filePath: string): {
+  route?: string;
+  type?: 'page' | 'layout' | 'loading' | 'error' | 'api';
+  dynamic?: boolean;
+} {
+  const routeInfo: any = {};
+  
+  // Next.js App Router patterns
+  if (filePath.includes('/app/')) {
+    const pathParts = filePath.split('/app/')[1].split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    
+    // Determine file type
+    if (fileName === 'page.tsx' || fileName === 'page.js') {
+      routeInfo.type = 'page';
+    } else if (fileName === 'layout.tsx' || fileName === 'layout.js') {
+      routeInfo.type = 'layout';
+    } else if (fileName === 'loading.tsx' || fileName === 'loading.js') {
+      routeInfo.type = 'loading';
+    } else if (fileName === 'error.tsx' || fileName === 'error.js') {
+      routeInfo.type = 'error';
+    } else if (fileName === 'route.ts' || fileName === 'route.js') {
+      routeInfo.type = 'api';
+    }
+    
+    // Build route path
+    const routeParts = pathParts.slice(0, -1);
+    routeInfo.route = '/' + routeParts.join('/');
+    
+    // Check for dynamic routes
+    routeInfo.dynamic = routeParts.some(part => part.startsWith('[') && part.endsWith(']'));
+  }
+  
+  return routeInfo;
+}
+
+/**
+ * Extracts CMS configuration information
+ * @param {string} code - Configuration file content
+ * @param {string} filePath - File path
+ * @returns {object} CMS configuration data
+ */
+export function extractCMSConfig(code: string, filePath: string): {
+  platform?: string;
+  contentTypes?: string[];
+  collections?: string[];
+  pageCount?: number;
+} {
+  const config: any = {};
+  
+  // Ghost CMS detection
+  if (filePath.includes('ghost') || code.includes('ghost')) {
+    config.platform = 'Ghost';
+    
+    // Look for post/page configuration
+    const postMatches = code.match(/posts?['":\s]*(\d+)/gi);
+    const pageMatches = code.match(/pages?['":\s]*(\d+)/gi);
+    
+    if (postMatches || pageMatches) {
+      config.contentTypes = ['posts', 'pages'];
+    }
+  }
+  
+  // Strapi CMS detection
+  if (filePath.includes('strapi') || code.includes('strapi')) {
+    config.platform = 'Strapi';
+    
+    // Extract collection types
+    const collectionMatches = code.match(/collection-types\/(\w+)/g);
+    if (collectionMatches) {
+      config.collections = collectionMatches.map(match => 
+        match.replace('collection-types/', '')
+      );
+    }
+  }
+  
+  // WordPress detection
+  if (code.includes('wp-') || code.includes('wordpress')) {
+    config.platform = 'WordPress';
+    config.contentTypes = ['posts', 'pages'];
+  }
+  
+  return config;
+}
+
+/**
+ * Counts content files in directory structures
+ * @param {string} code - Directory listing or file content
+ * @param {string} filePath - File path
+ * @returns {object} Content counts
+ */
+export function extractContentCounts(code: string, filePath: string): {
+  posts?: number;
+  pages?: number;
+  files?: number;
+  directories?: number;
+} {
+  const counts: any = {};
+  
+  // Count markdown files that might be blog posts
+  const mdMatches = code.match(/\.md\b/g);
+  if (mdMatches) {
+    counts.files = mdMatches.length;
+    
+    // If in posts/blog directory, consider as posts
+    if (filePath.includes('/posts/') || filePath.includes('/blog/')) {
+      counts.posts = mdMatches.length;
+    } else if (filePath.includes('/pages/')) {
+      counts.pages = mdMatches.length;
+    }
+  }
+  
+  // Count directory entries
+  const dirMatches = code.match(/type:\s*['"]dir['"]/g);
+  if (dirMatches) {
+    counts.directories = dirMatches.length;
+  }
+  
+  return counts;
+}
+
+/**
  * Extracts function definitions from code
  * @param {string} code - Source code to parse
  * @returns {object[]} Array of function information
@@ -293,6 +466,30 @@ export interface ExtractedKnowledge {
   apiRoutes?: { method: string, path: string, handler: string }[];
   databaseSchemas?: Record<string, { fields: string[], relationships: string[] }>;
   classes?: { name: string, methods: string[], extends: string | null }[];
+  markdownMetadata?: {
+    title?: string;
+    date?: string;
+    tags?: string[];
+    description?: string;
+    frontmatter?: Record<string, any>;
+  };
+  pageRouting?: {
+    route?: string;
+    type?: 'page' | 'layout' | 'loading' | 'error' | 'api';
+    dynamic?: boolean;
+  };
+  cmsConfig?: {
+    platform?: string;
+    contentTypes?: string[];
+    collections?: string[];
+    pageCount?: number;
+  };
+  contentCounts?: {
+    posts?: number;
+    pages?: number;
+    files?: number;
+    directories?: number;
+  };
 }
 
 /**
@@ -317,7 +514,7 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
   };
   
   // Enhanced extraction based on file type or content patterns
-  if (fileType === 'js' || fileType === 'ts') {
+  if (fileType === 'js' || fileType === 'ts' || fileType === 'tsx' || fileType === 'jsx') {
     // Look for API routes in files that might define them
     if (
       filePath.includes('api') || 
@@ -339,6 +536,32 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
     
     // Extract class definitions for all JS/TS files
     knowledge['classes'] = extractClassDefs(code);
+    
+    // Extract Next.js page routing information
+    if (filePath.includes('/app/') || filePath.includes('/pages/')) {
+      knowledge['pageRouting'] = extractPageRouting(filePath);
+    }
+  }
+  
+  // Extract markdown metadata for .md files
+  if (fileType === 'md' || fileType === 'mdx') {
+    knowledge['markdownMetadata'] = extractMarkdownMetadata(code);
+    knowledge['contentCounts'] = extractContentCounts(code, filePath);
+  }
+  
+  // Extract CMS configuration
+  if (
+    filePath.includes('config') || 
+    filePath.includes('ghost') || 
+    filePath.includes('strapi') ||
+    filePath.includes('cms')
+  ) {
+    knowledge['cmsConfig'] = extractCMSConfig(code, filePath);
+  }
+  
+  // Extract content counts from directory listings or package.json
+  if (filePath.includes('package.json') || code.includes('"type":') || code.includes('"name":')) {
+    knowledge['contentCounts'] = extractContentCounts(code, filePath);
   }
   
   return knowledge;
