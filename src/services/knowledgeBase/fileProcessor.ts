@@ -1,3 +1,4 @@
+
 import { getCurrentRepository, getRepositoryContents } from '../githubConnector';
 import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { extractKeywords } from './keywordUtils';
@@ -28,14 +29,25 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
       // Decode base64 content
       const content = atob(contents.content as string);
       
+      // Skip very large files to prevent performance issues
+      if (content.length > 100000) {
+        console.log(`Skipping large file: ${filePath} (${content.length} chars)`);
+        processedFilesCache.add(filePath);
+        return true;
+      }
+      
       // Extract knowledge using enhanced parser
       const knowledge = extractKnowledge(content, filePath);
       
-      // Create knowledge entries
-      await createKnowledgeEntries(knowledge, knowledgeBase);
+      // Create knowledge entries with better validation
+      const entriesCreated = await createKnowledgeEntries(knowledge, knowledgeBase);
+      
+      if (entriesCreated > 0) {
+        console.log(`Created ${entriesCreated} knowledge entries from ${filePath}`);
+      }
       
       processedFilesCache.add(filePath);
-      return true;
+      return entriesCreated > 0;
     }
     
     return false;
@@ -46,145 +58,185 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
 }
 
 /**
- * Create knowledge entries from extracted content
+ * Create knowledge entries from extracted content with better validation
  */
-async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBase: KnowledgeEntry[]): Promise<void> {
+async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBase: KnowledgeEntry[]): Promise<number> {
   const { filePath } = knowledge;
+  let entriesCreated = 0;
   
   // Process JSX/HTML text content
   if (knowledge.jsxTextContent && knowledge.jsxTextContent.length > 0) {
     console.log(`Found ${knowledge.jsxTextContent.length} text content items in ${filePath}`);
     
     knowledge.jsxTextContent.forEach((text, index) => {
-      knowledgeBase.push({
-        id: `${filePath}-text-${index}`,
-        content: text,
-        type: 'text-content',
-        filePath,
-        keywords: extractKeywords(text),
-        lastUpdated: new Date().toISOString(),
-        metadata: {
-          name: `Text content from ${filePath}`,
-          contentType: 'text'
-        }
-      });
+      if (text.trim().length > 5) { // Only meaningful text
+        knowledgeBase.push({
+          id: `${filePath}-text-${index}`,
+          content: text,
+          type: 'text-content',
+          filePath,
+          keywords: extractKeywords(text),
+          lastUpdated: new Date().toISOString(),
+          metadata: {
+            name: `Text content from ${filePath}`,
+            contentType: 'text',
+            location: `text-${index}`
+          }
+        });
+        entriesCreated++;
+      }
     });
   }
   
-  // Process structured data
+  // Process structured data with better filtering
   if (knowledge.structuredData) {
     Object.entries(knowledge.structuredData).forEach(([key, value]) => {
+      const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+      if (valueStr.trim().length > 10) { // Only meaningful data
+        knowledgeBase.push({
+          id: `${filePath}-data-${key}`,
+          content: `Data structure: ${key}\nContent: ${valueStr}`,
+          type: 'structured-data',
+          filePath,
+          keywords: extractKeywords(`${key} ${valueStr}`),
+          lastUpdated: new Date().toISOString(),
+          metadata: {
+            name: key,
+            dataType: 'structured',
+            category: 'data'
+          }
+        });
+        entriesCreated++;
+      }
+    });
+  }
+  
+  // Process comments with better filtering
+  knowledge.jsDocComments.forEach((comment, index) => {
+    if (comment.trim().length > 10) {
       knowledgeBase.push({
-        id: `${filePath}-data-${key}`,
-        content: `Data structure: ${key}\nContent: ${value}`,
-        type: 'structured-data',
+        id: `${filePath}-comment-${index}`,
+        content: comment,
+        type: 'comment',
+        filePath,
+        keywords: extractKeywords(comment),
+        lastUpdated: new Date().toISOString(),
+        metadata: {
+          commentType: 'jsdoc'
+        }
+      });
+      entriesCreated++;
+    }
+  });
+
+  knowledge.inlineComments.forEach((comment, index) => {
+    if (comment.trim().length > 8) {
+      knowledgeBase.push({
+        id: `${filePath}-inline-${index}`,
+        content: comment,
+        type: 'comment',
+        filePath,
+        keywords: extractKeywords(comment),
+        lastUpdated: new Date().toISOString(),
+        metadata: {
+          commentType: 'inline'
+        }
+      });
+      entriesCreated++;
+    }
+  });
+
+  // Function processing with better content
+  knowledge.functions.forEach((func, index) => {
+    if (func.name && func.name.length > 1) {
+      const funcContent = `Function: ${func.name}${func.params ? `\nParameters: ${func.params}` : ''}${func.body ? `\nImplementation: ${func.body.substring(0, 300)}` : ''}`;
+      
+      knowledgeBase.push({
+        id: `${filePath}-function-${index}`,
+        content: funcContent,
+        type: 'function',
+        filePath,
+        keywords: extractKeywords(funcContent),
+        lastUpdated: new Date().toISOString(),
+        metadata: {
+          name: func.name,
+          params: func.params,
+          category: 'function'
+        }
+      });
+      entriesCreated++;
+    }
+  });
+
+  // Export processing
+  Object.entries(knowledge.exports).forEach(([key, value], index) => {
+    if (key && key.length > 1) {
+      knowledgeBase.push({
+        id: `${filePath}-export-${index}`,
+        content: `Export: ${key}${value !== key ? ` = ${value}` : ''}`,
+        type: 'export',
         filePath,
         keywords: extractKeywords(`${key} ${value}`),
         lastUpdated: new Date().toISOString(),
         metadata: {
           name: key,
-          dataType: 'structured'
+          value: value,
+          category: 'export'
         }
       });
-    });
-  }
-  
-  // Process comments
-  knowledge.jsDocComments.forEach((comment, index) => {
-    knowledgeBase.push({
-      id: `${filePath}-comment-${index}`,
-      content: comment,
-      type: 'comment',
-      filePath,
-      keywords: extractKeywords(comment),
-      lastUpdated: new Date().toISOString()
-    });
-  });
-
-  knowledge.inlineComments.forEach((comment, index) => {
-    knowledgeBase.push({
-      id: `${filePath}-inline-${index}`,
-      content: comment,
-      type: 'comment',
-      filePath,
-      keywords: extractKeywords(comment),
-      lastUpdated: new Date().toISOString()
-    });
-  });
-
-  // Function processing
-  knowledge.functions.forEach((func, index) => {
-    const funcContent = `Function: ${func.name}\nParameters: ${func.params}\nBody: ${func.body.substring(0, 500)}...`;
-    
-    knowledgeBase.push({
-      id: `${filePath}-function-${index}`,
-      content: funcContent,
-      type: 'function',
-      filePath,
-      keywords: extractKeywords(funcContent),
-      lastUpdated: new Date().toISOString(),
-      metadata: {
-        name: func.name,
-        params: func.params
-      }
-    });
-  });
-
-  // Export processing
-  Object.entries(knowledge.exports).forEach(([key, value], index) => {
-    knowledgeBase.push({
-      id: `${filePath}-export-${index}`,
-      content: `Export: ${key} = ${value}`,
-      type: 'export',
-      filePath,
-      keywords: extractKeywords(`${key} ${value}`),
-      lastUpdated: new Date().toISOString(),
-      metadata: {
-        name: key,
-        value: value
-      }
-    });
+      entriesCreated++;
+    }
   });
 
   // Class processing
   if (knowledge.classes) {
     knowledge.classes.forEach((cls, index) => {
-      const classContent = `Class: ${cls.name}${cls.extends ? ` extends ${cls.extends}` : ''}\nMethods: ${cls.methods.join(', ')}`;
-      
-      knowledgeBase.push({
-        id: `${filePath}-class-${index}`,
-        content: classContent,
-        type: 'class',
-        filePath,
-        keywords: extractKeywords(classContent),
-        lastUpdated: new Date().toISOString(),
-        metadata: {
-          name: cls.name,
-          extends: cls.extends,
-          methods: cls.methods
-        }
-      });
+      if (cls.name && cls.name.length > 1) {
+        const classContent = `Class: ${cls.name}${cls.extends ? ` extends ${cls.extends}` : ''}${cls.methods.length > 0 ? `\nMethods: ${cls.methods.join(', ')}` : ''}`;
+        
+        knowledgeBase.push({
+          id: `${filePath}-class-${index}`,
+          content: classContent,
+          type: 'class',
+          filePath,
+          keywords: extractKeywords(classContent),
+          lastUpdated: new Date().toISOString(),
+          metadata: {
+            name: cls.name,
+            extends: cls.extends,
+            methods: cls.methods,
+            category: 'class'
+          }
+        });
+        entriesCreated++;
+      }
     });
   }
 
   // API route processing
   if (knowledge.apiRoutes) {
     knowledge.apiRoutes.forEach((route, index) => {
-      knowledgeBase.push({
-        id: `${filePath}-route-${index}`,
-        content: `API Route: ${route.method} ${route.path} -> ${route.handler}`,
-        type: 'api-route',
-        filePath,
-        keywords: extractKeywords(`${route.method} ${route.path} ${route.handler}`),
-        lastUpdated: new Date().toISOString(),
-        metadata: {
-          method: route.method,
-          path: route.path,
-          handler: route.handler
-        }
-      });
+      if (route.method && route.path) {
+        knowledgeBase.push({
+          id: `${filePath}-route-${index}`,
+          content: `API Route: ${route.method} ${route.path}${route.handler ? ` -> ${route.handler}` : ''}`,
+          type: 'api-route',
+          filePath,
+          keywords: extractKeywords(`${route.method} ${route.path} ${route.handler || ''}`),
+          lastUpdated: new Date().toISOString(),
+          metadata: {
+            method: route.method,
+            path: route.path,
+            handler: route.handler,
+            category: 'api'
+          }
+        });
+        entriesCreated++;
+      }
     });
   }
+
+  return entriesCreated;
 }
 
 /**
@@ -200,14 +252,21 @@ export async function processModule(modulePath: string, knowledgeBase: Knowledge
     if (Array.isArray(contents)) {
       let processedAny = false;
       
-      for (const item of contents.slice(0, 10)) { // Limit to prevent too many requests
+      // Process more files but still limit to prevent too many requests
+      for (const item of contents.slice(0, 15)) {
         if (item && typeof item === 'object' && 'type' in item && 'path' in item) {
           const typedItem = item as { type: string; path: string; name?: string };
           
           if (typedItem.type === 'file' && typedItem.name) {
-            const success = await processFile(typedItem.path, knowledgeBase);
-            if (success) {
-              processedAny = true;
+            // Skip very large files and binary files
+            const skipExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot', '.map'];
+            const shouldSkip = skipExtensions.some(ext => typedItem.name!.toLowerCase().endsWith(ext));
+            
+            if (!shouldSkip) {
+              const success = await processFile(typedItem.path, knowledgeBase);
+              if (success) {
+                processedAny = true;
+              }
             }
           }
         }

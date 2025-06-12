@@ -32,7 +32,7 @@ export function extractInlineComments(code: string): string[] {
 }
 
 /**
- * Extracts structured data like arrays and objects
+ * Extracts structured data like arrays and objects with meaningful content
  * @param {string} code - Source code to parse
  * @returns {object} Extracted structured data
  */
@@ -45,44 +45,66 @@ export function extractStructuredData(code: string): Record<string, any> {
   while ((match = arrayRegex.exec(code)) !== null) {
     const varName = match[1];
     const arrayContent = match[2];
-    data[varName] = arrayContent;
+    if (arrayContent.trim().length > 0) {
+      data[varName] = arrayContent.trim();
+    }
   }
   
-  // Extract object literals
+  // Extract object literals with meaningful content
   const objectRegex = /(?:const|let|var)\s+(\w+)\s*=\s*{([^}]*)}/g;
   while ((match = objectRegex.exec(code)) !== null) {
     const varName = match[1];
     const objectContent = match[2];
-    data[varName] = objectContent;
+    if (objectContent.trim().length > 0) {
+      data[varName] = objectContent.trim();
+    }
+  }
+
+  // Extract multi-line template literals and strings that might contain content
+  const templateLiteralRegex = /`([^`]{20,}?)`/g;
+  while ((match = templateLiteralRegex.exec(code)) !== null) {
+    const content = match[1].trim();
+    if (content.length > 20) {
+      data[`template_${Object.keys(data).length}`] = content;
+    }
   }
   
   return data;
 }
 
 /**
- * Extracts text content from JSX/TSX elements
+ * Enhanced JSX text content extraction
  * @param {string} code - Source code to parse
  * @returns {string[]} Array of text content
  */
 export function extractJSXTextContent(code: string): string[] {
   const textContent = [];
   
-  // Extract text from JSX elements
-  const jsxTextRegex = />([^<>]+)</g;
+  // Extract text from JSX elements (more comprehensive)
+  const jsxTextRegex = />([^<>{}]+)</g;
   let match;
   while ((match = jsxTextRegex.exec(code)) !== null) {
     const text = match[1].trim();
-    if (text.length > 3 && !text.includes('{') && !text.includes('}')) {
+    if (text.length > 2 && !text.includes('{') && !text.includes('}') && !text.startsWith('//')) {
       textContent.push(text);
     }
   }
   
   // Extract string literals that might contain important content
-  const stringLiteralRegex = /["'`]([^"'`]{10,}?)["'`]/g;
+  const stringLiteralRegex = /["'`]([^"'`]{15,}?)["'`]/g;
   while ((match = stringLiteralRegex.exec(code)) !== null) {
     const text = match[1].trim();
-    if (text.length > 10) {
+    if (text.length > 15 && !text.includes('\\n') && !text.startsWith('http')) {
       textContent.push(text);
+    }
+  }
+
+  // Extract content from commonly used properties that might contain text
+  const contentPropsRegex = /(title|description|label|placeholder|alt|aria-label|content)\s*[:=]\s*["'`]([^"'`]{10,}?)["'`]/g;
+  while ((match = contentPropsRegex.exec(code)) !== null) {
+    const text = match[2].trim();
+    if (text.length > 10) {
+      textContent.push(`${match[1]}: ${text}`);
     }
   }
   
@@ -90,21 +112,21 @@ export function extractJSXTextContent(code: string): string[] {
 }
 
 /**
- * Extracts function definitions from code
+ * Enhanced function definitions extraction
  * @param {string} code - Source code to parse
  * @returns {object[]} Array of function information
  */
 export function extractFunctionDefs(code: string): { name: string, params: string, body: string }[] {
+  const functions = [];
+  
   // Regular function definitions
   const functionRegex = /function\s+(\w+)\s*\(([^)]*)\)\s*{([^{}]*(?:{[^{}]*}[^{}]*)*?)}/g;
+  // Arrow functions with identifier
+  const arrowFuncRegex = /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>\s*{([^{}]*(?:{[^{}]*}[^{}]*)*?)}/g;
+  // Arrow functions without braces
+  const simpleArrowRegex = /(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>\s*([^;,\n}]+)/g;
   // Class methods
   const methodRegex = /(\w+)\s*\(([^)]*)\)\s*{([^{}]*(?:{[^{}]*}[^{}]*)*?)}/g;
-  // Arrow functions with identifier
-  const arrowFuncRegex = /(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>\s*{([^{}]*(?:{[^{}]*}[^{}]*)*?)}/g;
-  // ES6 class method syntax
-  const es6MethodRegex = /(\w+)\s*\(([^)]*)\)\s*{([^{}]*(?:{[^{}]*}[^{}]*)*?)}/g;
-  
-  const functions = [];
   
   // Match regular functions
   let match;
@@ -112,42 +134,41 @@ export function extractFunctionDefs(code: string): { name: string, params: strin
     functions.push({
       name: match[1],
       params: match[2],
-      body: match[3]
+      body: match[3].substring(0, 500) // Limit body length
     });
   }
   
-  // Match method definitions
-  while ((match = methodRegex.exec(code)) !== null) {
-    // Skip if it looks like it's already been captured
-    if (!functions.some(f => f.name === match[1])) {
-      functions.push({
-        name: match[1],
-        params: match[2],
-        body: match[3]
-      });
-    }
-  }
-  
-  // Match arrow functions
+  // Match arrow functions with braces
   while ((match = arrowFuncRegex.exec(code)) !== null) {
     functions.push({
       name: match[1],
       params: match[2],
-      body: match[3]
+      body: match[3].substring(0, 500)
+    });
+  }
+
+  // Match simple arrow functions
+  while ((match = simpleArrowRegex.exec(code)) !== null) {
+    functions.push({
+      name: match[1],
+      params: match[2],
+      body: match[3].substring(0, 200)
     });
   }
   
-  // Match ES6 methods
-  while ((match = es6MethodRegex.exec(code)) !== null) {
+  // Match methods (be more selective to avoid duplicates)
+  const methodMatches = [];
+  while ((match = methodRegex.exec(code)) !== null) {
     if (!functions.some(f => f.name === match[1])) {
-      functions.push({
+      methodMatches.push({
         name: match[1],
         params: match[2],
-        body: match[3]
+        body: match[3].substring(0, 500)
       });
     }
   }
   
+  functions.push(...methodMatches);
   return functions;
 }
 
@@ -186,16 +207,40 @@ export function extractClassDefs(code: string): { name: string, methods: string[
 }
 
 /**
- * Extracts export definitions from code
+ * Enhanced exports extraction
  * @param {string} code - Source code to parse
  * @returns {object} Map of exported values
  */
 export function extractExports(code: string): Record<string, string> {
   const exports = {};
   
-  // CommonJS module.exports = {...}
-  const moduleExportsRegex = /module\.exports\s*=\s*{([^}]*)}/g;
+  // ES6 named exports
+  const es6ExportsRegex = /export\s+(?:const|let|var|function|class)\s+(\w+)/g;
   let match;
+  while ((match = es6ExportsRegex.exec(code)) !== null) {
+    exports[match[1]] = match[1];
+  }
+  
+  // ES6 default export
+  const defaultExportRegex = /export\s+default\s+(\w+)/g;
+  while ((match = defaultExportRegex.exec(code)) !== null) {
+    exports['default'] = match[1];
+  }
+
+  // Export object destructuring
+  const exportObjectRegex = /export\s*{([^}]+)}/g;
+  while ((match = exportObjectRegex.exec(code)) !== null) {
+    const exportList = match[1].split(',').map(item => item.trim());
+    exportList.forEach(item => {
+      const cleanItem = item.replace(/\s+as\s+\w+/, '').trim();
+      if (cleanItem) {
+        exports[cleanItem] = cleanItem;
+      }
+    });
+  }
+
+  // CommonJS module.exports
+  const moduleExportsRegex = /module\.exports\s*=\s*{([^}]*)}/g;
   while ((match = moduleExportsRegex.exec(code)) !== null) {
     const exportBlock = match[1];
     const exportPairs = exportBlock.split(',').map(pair => pair.trim());
@@ -208,18 +253,6 @@ export function extractExports(code: string): Record<string, string> {
         exports[pair] = pair;
       }
     }
-  }
-  
-  // ES6 named exports
-  const es6ExportsRegex = /export\s+(?:const|let|var|function|class)\s+(\w+)/g;
-  while ((match = es6ExportsRegex.exec(code)) !== null) {
-    exports[match[1]] = match[1];
-  }
-  
-  // ES6 default export
-  const defaultExportRegex = /export\s+default\s+(\w+)/g;
-  while ((match = defaultExportRegex.exec(code)) !== null) {
-    exports['default'] = match[1];
   }
   
   return exports;
@@ -356,7 +389,7 @@ export interface ExtractedKnowledge {
 }
 
 /**
- * Extracts all knowledge from code
+ * Enhanced knowledge extraction with better content detection
  * @param {string} code - Source code to parse
  * @param {string} filePath - Path to the file
  * @returns {ExtractedKnowledge} Extracted knowledge
@@ -378,11 +411,22 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
   
   // Enhanced extraction based on file type or content patterns
   if (fileType === 'js' || fileType === 'ts' || fileType === 'jsx' || fileType === 'tsx') {
+    // Always extract structured data for better content detection
+    knowledge['structuredData'] = extractStructuredData(code);
+    
+    // Extract JSX text content for React components
+    if (fileType === 'jsx' || fileType === 'tsx') {
+      knowledge['jsxTextContent'] = extractJSXTextContent(code);
+    }
+    
     // Look for API routes in files that might define them
     if (
       filePath.includes('api') || 
       filePath.includes('route') || 
-      filePath.includes('controller')
+      filePath.includes('controller') ||
+      code.includes('app.get') ||
+      code.includes('app.post') ||
+      code.includes('router.')
     ) {
       knowledge['apiRoutes'] = extractAPIRoutes(code);
     }
@@ -392,21 +436,23 @@ export function extractKnowledge(code: string, filePath: string): ExtractedKnowl
       filePath.includes('model') || 
       filePath.includes('schema') || 
       code.includes('Schema') || 
-      code.includes('define(')
+      code.includes('define(') ||
+      code.includes('sequelize') ||
+      code.includes('mongoose')
     ) {
       knowledge['databaseSchemas'] = extractDatabaseSchema(code);
     }
     
     // Extract class definitions for all JS/TS files
     knowledge['classes'] = extractClassDefs(code);
-    
-    // Extract structured data for all files
-    knowledge['structuredData'] = extractStructuredData(code);
-    
-    // Extract JSX text content for React components
-    if (fileType === 'jsx' || fileType === 'tsx') {
-      knowledge['jsxTextContent'] = extractJSXTextContent(code);
-    }
+  }
+
+  // Also extract content from other file types that might contain useful information
+  if (fileType === 'md' || fileType === 'txt' || fileType === 'html') {
+    // For markdown and text files, treat the whole content as structured data
+    knowledge['structuredData'] = {
+      fileContent: code.substring(0, 2000) // Limit to prevent too much data
+    };
   }
   
   return knowledge;
