@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { getShareableAnswer, trackShare, ShareableAnswer } from "@/services/shareableAnswerService";
@@ -29,11 +28,15 @@ export default function SharePage() {
     hasSessionStorage: boolean;
     availableIds: string[];
     searchedId: string;
+    currentUrl: string;
+    extractedId: string;
   }>({
     hasLocalStorage: false,
     hasSessionStorage: false,
     availableIds: [],
-    searchedId: ''
+    searchedId: '',
+    currentUrl: '',
+    extractedId: ''
   });
 
   // Handle logo click with explicit navigation
@@ -55,29 +58,59 @@ export default function SharePage() {
   // Separate function to load answer for reusability
   const loadAnswer = (shareId: string) => {
     try {
-      console.log("Loading shared answer with ID:", shareId);
+      console.log("=== SHARE PAGE DEBUG START ===");
+      console.log("Current URL:", window.location.href);
+      console.log("URL params ID:", shareId);
+      console.log("Raw ID from useParams:", id);
       
-      // Get debug information about storage
-      const localData = localStorage.getItem('unfold_shareableAnswers');
-      const sessionData = sessionStorage.getItem('unfold_shareableAnswers');
+      // Get debug information about storage with more detail
+      const STORAGE_KEY = 'unfold_shareableAnswers';
+      const localData = localStorage.getItem(STORAGE_KEY);
+      const sessionData = sessionStorage.getItem(STORAGE_KEY);
+      
+      console.log("Storage key being used:", STORAGE_KEY);
+      console.log("localStorage raw data:", localData);
+      console.log("sessionStorage raw data:", sessionData);
       
       let availableIds: string[] = [];
+      let localStorageIds: string[] = [];
+      let sessionStorageIds: string[] = [];
       
       if (localData) {
         try {
           const parsed = JSON.parse(localData);
-          availableIds = Object.keys(parsed);
-          console.log("Available IDs in localStorage:", availableIds);
+          localStorageIds = Object.keys(parsed);
+          availableIds = localStorageIds;
+          console.log("localStorage parsed successfully:", parsed);
+          console.log("Available IDs in localStorage:", localStorageIds);
+          
+          // Check if our specific ID exists
+          if (parsed[shareId]) {
+            console.log("Found answer in localStorage:", parsed[shareId]);
+          } else {
+            console.log("Answer NOT found in localStorage for ID:", shareId);
+          }
         } catch (e) {
           console.error("Error parsing localStorage data:", e);
         }
+      } else {
+        console.log("No localStorage data found");
       }
       
-      if (sessionData && !localData) {
+      if (sessionData && availableIds.length === 0) {
         try {
           const parsed = JSON.parse(sessionData);
-          availableIds = Object.keys(parsed);
-          console.log("Available IDs in sessionStorage:", availableIds);
+          sessionStorageIds = Object.keys(parsed);
+          availableIds = sessionStorageIds;
+          console.log("sessionStorage parsed successfully:", parsed);
+          console.log("Available IDs in sessionStorage:", sessionStorageIds);
+          
+          // Check if our specific ID exists
+          if (parsed[shareId]) {
+            console.log("Found answer in sessionStorage:", parsed[shareId]);
+          } else {
+            console.log("Answer NOT found in sessionStorage for ID:", shareId);
+          }
         } catch (e) {
           console.error("Error parsing sessionStorage data:", e);
         }
@@ -87,20 +120,42 @@ export default function SharePage() {
         hasLocalStorage: !!localData,
         hasSessionStorage: !!sessionData,
         availableIds,
-        searchedId: shareId
+        searchedId: shareId,
+        currentUrl: window.location.href,
+        extractedId: id || 'undefined'
       });
       
-      // Try to get the answer
+      // Try to get the answer using the service
+      console.log("Calling getShareableAnswer with ID:", shareId);
       const sharedAnswer = getShareableAnswer(shareId);
+      console.log("getShareableAnswer returned:", sharedAnswer);
       
       if (sharedAnswer) {
-        console.log("Successfully loaded shared answer:", sharedAnswer.id);
+        console.log("✅ Successfully loaded shared answer:", sharedAnswer.id);
         setAnswer(sharedAnswer);
         setError(null);
       } else {
-        console.log("No answer found for ID:", shareId);
-        setError(`The shared answer with ID "${shareId}" could not be found`);
+        console.log("❌ No answer found for ID:", shareId);
+        console.log("Available IDs were:", availableIds);
+        
+        // Try direct access to see if data exists
+        if (localData) {
+          try {
+            const directAccess = JSON.parse(localData)[shareId];
+            if (directAccess) {
+              console.log("🔍 Found data via direct access:", directAccess);
+              setAnswer(directAccess);
+              setError(null);
+              return;
+            }
+          } catch (e) {
+            console.error("Direct access failed:", e);
+          }
+        }
+        
+        setError(`The shared answer with ID "${shareId}" could not be found. Available IDs: ${availableIds.join(', ')}`);
       }
+      console.log("=== SHARE PAGE DEBUG END ===");
     } catch (err) {
       console.error("Error loading shared answer:", err);
       setError("Failed to load the shared answer");
@@ -110,10 +165,15 @@ export default function SharePage() {
   };
 
   useEffect(() => {
+    console.log("SharePage useEffect triggered");
+    console.log("ID from params:", id);
+    console.log("Current location:", window.location.pathname);
+    
     if (id) {
       loadAnswer(id);
     } else {
-      setError("No share ID provided");
+      console.error("No ID found in URL params");
+      setError("No share ID provided in URL");
       setLoading(false);
     }
   }, [id]);
@@ -203,12 +263,14 @@ export default function SharePage() {
               
               {/* Enhanced debug information */}
               <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
-                <p className="text-sm text-gray-700 font-medium mb-2">Debug Information:</p>
+                <p className="text-sm text-gray-700 font-medium mb-2">Detailed Debug Information:</p>
                 <ul className="text-xs text-gray-600 space-y-1">
-                  <li>Searched ID: {debugInfo.searchedId || "Not provided"}</li>
-                  <li>localStorage available: {debugInfo.hasLocalStorage ? "Yes" : "No"}</li>
-                  <li>sessionStorage available: {debugInfo.hasSessionStorage ? "Yes" : "No"}</li>
-                  <li>Available IDs ({debugInfo.availableIds.length}): {
+                  <li><strong>Current URL:</strong> {debugInfo.currentUrl}</li>
+                  <li><strong>Extracted ID from params:</strong> {debugInfo.extractedId}</li>
+                  <li><strong>Searched ID:</strong> {debugInfo.searchedId || "Not provided"}</li>
+                  <li><strong>localStorage available:</strong> {debugInfo.hasLocalStorage ? "Yes" : "No"}</li>
+                  <li><strong>sessionStorage available:</strong> {debugInfo.hasSessionStorage ? "Yes" : "No"}</li>
+                  <li><strong>Available IDs ({debugInfo.availableIds.length}):</strong> {
                     debugInfo.availableIds.length > 0 
                       ? debugInfo.availableIds.join(', ')
                       : "None found"
