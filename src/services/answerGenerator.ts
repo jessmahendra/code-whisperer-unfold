@@ -1,3 +1,4 @@
+
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
@@ -281,9 +282,52 @@ export async function generateAnswer(query: string, options?: {
       searchQuery = [query, ...queryAnalysis.keywords].join(' ');
     }
     
-    const results = await searchKnowledgeWithHistory(searchQuery);
+    // Special handling for download questions - try multiple search approaches
+    const isDownloadQuestion = query.toLowerCase().includes("download") || 
+                              query.toLowerCase().includes("link") ||
+                              query.toLowerCase().includes("install");
+    
+    let results = await searchKnowledgeWithHistory(searchQuery);
+    
+    if (isDownloadQuestion && results.length < 5) {
+      console.log("Download question with few results, trying alternative searches");
+      
+      // Try searching for specific download-related terms
+      const alternativeSearches = [
+        "download app mac windows ios android",
+        "app store google play download",
+        "platform install download",
+        "href download link button",
+        "apple app store google play"
+      ];
+      
+      for (const altSearch of alternativeSearches) {
+        const altResults = await searchKnowledgeWithHistory(altSearch);
+        console.log(`Alternative search "${altSearch}" found ${altResults.length} results`);
+        
+        // Merge unique results
+        altResults.forEach(newResult => {
+          if (!results.find(existing => existing.filePath === newResult.filePath && existing.content === newResult.content)) {
+            results.push(newResult);
+          }
+        });
+      }
+    }
     
     console.log(`Enhanced search results: ${results.length} entries found for "${query}"`);
+    
+    // Debug: Log the actual content of search results for download questions
+    if (isDownloadQuestion) {
+      console.log("=== DOWNLOAD QUESTION DEBUG ===");
+      console.log("Search results content preview:");
+      results.slice(0, 10).forEach((result, index) => {
+        console.log(`${index + 1}. File: ${result.filePath}`);
+        console.log(`   Type: ${result.type}`);
+        console.log(`   Content: ${result.content.substring(0, 200)}...`);
+        console.log(`   Keywords: ${result.keywords ? result.keywords.join(', ') : 'none'}`);
+      });
+      console.log("=== END DEBUG ===");
+    }
     
     if (results.length === 0) {
       console.log("No results found for enhanced query:", query);
