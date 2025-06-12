@@ -19,9 +19,11 @@ import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
 import RepositoryProgressIndicator from "./RepositoryProgressIndicator";
+
 interface HeaderProps {
   isOnboarding?: boolean;
 }
+
 export default function Header({
   isOnboarding = false
 }: HeaderProps) {
@@ -239,22 +241,23 @@ export default function Header({
     }
   };
 
-  // Always use proper navigation for logo click to ensure consistency across all pages
+  // Fix the logo click handler to ensure it always navigates properly
   const handleLogoClick = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent default anchor behavior
+    e.preventDefault();
+    e.stopPropagation();
     console.log("Logo clicked, navigating to homepage");
-    navigate("/", {
-      replace: true
-    });
+    navigate("/");
   };
+
   const statusInfo = getConnectionStatusInfo();
+  
   return <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
-          {/* Replace Link with a proper navigation handler to ensure it always works */}
-          <a href="/" onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer">
+          {/* Fixed logo with proper click handler */}
+          <button onClick={handleLogoClick} className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0">
             <span className="inline-block font-bold text-xl bg-gradient-to-r from-unfold-purple to-unfold-teal bg-clip-text text-sky-900">story</span>
-          </a>
+          </button>
         </div>
         
         {showProgressIndicator && <div className="flex-1 max-w-md px-2">
