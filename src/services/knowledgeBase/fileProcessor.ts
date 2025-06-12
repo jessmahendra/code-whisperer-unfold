@@ -24,11 +24,27 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
     
     const contents = await getRepositoryContents(filePath);
     
-    // Handle file content
-    if (contents && typeof contents === 'object' && 'content' in contents) {
-      // Decode base64 content
-      const content = atob(contents.content as string);
-      console.log(`File content length: ${content.length} chars for ${filePath}`);
+    // Handle file content - FIXED: Better content handling
+    if (contents && typeof contents === 'object') {
+      let content = '';
+      
+      // Handle different content formats
+      if ('content' in contents && contents.content) {
+        try {
+          // Decode base64 content properly
+          const base64Content = (contents.content as string).replace(/\s/g, '');
+          content = atob(base64Content);
+          console.log(`Successfully decoded file: ${filePath}, length: ${content.length}`);
+        } catch (decodeError) {
+          console.error(`Failed to decode ${filePath}:`, decodeError);
+          return false;
+        }
+      } else if (typeof contents === 'string') {
+        content = contents;
+      } else {
+        console.log(`No usable content in ${filePath}:`, contents);
+        return false;
+      }
       
       // Skip very large files to prevent performance issues
       if (content.length > 100000) {
@@ -37,59 +53,51 @@ export async function processFile(filePath: string, knowledgeBase: KnowledgeEntr
         return true;
       }
       
-      // Skip empty files but mark as processed
-      if (content.trim().length === 0) {
-        console.log(`Skipping empty file: ${filePath}`);
+      // ALWAYS create entries for files with any content
+      if (content.length > 0) {
+        console.log(`Creating entries for ${filePath} with ${content.length} characters`);
+        
+        // Extract knowledge using enhanced parser
+        const knowledge = extractKnowledge(content, filePath);
+        
+        // Create knowledge entries - this is the critical part
+        const entriesCreated = await createKnowledgeEntries(knowledge, knowledgeBase, content);
+        
+        console.log(`✅ Created ${entriesCreated} knowledge entries from ${filePath}, total KB size: ${knowledgeBase.length}`);
+        
         processedFilesCache.add(filePath);
-        return true;
+        return entriesCreated > 0;
+      } else {
+        console.log(`⚠️ Empty content in file: ${filePath}`);
+        processedFilesCache.add(filePath);
+        return false;
       }
-      
-      // Extract knowledge using enhanced parser
-      const knowledge = extractKnowledge(content, filePath);
-      console.log(`Knowledge extraction for ${filePath}:`, {
-        jsDocComments: knowledge.jsDocComments?.length || 0,
-        inlineComments: knowledge.inlineComments?.length || 0,
-        functions: knowledge.functions?.length || 0,
-        exports: Object.keys(knowledge.exports || {}).length,
-        jsxTextContent: knowledge.jsxTextContent?.length || 0,
-        structuredData: Object.keys(knowledge.structuredData || {}).length,
-        contentLength: content.length
-      });
-      
-      // Create knowledge entries - this is the critical part
-      const entriesCreated = await createKnowledgeEntries(knowledge, knowledgeBase, content);
-      
-      console.log(`Created ${entriesCreated} knowledge entries from ${filePath}, total KB size: ${knowledgeBase.length}`);
-      
-      processedFilesCache.add(filePath);
-      return entriesCreated > 0;
     } else {
-      console.log(`No content found in file: ${filePath}`, contents);
+      console.log(`❌ Invalid content structure for ${filePath}:`, contents);
     }
     
     return false;
   } catch (error) {
-    console.error(`Error processing file ${filePath}:`, error);
+    console.error(`❌ Error processing file ${filePath}:`, error);
     return false;
   }
 }
 
 /**
- * Create knowledge entries from extracted content - FIXED VERSION
+ * Create knowledge entries from extracted content - ENHANCED VERSION
  */
 async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBase: KnowledgeEntry[], rawContent: string): Promise<number> {
   const { filePath } = knowledge;
   let entriesCreated = 0;
   
-  console.log(`Creating knowledge entries for ${filePath} with content length ${rawContent.length}`);
+  console.log(`📝 Creating knowledge entries for ${filePath} with content length ${rawContent.length}`);
   
-  // ALWAYS create at least one entry for file content if it's substantial
-  if (rawContent.trim().length > 20) {
-    // Create a general file content entry
-    const contentPreview = rawContent.substring(0, 1000);
+  // ALWAYS create a main file content entry for any meaningful content
+  if (rawContent.trim().length > 10) {
+    const contentPreview = rawContent.substring(0, 2000); // Increased preview size
     const entry: KnowledgeEntry = {
-      id: `${filePath}-content`,
-      content: `File: ${filePath}\n\nContent:\n${contentPreview}${rawContent.length > 1000 ? '...' : ''}`,
+      id: `${filePath}-content-${Date.now()}`,
+      content: `File: ${filePath}\n\nContent:\n${contentPreview}${rawContent.length > 2000 ? '\n\n[Content truncated...]' : ''}`,
       type: 'text-content',
       filePath,
       keywords: extractKeywords(`${filePath} ${contentPreview}`),
@@ -97,24 +105,25 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
       metadata: {
         name: `Content from ${filePath}`,
         contentType: 'file-content',
-        location: 'full-file'
+        location: 'full-file',
+        originalLength: rawContent.length
       }
     };
     knowledgeBase.push(entry);
     entriesCreated++;
-    console.log(`Added file content entry for ${filePath}`);
+    console.log(`✅ Added main content entry for ${filePath} (${rawContent.length} chars)`);
   }
 
   // Process JSX/HTML text content
   if (knowledge.jsxTextContent && knowledge.jsxTextContent.length > 0) {
-    console.log(`Found ${knowledge.jsxTextContent.length} text content items in ${filePath}`);
+    console.log(`📄 Found ${knowledge.jsxTextContent.length} text content items in ${filePath}`);
     
     knowledge.jsxTextContent.forEach((text, index) => {
       const cleanText = text.trim();
-      if (cleanText.length > 2) {
+      if (cleanText.length > 3) {
         const entry: KnowledgeEntry = {
-          id: `${filePath}-text-${index}`,
-          content: cleanText,
+          id: `${filePath}-jsx-text-${index}-${Date.now()}`,
+          content: `Text from ${filePath}: ${cleanText}`,
           type: 'text-content',
           filePath,
           keywords: extractKeywords(cleanText),
@@ -127,19 +136,19 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added JSX text content entry: ${cleanText.substring(0, 50)}...`);
+        console.log(`✅ Added JSX text: "${cleanText.substring(0, 50)}..."`);
       }
     });
   }
   
-  // Process comments
+  // Process comments with more lenient filtering
   if (knowledge.jsDocComments && knowledge.jsDocComments.length > 0) {
     knowledge.jsDocComments.forEach((comment, index) => {
       const cleanComment = comment.trim();
-      if (cleanComment.length > 10) {
+      if (cleanComment.length > 5) {
         const entry: KnowledgeEntry = {
-          id: `${filePath}-jsdoc-${index}`,
-          content: cleanComment,
+          id: `${filePath}-jsdoc-${index}-${Date.now()}`,
+          content: `Documentation from ${filePath}: ${cleanComment}`,
           type: 'comment',
           filePath,
           keywords: extractKeywords(cleanComment),
@@ -150,18 +159,19 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added JSDoc comment entry from ${filePath}`);
+        console.log(`✅ Added JSDoc comment from ${filePath}`);
       }
     });
   }
 
+  // Process inline comments
   if (knowledge.inlineComments && knowledge.inlineComments.length > 0) {
     knowledge.inlineComments.forEach((comment, index) => {
       const cleanComment = comment.trim();
-      if (cleanComment.length > 5) {
+      if (cleanComment.length > 3) {
         const entry: KnowledgeEntry = {
-          id: `${filePath}-inline-${index}`,
-          content: cleanComment,
+          id: `${filePath}-inline-${index}-${Date.now()}`,
+          content: `Comment from ${filePath}: ${cleanComment}`,
           type: 'comment',
           filePath,
           keywords: extractKeywords(cleanComment),
@@ -172,7 +182,7 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added inline comment entry from ${filePath}`);
+        console.log(`✅ Added inline comment from ${filePath}`);
       }
     });
   }
@@ -181,10 +191,10 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
   if (knowledge.functions && knowledge.functions.length > 0) {
     knowledge.functions.forEach((func, index) => {
       if (func.name && func.name.length > 0) {
-        const funcContent = `Function: ${func.name}${func.params ? `\nParameters: ${func.params}` : ''}${func.body ? `\nImplementation: ${func.body.substring(0, 300)}` : ''}`;
+        const funcContent = `Function in ${filePath}: ${func.name}${func.params ? `\nParameters: ${func.params}` : ''}${func.body ? `\nImplementation: ${func.body.substring(0, 500)}` : ''}`;
         
         const entry: KnowledgeEntry = {
-          id: `${filePath}-function-${index}`,
+          id: `${filePath}-function-${index}-${Date.now()}`,
           content: funcContent,
           type: 'function',
           filePath,
@@ -198,7 +208,7 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added function entry: ${func.name} from ${filePath}`);
+        console.log(`✅ Added function: ${func.name} from ${filePath}`);
       }
     });
   }
@@ -208,8 +218,8 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
     Object.entries(knowledge.exports).forEach(([key, value], index) => {
       if (key && key.length > 0) {
         const entry: KnowledgeEntry = {
-          id: `${filePath}-export-${index}`,
-          content: `Export: ${key}${value !== key ? ` = ${value}` : ''}`,
+          id: `${filePath}-export-${index}-${Date.now()}`,
+          content: `Export from ${filePath}: ${key}${value !== key ? ` = ${value}` : ''}`,
           type: 'export',
           filePath,
           keywords: extractKeywords(`${key} ${value}`),
@@ -222,87 +232,36 @@ async function createKnowledgeEntries(knowledge: ExtractedKnowledge, knowledgeBa
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added export entry: ${key} from ${filePath}`);
+        console.log(`✅ Added export: ${key} from ${filePath}`);
       }
     });
   }
 
-  // Class processing
-  if (knowledge.classes && knowledge.classes.length > 0) {
-    knowledge.classes.forEach((cls, index) => {
-      if (cls.name && cls.name.length > 0) {
-        const classContent = `Class: ${cls.name}${cls.extends ? ` extends ${cls.extends}` : ''}${cls.methods.length > 0 ? `\nMethods: ${cls.methods.join(', ')}` : ''}`;
-        
+  // Structured data processing
+  if (knowledge.structuredData && Object.keys(knowledge.structuredData).length > 0) {
+    Object.entries(knowledge.structuredData).forEach(([key, value], index) => {
+      if (value && typeof value === 'string' && value.length > 10) {
         const entry: KnowledgeEntry = {
-          id: `${filePath}-class-${index}`,
-          content: classContent,
-          type: 'class',
+          id: `${filePath}-data-${index}-${Date.now()}`,
+          content: `Data from ${filePath} (${key}): ${value.substring(0, 1000)}`,
+          type: 'structured-data',
           filePath,
-          keywords: extractKeywords(classContent),
+          keywords: extractKeywords(`${key} ${value}`),
           lastUpdated: new Date().toISOString(),
           metadata: {
-            name: cls.name,
-            extends: cls.extends,
-            methods: cls.methods,
-            category: 'class'
+            name: key,
+            dataType: 'structured',
+            category: 'data'
           }
         };
         knowledgeBase.push(entry);
         entriesCreated++;
-        console.log(`Added class entry: ${cls.name} from ${filePath}`);
+        console.log(`✅ Added structured data: ${key} from ${filePath}`);
       }
     });
   }
 
-  // API route processing
-  if (knowledge.apiRoutes && knowledge.apiRoutes.length > 0) {
-    knowledge.apiRoutes.forEach((route, index) => {
-      if (route.method && route.path) {
-        const entry: KnowledgeEntry = {
-          id: `${filePath}-route-${index}`,
-          content: `API Route: ${route.method} ${route.path}${route.handler ? ` -> ${route.handler}` : ''}`,
-          type: 'api-route',
-          filePath,
-          keywords: extractKeywords(`${route.method} ${route.path} ${route.handler || ''}`),
-          lastUpdated: new Date().toISOString(),
-          metadata: {
-            method: route.method,
-            path: route.path,
-            handler: route.handler,
-            category: 'api'
-          }
-        };
-        knowledgeBase.push(entry);
-        entriesCreated++;
-        console.log(`Added API route entry: ${route.method} ${route.path} from ${filePath}`);
-      }
-    });
-  }
-
-  // Special handling for README and documentation files
-  if (filePath.toLowerCase().includes('readme') || filePath.toLowerCase().endsWith('.md')) {
-    const content = rawContent;
-    if (content.length > 50) {
-      const entry: KnowledgeEntry = {
-        id: `${filePath}-documentation`,
-        content: content.substring(0, 2000),
-        type: 'documentation',
-        filePath,
-        keywords: extractKeywords(content),
-        lastUpdated: new Date().toISOString(),
-        metadata: {
-          name: `Documentation from ${filePath}`,
-          contentType: 'markdown',
-          category: 'documentation'
-        }
-      };
-      knowledgeBase.push(entry);
-      entriesCreated++;
-      console.log(`Added documentation entry from ${filePath}`);
-    }
-  }
-
-  console.log(`Total entries created for ${filePath}: ${entriesCreated}`);
+  console.log(`📊 Total entries created for ${filePath}: ${entriesCreated}`);
   return entriesCreated;
 }
 

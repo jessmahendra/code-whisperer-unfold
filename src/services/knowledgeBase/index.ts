@@ -1,3 +1,4 @@
+
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -18,8 +19,8 @@ import {
 } from '../scanScheduler';
 import { getActiveRepository } from '../userRepositories';
 
-// Knowledge base - initialized with mock data but will be populated with real data
-let knowledgeBase: KnowledgeEntry[] = [...mockKnowledgeEntries];
+// Knowledge base - start empty
+let knowledgeBase: KnowledgeEntry[] = [];
 
 // Track initialization state
 let initializationState = {
@@ -33,45 +34,40 @@ let initializationState = {
 };
 
 /**
- * FIXED: Better detection of real repository data
+ * ENHANCED: Better detection of real repository data
  */
 function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
-  console.log(`Checking if data is real: ${entries.length} entries`);
+  console.log(`🔍 Checking if data is real: ${entries.length} total entries`);
   
-  // If we have no entries, it's definitely not real data
   if (entries.length === 0) {
-    console.log('No entries found - not real data');
+    console.log('❌ No entries found - not real data');
     return false;
   }
   
-  // Check for mock data patterns - if ALL entries are mock, it's not real
-  const mockEntries = entries.filter(entry => 
-    entry.id.includes('mock-') || 
-    entry.content.includes('Ghost') ||
-    entry.filePath === 'mock'
+  // Count real vs mock entries
+  const realEntries = entries.filter(entry => 
+    !entry.id.includes('mock-') && 
+    !entry.content.includes('Ghost') &&
+    entry.filePath !== 'mock'
   );
   
-  const realEntries = entries.length - mockEntries.length;
-  console.log(`Mock entries: ${mockEntries.length}, Real entries: ${realEntries}`);
+  const mockEntries = entries.length - realEntries.length;
   
-  // If we have any real entries (non-mock), it's real data
-  if (realEntries > 0) {
-    console.log(`Real data detected: ${realEntries} non-mock entries found`);
+  console.log(`📊 Real entries: ${realEntries.length}, Mock entries: ${mockEntries.length}`);
+  
+  // If we have any real entries, it's real data
+  if (realEntries.length > 0) {
+    console.log(`✅ Real data detected: ${realEntries.length} non-mock entries found`);
+    console.log(`Sample real entries:`, realEntries.slice(0, 3).map(e => ({ 
+      id: e.id, 
+      file: e.filePath, 
+      contentPreview: e.content.substring(0, 100) 
+    })));
     return true;
   }
   
-  // Get scan diagnostics for more context
-  const diagnostics = getScanDiagnostics();
-  console.log(`Scan diagnostics: ${diagnostics.scannedFiles.length} files scanned`);
-  
-  // If we scanned files but only have mock entries, something went wrong
-  if (diagnostics.scannedFiles.length > 0 && realEntries === 0) {
-    console.log(`Warning: ${diagnostics.scannedFiles.length} files scanned but no real entries created`);
-    return false;
-  }
-  
-  console.log(`Data evaluation: ${entries.length} total entries, ${realEntries} real entries`);
-  return realEntries > 0;
+  console.log(`❌ No real entries detected among ${entries.length} total entries`);
+  return false;
 }
 
 /**
@@ -86,7 +82,7 @@ function loadFromCache(): boolean {
   
   try {
     // Load cached knowledge base
-    knowledgeBase = cache.scanData.knowledgeBase || [...mockKnowledgeEntries];
+    knowledgeBase = cache.scanData.knowledgeBase || [];
     
     // Enhanced real data detection
     const hasRealData = hasRealRepositoryData(knowledgeBase);
@@ -98,7 +94,7 @@ function loadFromCache(): boolean {
     initializationState.lastInitTime = cache.lastScanTime;
     initializationState.lastRepositoryFingerprint = `${activeRepo.owner}/${activeRepo.repo}`;
     
-    console.log(`Cache loaded: ${knowledgeBase.length} entries, real data: ${hasRealData}`);
+    console.log(`📦 Cache loaded: ${knowledgeBase.length} entries, real data: ${hasRealData}`);
     
     if (!initializationState.usingMockData) {
       toast.success(`Loaded cached repository data (${knowledgeBase.length} entries)`, {
@@ -109,7 +105,7 @@ function loadFromCache(): boolean {
     
     return true;
   } catch (error) {
-    console.error('Error loading from cache:', error);
+    console.error('❌ Error loading from cache:', error);
     clearScanCache(activeRepo.id);
     return false;
   }
@@ -143,11 +139,11 @@ function saveToCache(): void {
  * @returns {Promise<void>}
  */
 export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
-  console.log('Initializing adaptive knowledge base...');
+  console.log('🚀 Initializing adaptive knowledge base...');
   
   const activeRepo = getActiveRepository();
   if (!activeRepo) {
-    console.log('No active repository, using mock data');
+    console.log('⚠️ No active repository, using mock data');
     knowledgeBase = [...mockKnowledgeEntries];
     initializationState.usingMockData = true;
     initializationState.initialized = true;
@@ -156,7 +152,7 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   
   // Prevent multiple simultaneous initializations
   if (initializationState.inProgress) {
-    console.log('Knowledge base initialization already in progress');
+    console.log('⏳ Knowledge base initialization already in progress');
     toast.info('Knowledge base initialization already in progress');
     return;
   }
@@ -166,13 +162,13 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   const repositoryChanged = initializationState.lastRepositoryFingerprint !== currentFingerprint;
   
   if (repositoryChanged) {
-    console.log('Repository changed, forcing refresh');
+    console.log('🔄 Repository changed, forcing refresh');
     forceRefresh = true;
   }
   
   // Check if we should use cached data
   if (!forceRefresh && !shouldScanRepository(activeRepo.id)) {
-    console.log('Using cached scan data...');
+    console.log('📦 Using cached scan data...');
     const loaded = loadFromCache();
     if (loaded && !initializationState.usingMockData) {
       return; // Successfully loaded real data from cache
@@ -198,17 +194,17 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   }
   
   try {
-    // IMPORTANT: Clear knowledge base to start fresh
+    // Clear knowledge base completely to start fresh
     knowledgeBase = [];
-    console.log('Starting fresh scan - knowledge base cleared');
+    console.log('🗑️ Starting fresh scan - knowledge base cleared completely');
     
-    console.log('Starting adaptive repository exploration...');
+    console.log('🔍 Starting adaptive repository exploration...');
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
     
     // Get scan diagnostics
     const diagnostics = getScanDiagnostics();
-    console.log(`Exploration complete. Processed any: ${processedAny}, KB size: ${knowledgeBase.length}`);
-    console.log(`Scanned files: ${diagnostics.scannedFiles.length}`);
+    console.log(`🎯 Exploration complete. Processed any: ${processedAny}, KB size: ${knowledgeBase.length}`);
+    console.log(`📁 Scanned files: ${diagnostics.scannedFiles.length}`);
     
     initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
@@ -218,8 +214,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     // Enhanced success detection
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
-    if (!hasRealData || knowledgeBase.length === 0) {
-      console.log('Adaptive scan found insufficient real data, adding mock data as fallback');
+    if (!hasRealData) {
+      console.log('⚠️ Adaptive scan found insufficient real data, adding mock data as fallback');
       
       // Add mock data as fallback
       knowledgeBase.push(...mockKnowledgeEntries);
@@ -237,21 +233,25 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     } else {
       initializationState.usingMockData = false;
       
-      const stats = getKnowledgeBaseStats();
       const realEntries = knowledgeBase.filter(e => !e.id.includes('mock-')).length;
-      const successMsg = `Repository scan successful: ${realEntries} real entries from ${diagnostics.scannedFiles.length} files.`;
+      const successMsg = `✅ Repository scan successful: ${realEntries} real entries from ${diagnostics.scannedFiles.length} files.`;
       toast.success(successMsg, {
-        description: 'Repository scan completed and cached for 2 weeks.',
+        description: 'Repository data loaded successfully.',
         duration: 4000
       });
       console.log(successMsg);
-      console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 10));
-      console.log('Sample knowledge entries:', knowledgeBase.slice(0, 3).map(e => ({ id: e.id, type: e.type, content: e.content.substring(0, 100) })));
+      console.log('📂 Sample scanned files:', diagnostics.scannedFiles.slice(0, 10));
+      console.log('📝 Sample knowledge entries:', knowledgeBase.slice(0, 3).map(e => ({ 
+        id: e.id, 
+        type: e.type, 
+        file: e.filePath,
+        content: e.content.substring(0, 100) 
+      })));
       
       saveToCache();
     }
   } catch (error) {
-    console.error('Error in adaptive knowledge base initialization:', error);
+    console.error('❌ Error in adaptive knowledge base initialization:', error);
     initializationState.error = error instanceof Error ? error.message : 'Unknown error';
     initializationState.usingMockData = true;
     
