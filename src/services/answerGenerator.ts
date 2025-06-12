@@ -1,4 +1,3 @@
-
 import { searchKnowledgeWithHistory } from "./knowledgeBaseEnhanced";
 import { getLastUpdatedText } from "./knowledgeBaseEnhanced";
 import { generateVisualContext } from "./visualContextGenerator";
@@ -80,6 +79,58 @@ function analyzeQuery(query: string): {
                    lowerQuery.includes('function') || lowerQuery.includes('component');
   
   return { type, keywords, needsScreenshots, needsCode, isContentQuery };
+}
+
+/**
+ * Enhanced content filtering for download questions
+ */
+function filterDownloadContent(results: any[], query: string): any[] {
+  const lowerQuery = query.toLowerCase();
+  const isDownloadQuestion = lowerQuery.includes("download") || lowerQuery.includes("link");
+  
+  if (!isDownloadQuestion) return results;
+  
+  // Prioritize actual download content over tracking/analytics code
+  const prioritizedResults = results.map(result => {
+    let priority = 0;
+    const content = result.content.toLowerCase();
+    const filePath = result.filePath.toLowerCase();
+    
+    // Highest priority: Download pages and components
+    if (filePath.includes('/download') || filePath.includes('download')) {
+      priority += 10;
+    }
+    
+    // High priority: App store links, download buttons
+    if (content.includes('app store') || content.includes('google play') || 
+        content.includes('download') && content.includes('href') ||
+        content.includes('platform') && content.includes('download')) {
+      priority += 8;
+    }
+    
+    // Medium priority: Download-related UI components
+    if (filePath.includes('component') && content.includes('download')) {
+      priority += 6;
+    }
+    
+    // Lower priority: Analytics and tracking (still relevant but not primary)
+    if (content.includes('track') && content.includes('download') ||
+        filePath.includes('analytics')) {
+      priority += 2;
+    }
+    
+    // Penalty for pure code without UI content
+    if (result.type === 'function' && !content.includes('jsx') && !content.includes('return')) {
+      priority -= 3;
+    }
+    
+    return { ...result, priority };
+  });
+  
+  // Sort by priority, then by original relevance
+  return prioritizedResults
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, 15); // Keep top results
 }
 
 /**
@@ -289,45 +340,47 @@ export async function generateAnswer(query: string, options?: {
     
     let results = await searchKnowledgeWithHistory(searchQuery);
     
-    if (isDownloadQuestion && results.length < 5) {
-      console.log("Download question with few results, trying alternative searches");
+    if (isDownloadQuestion) {
+      console.log("Download question detected, applying enhanced filtering");
       
-      // Try searching for specific download-related terms
-      const alternativeSearches = [
-        "download app mac windows ios android",
-        "app store google play download",
-        "platform install download",
-        "href download link button",
-        "apple app store google play"
-      ];
-      
-      for (const altSearch of alternativeSearches) {
-        const altResults = await searchKnowledgeWithHistory(altSearch);
-        console.log(`Alternative search "${altSearch}" found ${altResults.length} results`);
+      // If few results, try alternative searches
+      if (results.length < 5) {
+        console.log("Few results found, trying alternative searches");
         
-        // Merge unique results
-        altResults.forEach(newResult => {
-          if (!results.find(existing => existing.filePath === newResult.filePath && existing.content === newResult.content)) {
-            results.push(newResult);
-          }
-        });
+        const alternativeSearches = [
+          "download page app",
+          "app store google play",
+          "download button link",
+          "platform mac windows ios android",
+          "href download"
+        ];
+        
+        for (const altSearch of alternativeSearches) {
+          const altResults = await searchKnowledgeWithHistory(altSearch);
+          console.log(`Alternative search "${altSearch}" found ${altResults.length} results`);
+          
+          altResults.forEach(newResult => {
+            if (!results.find(existing => existing.filePath === newResult.filePath && existing.content === newResult.content)) {
+              results.push(newResult);
+            }
+          });
+        }
       }
+      
+      // Apply download-specific filtering
+      results = filterDownloadContent(results, query);
+      
+      console.log("=== ENHANCED DOWNLOAD FILTERING ===");
+      console.log("Filtered and prioritized results:");
+      results.slice(0, 5).forEach((result, index) => {
+        console.log(`${index + 1}. File: ${result.filePath} (Priority: ${result.priority || 0})`);
+        console.log(`   Type: ${result.type}`);
+        console.log(`   Content: ${result.content.substring(0, 150)}...`);
+      });
+      console.log("=== END ENHANCED FILTERING ===");
     }
     
     console.log(`Enhanced search results: ${results.length} entries found for "${query}"`);
-    
-    // Debug: Log the actual content of search results for download questions
-    if (isDownloadQuestion) {
-      console.log("=== DOWNLOAD QUESTION DEBUG ===");
-      console.log("Search results content preview:");
-      results.slice(0, 10).forEach((result, index) => {
-        console.log(`${index + 1}. File: ${result.filePath}`);
-        console.log(`   Type: ${result.type}`);
-        console.log(`   Content: ${result.content.substring(0, 200)}...`);
-        console.log(`   Keywords: ${result.keywords ? result.keywords.join(', ') : 'none'}`);
-      });
-      console.log("=== END DEBUG ===");
-    }
     
     if (results.length === 0) {
       console.log("No results found for enhanced query:", query);
@@ -733,8 +786,8 @@ function generateGeneralAnswer(
     results.slice(0, 2).forEach(result => {
       answer += `**From \`${result.filePath}\`:**\n`;
       answer += `\`\`\`${result.filePath.split('.').pop()}\n`;
-      answer += result.content.substring(0, 300);
-      answer += result.content.length > 300 ? '\n// ... (truncated)' : '';
+      answer += result.content.substring(0, 200);
+      answer += result.content.length > 200 ? '\n// ... (truncated)' : '';
       answer += `\n\`\`\`\n\n`;
     });
   }
