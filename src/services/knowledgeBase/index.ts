@@ -33,7 +33,7 @@ let initializationState = {
 };
 
 /**
- * Enhanced detection of real repository data
+ * Improved detection of real repository data
  */
 function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
   console.log(`Checking if data is real: ${entries.length} entries`);
@@ -54,31 +54,23 @@ function hasRealRepositoryData(entries: KnowledgeEntry[]): boolean {
     return true;
   }
   
-  // Check for repository-specific patterns that indicate real data
-  const realDataIndicators = [
-    'package.json', 'tsconfig.json', 'vite.config', 'next.config',
-    'src/', 'app/', 'components/', 'pages/', 'services/', 'utils/'
-  ];
-  
-  const hasRealIndicators = entries.some(entry => 
-    realDataIndicators.some(indicator => 
-      entry.filePath.includes(indicator)
-    )
+  // Check for any entries that don't match mock data patterns
+  const hasNonMockEntries = entries.some(entry => 
+    !entry.id.includes('mock-') && 
+    !entry.content.includes('Ghost') &&
+    entry.filePath !== 'mock'
   );
   
-  console.log(`Real indicators found: ${hasRealIndicators}`);
+  console.log(`Non-mock entries found: ${hasNonMockEntries}`);
   
-  // If we have significantly more entries than mock data with real indicators
-  const significantlyMoreData = entries.length > (mockKnowledgeEntries.length * 1.5);
-  
-  // More sophisticated detection - lower the threshold
-  if (hasRealIndicators || significantlyMoreData) {
-    console.log(`Real data detected: ${entries.length} entries, indicators: ${hasRealIndicators}, more data: ${significantlyMoreData}`);
+  // Lower threshold - if we have any reasonable amount of data, consider it real
+  if (entries.length > 20 || hasNonMockEntries) {
+    console.log(`Real data detected: ${entries.length} entries, has non-mock: ${hasNonMockEntries}`);
     return true;
   }
   
-  console.log(`Data evaluation: ${entries.length} entries, real indicators: ${hasRealIndicators}`);
-  return entries.length > 15; // Lower threshold
+  console.log(`Data evaluation: ${entries.length} entries, likely mock data`);
+  return false;
 }
 
 /**
@@ -150,7 +142,7 @@ function saveToCache(): void {
  * @returns {Promise<void>}
  */
 export async function initializeKnowledgeBase(forceRefresh: boolean = false): Promise<void> {
-  console.log('Initializing enhanced knowledge base...');
+  console.log('Initializing adaptive knowledge base...');
   
   const activeRepo = getActiveRepository();
   if (!activeRepo) {
@@ -181,8 +173,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
   if (!forceRefresh && !shouldScanRepository(activeRepo.id)) {
     console.log('Using cached scan data...');
     const loaded = loadFromCache();
-    if (loaded) {
-      return; // Successfully loaded from cache
+    if (loaded && !initializationState.usingMockData) {
+      return; // Successfully loaded real data from cache
     }
   }
   
@@ -209,12 +201,13 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       knowledgeBase = [];
     }
     
-    console.log('Starting enhanced repository exploration...');
+    console.log('Starting adaptive repository exploration...');
     const processedAny = await exploreRepositoryPaths(knowledgeBase);
     
     // Get scan diagnostics
     const diagnostics = getScanDiagnostics();
     console.log(`Exploration complete. Processed any: ${processedAny}, KB size: ${knowledgeBase.length}`);
+    console.log(`Scanned files: ${diagnostics.scannedFiles.length}`);
     
     initializationState.fetchConfirmed = hasConfirmedSuccessfulFetch();
     initializationState.lastInitTime = Date.now();
@@ -224,8 +217,8 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
     // Enhanced success detection with more lenient criteria
     const hasRealData = hasRealRepositoryData(knowledgeBase);
     
-    if (!hasRealData && knowledgeBase.length < 5) {
-      console.log('Enhanced scan failed or insufficient data, using mock data');
+    if (!hasRealData || knowledgeBase.length === 0) {
+      console.log('Adaptive scan found insufficient data, using mock data as fallback');
       
       if (knowledgeBase.length === 0) {
         knowledgeBase = [...mockKnowledgeEntries];
@@ -245,22 +238,22 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       initializationState.usingMockData = false;
       
       const stats = getKnowledgeBaseStats();
-      const successMsg = `Enhanced scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
+      const successMsg = `Adaptive scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
       toast.success(successMsg, {
         description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
       });
       console.log(successMsg);
-      console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 5));
+      console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 10));
       
       saveToCache();
     }
   } catch (error) {
-    console.error('Error in enhanced knowledge base initialization:', error);
+    console.error('Error in adaptive knowledge base initialization:', error);
     initializationState.error = error instanceof Error ? error.message : 'Unknown error';
     initializationState.usingMockData = true;
     
-    toast.error('Enhanced scan failed', {
+    toast.error('Adaptive scan failed', {
       description: initializationState.error,
       duration: 5000
     });
@@ -288,14 +281,14 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     return [];
   }
   
-  // Enhanced scoring algorithm with lower thresholds
+  // Enhanced scoring algorithm with very low thresholds
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
     
     // Exact keyword matches (highest weight)
     keywords.forEach(keyword => {
       if (entry.keywords.includes(keyword)) {
-        score += 3.0;
+        score += 5.0;
       }
       
       // Content matches (medium weight) - case insensitive
@@ -303,25 +296,25 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
       const lowerKeyword = keyword.toLowerCase();
       
       if (lowerContent.includes(lowerKeyword)) {
-        score += 2.0;
+        score += 3.0;
         
         // Bonus for exact word matches
         const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
         if (wordBoundaryRegex.test(lowerContent)) {
-          score += 1.0;
+          score += 2.0;
         }
       }
       
       // File path matches (lower weight)
       if (entry.filePath.toLowerCase().includes(lowerKeyword)) {
-        score += 1.0;
+        score += 1.5;
       }
       
-      // Metadata matches (if available)
+      // Metadata matches
       if (entry.metadata && typeof entry.metadata === 'object') {
         const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
         if (metadataStr.includes(lowerKeyword)) {
-          score += 0.5;
+          score += 1.0;
         }
       }
     });
@@ -332,16 +325,21 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     };
   });
   
-  // Much more lenient filtering and sorting
+  // Very lenient filtering and sorting
   const results = scoredEntries
-    .filter(item => item.score > 0.01) // Very low threshold
+    .filter(item => item.score > 0) // Accept any score > 0
     .sort((a, b) => b.score - a.score)
-    .slice(0, 25) // More results
+    .slice(0, 30) // More results
     .map(item => item.entry);
   
   console.log(`Search results: ${results.length} entries found`);
-  console.log(`Top 3 scores: ${scoredEntries.filter(s => s.score > 0.01).slice(0, 3).map(s => s.score.toFixed(2)).join(', ')}`);
-  console.log(`Sample results:`, results.slice(0, 3).map(r => ({ file: r.filePath, type: r.type, contentPreview: r.content.substring(0, 50) })));
+  console.log(`Top 5 scores: ${scoredEntries.filter(s => s.score > 0).slice(0, 5).map(s => s.score.toFixed(2)).join(', ')}`);
+  console.log(`Sample results:`, results.slice(0, 3).map(r => ({ 
+    file: r.filePath, 
+    type: r.type, 
+    score: scoredEntries.find(s => s.entry.id === r.id)?.score || 0,
+    contentPreview: r.content.substring(0, 100)
+  })));
   
   return results;
 }
