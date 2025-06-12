@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -124,7 +123,7 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
   };
 
   const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-6">
+    <div className="flex items-center justify-center mb-8">
       {Array.from({ length: totalSteps }, (_, index) => {
         const stepNumber = index + 1;
         const isCompleted = completedSteps.includes(stepNumber);
@@ -132,22 +131,22 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
         
         return (
           <React.Fragment key={stepNumber}>
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 ${
+            <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${
               isCompleted 
-                ? "bg-primary border-primary text-primary-foreground" 
+                ? "bg-muted-foreground text-background" 
                 : isCurrent 
-                ? "border-primary text-primary" 
-                : "border-muted-foreground text-muted-foreground"
+                ? "bg-muted border border-muted-foreground text-muted-foreground" 
+                : "bg-muted text-muted-foreground"
             }`}>
               {isCompleted ? (
-                <Check className="h-4 w-4" />
+                <Check className="h-3 w-3" />
               ) : (
-                <span className="text-sm font-medium">{stepNumber}</span>
+                <span>{stepNumber}</span>
               )}
             </div>
             {index < totalSteps - 1 && (
-              <div className={`w-12 h-0.5 mx-2 ${
-                isCompleted ? "bg-primary" : "bg-muted"
+              <div className={`w-8 h-px mx-2 ${
+                isCompleted ? "bg-muted-foreground" : "bg-muted"
               }`} />
             )}
           </React.Fragment>
@@ -378,9 +377,6 @@ export default function OnboardingPanel({ onComplete, onSkip, className = "" }: 
         >
           <X className="h-4 w-4" />
         </Button>
-        <CardDescription>
-          Let's get you set up to explore code repositories with AI assistance
-        </CardDescription>
       </CardHeader>
       <CardContent>
         {renderStepIndicator()}
