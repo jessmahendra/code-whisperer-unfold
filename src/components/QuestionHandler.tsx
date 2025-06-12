@@ -102,6 +102,23 @@ export default function QuestionHandler({
         repository: getCurrentRepository()
       });
       
+      // If asking about downloads and using mock data, force refresh
+      const isDownloadQuestion = question.toLowerCase().includes("download") || 
+                                question.toLowerCase().includes("install") ||
+                                question.toLowerCase().includes("app");
+      
+      if (isDownloadQuestion && isUsingMockData()) {
+        console.log("Download question detected with mock data, forcing knowledge base refresh");
+        await initializeKnowledgeBase(true);
+        
+        const postRefreshDiagnostics = getEnhancedDiagnostics();
+        console.log("Post-refresh diagnostics:", {
+          usingMockData: isUsingMockData(),
+          knowledgeBaseSize: postRefreshDiagnostics.knowledgeBaseSize,
+          scannedFiles: postRefreshDiagnostics.lastScanDiagnostics.scannedFiles.length
+        });
+      }
+      
       // Detect if it's a how-to question to modify the prompt approach
       const isHowToQuestion = question.toLowerCase().includes("how to") || 
                              question.toLowerCase().startsWith("how do") ||

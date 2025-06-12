@@ -4,6 +4,18 @@ import { KnowledgeEntry } from './types';
 // Mock knowledge base entries for demo purposes
 export const mockKnowledgeEntries: KnowledgeEntry[] = [
   {
+    type: 'content',
+    content: 'Download Granola for Mac, Windows, iOS, and Android (waitlist available)',
+    filePath: 'app/downloads/page.tsx',
+    keywords: ['download', 'mac', 'windows', 'ios', 'android', 'app', 'install', 'platform'],
+  },
+  {
+    type: 'content',
+    content: 'Download links and installation instructions for Granola app across platforms',
+    filePath: 'app/components/DownloadSection.tsx',
+    keywords: ['download', 'links', 'installation', 'platform', 'app', 'granola'],
+  },
+  {
     type: 'comment',
     content: '/** Processes subscription payments through Stripe integration */',
     filePath: 'ghost/core/core/server/services/members/payment.js',
