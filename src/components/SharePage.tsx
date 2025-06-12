@@ -24,123 +24,38 @@ export default function SharePage() {
   const [answer, setAnswer] = useState<ShareableAnswer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<{
-    hasLocalStorage: boolean;
-    hasSessionStorage: boolean;
-    availableIds: string[];
-    searchedId: string;
-    currentUrl: string;
-    extractedId: string;
-    storageContents: any;
-  }>({
-    hasLocalStorage: false,
-    hasSessionStorage: false,
-    availableIds: [],
-    searchedId: '',
-    currentUrl: '',
-    extractedId: '',
-    storageContents: null
-  });
+  const [retryCount, setRetryCount] = useState(0);
 
-  // Handle logo click with explicit navigation
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
     console.log("Logo clicked from SharePage, navigating to homepage");
     navigate("/");
   };
 
-  // Function to retry loading the answer
-  const retryLoadAnswer = () => {
-    if (id) {
-      setLoading(true);
-      setError(null);
-      loadAnswer(id);
-    }
-  };
-
-  // Separate function to load answer for reusability
-  const loadAnswer = (shareId: string) => {
+  const loadAnswer = async (shareId: string, attempt: number = 1) => {
+    console.log(`🔍 === SHARE PAGE LOAD START (Attempt ${attempt}) ===`);
+    console.log("📍 Current URL:", window.location.href);
+    console.log("🆔 Share ID from params:", shareId);
+    console.log("🆔 Raw useParams ID:", id);
+    
     try {
-      console.log("🔍 === SHARE PAGE LOAD START ===");
-      console.log("📍 Current URL:", window.location.href);
-      console.log("🆔 Share ID from params:", shareId);
-      console.log("🆔 Raw useParams ID:", id);
+      // Enhanced URL validation
+      if (!shareId || typeof shareId !== 'string' || shareId.trim() === '') {
+        console.error("❌ Invalid share ID:", shareId);
+        setError("Invalid share link - missing or invalid ID");
+        return;
+      }
+
+      const cleanId = shareId.trim();
+      console.log(`🧹 Using cleaned ID: "${cleanId}"`);
       
-      // Get comprehensive debug information
-      const STORAGE_KEY = 'unfold_shareableAnswers';
-      const localData = localStorage.getItem(STORAGE_KEY);
-      const sessionData = sessionStorage.getItem(STORAGE_KEY);
-      
-      console.log("🔑 Storage key:", STORAGE_KEY);
-      console.log("📦 localStorage raw:", localData ? `${localData.length} chars` : "EMPTY");
-      console.log("🗂️ sessionStorage raw:", sessionData ? `${sessionData.length} chars` : "EMPTY");
-      
-      let availableIds: string[] = [];
-      let storageContents: any = null;
-      
-      // Parse and analyze localStorage
-      if (localData) {
-        try {
-          const parsed = JSON.parse(localData);
-          availableIds = Object.keys(parsed);
-          storageContents = parsed;
-          console.log("✅ localStorage parsed successfully");
-          console.log("📋 Available IDs:", availableIds);
-          console.log("📦 Full storage contents:", parsed);
-          
-          // Check for exact match
-          if (parsed[shareId]) {
-            console.log("✅ Found exact match in localStorage!");
-            console.log("📄 Matched data:", parsed[shareId]);
-          } else {
-            console.log("❌ No exact match in localStorage");
-            
-            // Check for partial matches
-            const partialMatches = availableIds.filter(id => 
-              id.includes(shareId) || shareId.includes(id)
-            );
-            if (partialMatches.length > 0) {
-              console.log("🔍 Partial matches found:", partialMatches);
-            }
-          }
-        } catch (parseError) {
-          console.error("💥 localStorage parse error:", parseError);
-        }
+      // Add a small delay for the first attempt to ensure storage is ready
+      if (attempt === 1) {
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
       
-      // Parse sessionStorage if localStorage didn't work
-      if (sessionData && availableIds.length === 0) {
-        try {
-          const parsed = JSON.parse(sessionData);
-          availableIds = Object.keys(parsed);
-          storageContents = parsed;
-          console.log("✅ sessionStorage parsed successfully");
-          console.log("📋 Available IDs:", availableIds);
-          
-          if (parsed[shareId]) {
-            console.log("✅ Found exact match in sessionStorage!");
-          } else {
-            console.log("❌ No exact match in sessionStorage");
-          }
-        } catch (parseError) {
-          console.error("💥 sessionStorage parse error:", parseError);
-        }
-      }
-      
-      // Update debug info
-      setDebugInfo({
-        hasLocalStorage: !!localData,
-        hasSessionStorage: !!sessionData,
-        availableIds,
-        searchedId: shareId,
-        currentUrl: window.location.href,
-        extractedId: id || 'undefined',
-        storageContents
-      });
-      
-      // Try to get the answer using the service
       console.log("🔄 Calling getShareableAnswer service...");
-      const sharedAnswer = getShareableAnswer(shareId);
+      const sharedAnswer = getShareableAnswer(cleanId);
       console.log("📤 Service returned:", sharedAnswer);
       
       if (sharedAnswer) {
@@ -148,20 +63,21 @@ export default function SharePage() {
         setAnswer(sharedAnswer);
         setError(null);
       } else {
-        console.log("❌ Service returned null");
+        console.log(`❌ Service returned null for ID: ${cleanId}`);
         
-        // Try direct access as last resort
-        if (storageContents && storageContents[shareId]) {
-          console.log("🔧 Found via direct access, using that");
-          setAnswer(storageContents[shareId]);
-          setError(null);
-        } else {
-          const errorMsg = availableIds.length > 0 
-            ? `Share ID "${shareId}" not found. Available: ${availableIds.join(', ')}`
-            : `Share ID "${shareId}" not found. No shared answers in storage.`;
-          console.log("❌ Setting error:", errorMsg);
-          setError(errorMsg);
+        // For first few attempts, try again with a delay
+        if (attempt <= 3) {
+          console.log(`🔄 Retrying in ${attempt * 500}ms...`);
+          setTimeout(() => {
+            loadAnswer(shareId, attempt + 1);
+          }, attempt * 500);
+          return;
         }
+        
+        // After multiple attempts, show error
+        const errorMsg = `Share ID "${cleanId}" not found. This could be because the link was created in a different browser session or the data was cleared.`;
+        console.log("❌ Setting error after", attempt, "attempts:", errorMsg);
+        setError(errorMsg);
       }
       
       console.log("🔍 === SHARE PAGE LOAD END ===");
@@ -170,6 +86,17 @@ export default function SharePage() {
       setError("Failed to load the shared answer");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const retryLoadAnswer = () => {
+    if (id) {
+      setLoading(true);
+      setError(null);
+      const newRetryCount = retryCount + 1;
+      setRetryCount(newRetryCount);
+      console.log(`🔄 Manual retry attempt ${newRetryCount}`);
+      loadAnswer(id, 1);
     }
   };
 
@@ -203,7 +130,6 @@ export default function SharePage() {
     if (id) trackShare(id, platform);
   };
 
-  // Format date string
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Unknown';
     return new Date(dateString).toLocaleDateString();
@@ -257,49 +183,26 @@ export default function SharePage() {
             <CardContent className="space-y-4">
               <p>This could be because:</p>
               <ul className="list-disc pl-5 space-y-1">
-                <li>The link is incorrect or incomplete</li>
-                <li>The answer was created in a different browser or device</li>
+                <li>The link was created in a different browser or device</li>
                 <li>Your browser's storage was cleared or is restricted</li>
                 <li>The answer has expired or was removed</li>
+                <li>There was a temporary loading issue</li>
               </ul>
               
               <div className="rounded-md bg-amber-50 p-4 border border-amber-200">
                 <p className="text-sm text-amber-800">
-                  <strong>Note:</strong> In this current demo version, shared answers are stored in your browser's storage.
+                  <strong>Note:</strong> In this demo version, shared answers are stored in your browser's storage.
                   For a production environment, a proper backend database would be used for persistence.
                 </p>
               </div>
               
-              {/* Enhanced debug information */}
-              <div className="mt-4 rounded-md bg-gray-50 p-4 border border-gray-200">
-                <p className="text-sm text-gray-700 font-medium mb-2">Detailed Debug Information:</p>
-                <div className="text-xs text-gray-600 space-y-1">
-                  <div><strong>Current URL:</strong> {debugInfo.currentUrl}</div>
-                  <div><strong>Extracted ID from params:</strong> {debugInfo.extractedId}</div>
-                  <div><strong>Searched ID:</strong> {debugInfo.searchedId || "Not provided"}</div>
-                  <div><strong>localStorage available:</strong> {debugInfo.hasLocalStorage ? "Yes" : "No"}</div>
-                  <div><strong>sessionStorage available:</strong> {debugInfo.hasSessionStorage ? "Yes" : "No"}</div>
-                  <div><strong>Available IDs ({debugInfo.availableIds.length}):</strong></div>
-                  {debugInfo.availableIds.length > 0 ? (
-                    <ul className="ml-4 list-disc">
-                      {debugInfo.availableIds.map(availableId => (
-                        <li key={availableId}>{availableId}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="ml-4 text-red-600">No shared answers found in storage</div>
-                  )}
-                  
-                  {debugInfo.storageContents && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer font-medium">Full Storage Contents</summary>
-                      <pre className="mt-1 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
-                        {JSON.stringify(debugInfo.storageContents, null, 2)}
-                      </pre>
-                    </details>
-                  )}
+              {retryCount > 0 && (
+                <div className="rounded-md bg-blue-50 p-4 border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>Retry attempts:</strong> {retryCount}. If the issue persists, the shared answer may not be available in this browser.
+                  </p>
                 </div>
-              </div>
+              )}
             </CardContent>
             <CardFooter className="flex gap-2">
               <Button asChild variant="default">
@@ -308,7 +211,7 @@ export default function SharePage() {
               {id && (
                 <Button variant="outline" onClick={retryLoadAnswer}>
                   <RefreshCw className="h-4 w-4 mr-2" />
-                  Try Again
+                  Try Again {retryCount > 0 && `(${retryCount})`}
                 </Button>
               )}
             </CardFooter>
@@ -361,12 +264,10 @@ export default function SharePage() {
             </div>
             
             <div className="border-t pt-4 mt-6">
-              {/* Confidence Score */}
               <div className="mb-4">
                 <ConfidenceScore score={Math.round(answer.answer.confidence * 100)} />
               </div>
               
-              {/* Code References */}
               <h4 className="text-sm font-medium mb-2">References</h4>
               <div className="space-y-2">
                 {answer.answer.references.map((reference: Reference, index) => (
@@ -382,7 +283,6 @@ export default function SharePage() {
                 ))}
               </div>
               
-              {/* Share Options */}
               <div className="mt-6 pt-6 border-t">
                 <h4 className="text-sm font-medium mb-3">Share this answer</h4>
                 <div className="flex flex-wrap gap-2">
@@ -448,7 +348,7 @@ export default function SharePage() {
               </div>
               
               <div className="text-xs text-muted-foreground mt-4">
-                Last updated: {formatDate(answer.answer.lastUpdated)}
+                Last updated: {formatDate(answer.answer.lastUpdated)} • Views: {answer.views}
               </div>
             </div>
           </div>

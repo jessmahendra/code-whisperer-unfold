@@ -39,28 +39,69 @@ export interface ShareableAnswer {
 // Storage key for local and session storage
 const STORAGE_KEY = 'unfold_shareableAnswers';
 
-// Helper function to safely get data from storage with detailed logging
-function getSafeStorage(): Record<string, ShareableAnswer> {
-  console.log("🔍 === STORAGE RETRIEVAL START ===");
-  console.log("🔑 Using storage key:", STORAGE_KEY);
+// Enhanced storage operations with redundancy and verification
+async function saveDataWithVerification(data: Record<string, ShareableAnswer>): Promise<boolean> {
+  console.log("💾 === ENHANCED STORAGE SAVE START ===");
+  const dataString = JSON.stringify(data);
+  const keys = Object.keys(data);
+  console.log("💾 Saving", keys.length, "items:", keys);
+  
+  let success = false;
   
   try {
-    // Check both storages and log everything
-    const localData = localStorage.getItem(STORAGE_KEY);
-    const sessionData = sessionStorage.getItem(STORAGE_KEY);
+    // Save to both storages simultaneously for redundancy
+    localStorage.setItem(STORAGE_KEY, dataString);
+    sessionStorage.setItem(STORAGE_KEY, dataString);
     
-    console.log("📦 localStorage data:", localData ? `Found ${localData.length} chars` : "NOT FOUND");
-    console.log("🗂️ sessionStorage data:", sessionData ? `Found ${sessionData.length} chars` : "NOT FOUND");
+    // Wait a moment for storage to settle
+    await new Promise(resolve => setTimeout(resolve, 100));
     
+    // Verify both storages
+    const localCheck = localStorage.getItem(STORAGE_KEY);
+    const sessionCheck = sessionStorage.getItem(STORAGE_KEY);
+    
+    if (localCheck && sessionCheck) {
+      const localData = JSON.parse(localCheck);
+      const sessionData = JSON.parse(sessionCheck);
+      const localKeys = Object.keys(localData);
+      const sessionKeys = Object.keys(sessionData);
+      
+      // Verify all keys are present in both storages
+      const allKeysInLocal = keys.every(key => localKeys.includes(key));
+      const allKeysInSession = keys.every(key => sessionKeys.includes(key));
+      
+      if (allKeysInLocal && allKeysInSession) {
+        console.log("✅ Data successfully saved and verified in both storages");
+        success = true;
+      } else {
+        console.error("❌ Key verification failed");
+        console.error("Expected keys:", keys);
+        console.error("Local keys:", localKeys);
+        console.error("Session keys:", sessionKeys);
+      }
+    } else {
+      console.error("❌ Storage verification failed - data not found after save");
+    }
+  } catch (error) {
+    console.error("💥 Storage save failed:", error);
+  }
+  
+  console.log(`💾 === ENHANCED STORAGE SAVE END (success: ${success}) ===`);
+  return success;
+}
+
+function loadDataWithFallback(): Record<string, ShareableAnswer> {
+  console.log("📦 === ENHANCED STORAGE LOAD START ===");
+  
+  try {
     // Try localStorage first
+    const localData = localStorage.getItem(STORAGE_KEY);
     if (localData) {
       try {
         const parsed = JSON.parse(localData);
         const keys = Object.keys(parsed);
-        console.log("✅ localStorage parsed successfully");
-        console.log("📋 localStorage keys found:", keys);
-        console.log("📦 Full localStorage data structure:", parsed);
-        console.log("🔍 === STORAGE RETRIEVAL END (localStorage success) ===");
+        console.log("✅ Successfully loaded from localStorage:", keys.length, "items");
+        console.log("📋 Keys:", keys);
         return parsed;
       } catch (parseError) {
         console.error("💥 localStorage parse error:", parseError);
@@ -68,14 +109,13 @@ function getSafeStorage(): Record<string, ShareableAnswer> {
     }
     
     // Fallback to sessionStorage
+    const sessionData = sessionStorage.getItem(STORAGE_KEY);
     if (sessionData) {
       try {
         const parsed = JSON.parse(sessionData);
         const keys = Object.keys(parsed);
-        console.log("✅ sessionStorage parsed successfully");
-        console.log("📋 sessionStorage keys found:", keys);
-        console.log("🗂️ Full sessionStorage data structure:", parsed);
-        console.log("🔍 === STORAGE RETRIEVAL END (sessionStorage success) ===");
+        console.log("✅ Successfully loaded from sessionStorage:", keys.length, "items");
+        console.log("📋 Keys:", keys);
         return parsed;
       } catch (parseError) {
         console.error("💥 sessionStorage parse error:", parseError);
@@ -83,109 +123,29 @@ function getSafeStorage(): Record<string, ShareableAnswer> {
     }
     
     console.log("❌ No valid data found in either storage");
-    console.log("🔍 === STORAGE RETRIEVAL END (no data) ===");
     return {};
   } catch (error) {
-    console.error("💥 Error in getSafeStorage:", error);
-    console.log("🔍 === STORAGE RETRIEVAL END (error) ===");
+    console.error("💥 Error in loadDataWithFallback:", error);
     return {};
+  } finally {
+    console.log("📦 === ENHANCED STORAGE LOAD END ===");
   }
-}
-
-// Helper function to safely set data to storage with immediate verification
-function setSafeStorage(data: Record<string, ShareableAnswer>): boolean {
-  console.log("💾 === STORAGE SAVE START ===");
-  const keys = Object.keys(data);
-  console.log("💾 Attempting to save data with keys:", keys);
-  console.log("💾 Full data structure:", data);
-  
-  let success = false;
-  const dataString = JSON.stringify(data);
-  console.log("💾 Serialized data length:", dataString.length);
-  
-  // Try localStorage
-  try {
-    localStorage.setItem(STORAGE_KEY, dataString);
-    console.log("✅ Data written to localStorage");
-    
-    // Immediate verification
-    const verification = localStorage.getItem(STORAGE_KEY);
-    if (verification) {
-      const verifiedData = JSON.parse(verification);
-      const verifiedKeys = Object.keys(verifiedData);
-      console.log("✅ localStorage verification successful");
-      console.log("📋 Verified keys:", verifiedKeys);
-      
-      // Check if all keys are present
-      const allKeysPresent = keys.every(key => verifiedKeys.includes(key));
-      if (allKeysPresent) {
-        console.log("✅ All keys verified in localStorage");
-        success = true;
-      } else {
-        console.error("❌ Some keys missing after localStorage save");
-        console.error("Expected:", keys);
-        console.error("Found:", verifiedKeys);
-      }
-    } else {
-      console.error("❌ localStorage verification failed - no data returned");
-    }
-  } catch (e) {
-    console.error("💥 localStorage save failed:", e);
-  }
-  
-  // Try sessionStorage as backup
-  try {
-    sessionStorage.setItem(STORAGE_KEY, dataString);
-    console.log("✅ Data written to sessionStorage");
-    
-    // Immediate verification
-    const verification = sessionStorage.getItem(STORAGE_KEY);
-    if (verification) {
-      const verifiedData = JSON.parse(verification);
-      const verifiedKeys = Object.keys(verifiedData);
-      console.log("✅ sessionStorage verification successful");
-      console.log("📋 Verified keys:", verifiedKeys);
-      
-      // Check if all keys are present
-      const allKeysPresent = keys.every(key => verifiedKeys.includes(key));
-      if (allKeysPresent) {
-        console.log("✅ All keys verified in sessionStorage");
-        success = true;
-      } else {
-        console.error("❌ Some keys missing after sessionStorage save");
-      }
-    } else {
-      console.error("❌ sessionStorage verification failed - no data returned");
-    }
-  } catch (e) {
-    console.error("💥 sessionStorage save failed:", e);
-  }
-  
-  console.log(`💾 === STORAGE SAVE END (success: ${success}) ===`);
-  return success;
 }
 
 /**
  * Generate a readable but unique ID for shareable answers
  */
 export function generateReadableId(): string {
-  // Use a combination of words for readable IDs
   const adjectives = ['quick', 'smart', 'clever', 'bright', 'easy', 'simple', 'handy'];
   const nouns = ['answer', 'guide', 'help', 'tip', 'info', 'notes', 'hint'];
-  
-  // Add randomness with a 5-character alphanumeric string
   const random = Math.random().toString(36).substring(2, 7);
-  
-  // Pick random words
   const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
   const noun = nouns[Math.floor(Math.random() * nouns.length)];
-  
-  // Combine into readable ID (e.g., "quick-answer-x7f3q")
   return `${adjective}-${noun}-${random}`;
 }
 
 /**
- * Create a shareable answer from the current question and answer
+ * Create a shareable answer with enhanced persistence and verification
  */
 export async function createShareableAnswer(
   question: string, 
@@ -198,11 +158,9 @@ export async function createShareableAnswer(
 ): Promise<{ id: string; url: string; fullUrl: string }> {
   console.log("🎯 === CREATE SHAREABLE ANSWER START ===");
   
-  // Generate a unique, readable ID
   const shareId = generateReadableId();
   console.log(`🆔 Generated share ID: ${shareId}`);
   
-  // Create the shareable answer object
   const shareableAnswer: ShareableAnswer = {
     id: shareId,
     question,
@@ -221,42 +179,32 @@ export async function createShareableAnswer(
   
   console.log("📝 Created shareable answer object:", shareableAnswer);
   
-  // Get existing data and add new answer
-  console.log("📦 Getting existing storage data...");
-  const existingAnswers = getSafeStorage();
-  console.log("📦 Existing data retrieved:", existingAnswers);
-  
-  // Add the new answer
+  // Load existing data
+  const existingAnswers = loadDataWithFallback();
   existingAnswers[shareId] = shareableAnswer;
-  console.log("📦 Combined data to save:", existingAnswers);
   
-  // Save to storage with verification
-  console.log("💾 Saving to storage...");
-  const saveSuccess = setSafeStorage(existingAnswers);
+  // Save with enhanced verification
+  const saveSuccess = await saveDataWithVerification(existingAnswers);
   
   if (!saveSuccess) {
-    console.error("💥 Failed to save shareable answer to storage");
+    console.error("💥 Failed to save shareable answer");
     throw new Error("Could not save shareable answer to browser storage");
   }
   
-  // Double-check by retrieving immediately
-  console.log("🔍 Double-checking storage after save...");
-  await new Promise(resolve => setTimeout(resolve, 50)); // Small delay for storage to settle
+  // Triple-check by loading again
+  await new Promise(resolve => setTimeout(resolve, 200));
+  const verificationData = loadDataWithFallback();
   
-  const doubleCheck = getSafeStorage();
-  if (!doubleCheck[shareId]) {
-    console.error("💥 Double-check failed: Answer not found after save");
-    console.error("Expected ID:", shareId);
-    console.error("Available IDs:", Object.keys(doubleCheck));
-    throw new Error("Storage verification failed after save");
+  if (!verificationData[shareId]) {
+    console.error("💥 Final verification failed");
+    throw new Error("Storage verification failed - answer not found after save");
   }
   
   console.log(`✅ Successfully created and verified shareable answer: ${shareId}`);
   
-  // Initialize example data if this is the first share
+  // Initialize example data if needed
   initializeExampleData();
   
-  // Return the shareable link data
   const baseUrl = window.location.origin;
   const result = {
     id: shareId,
@@ -270,32 +218,32 @@ export async function createShareableAnswer(
 }
 
 /**
- * Get a shareable answer by ID with comprehensive debugging
+ * Get a shareable answer by ID with enhanced debugging and fallback mechanisms
  */
 export function getShareableAnswer(id: string): ShareableAnswer | null {
   console.log(`🔍 === GET SHAREABLE ANSWER START ===`);
   console.log(`🎯 Looking for answer with ID: "${id}"`);
   
-  if (!id) {
-    console.error("❌ No ID provided to getShareableAnswer");
-    console.log(`🔍 === GET SHAREABLE ANSWER END (no ID) ===`);
+  if (!id || typeof id !== 'string' || id.trim() === '') {
+    console.error("❌ Invalid ID provided:", id);
     return null;
   }
   
+  const cleanId = id.trim();
+  console.log(`🧹 Cleaned ID: "${cleanId}"`);
+  
   try {
-    // Get all data from storage
-    const existingAnswers = getSafeStorage();
+    const existingAnswers = loadDataWithFallback();
     const availableIds = Object.keys(existingAnswers);
     
     console.log("📋 Available IDs in storage:", availableIds);
-    console.log("🔍 Looking for exact match...");
     
     // Check for exact match
-    if (existingAnswers[id]) {
-      console.log(`✅ Found exact match for ID: ${id}`);
-      const answer = existingAnswers[id];
+    if (existingAnswers[cleanId]) {
+      console.log(`✅ Found exact match for ID: ${cleanId}`);
+      const answer = existingAnswers[cleanId];
       
-      // Update view count and referrer
+      // Update view count
       answer.views += 1;
       if (document.referrer) {
         answer.referrers.push({
@@ -304,19 +252,17 @@ export function getShareableAnswer(id: string): ShareableAnswer | null {
         });
       }
       
-      // Save updated stats
-      existingAnswers[id] = answer;
-      setSafeStorage(existingAnswers);
+      // Save updated stats (fire and forget)
+      existingAnswers[cleanId] = answer;
+      saveDataWithVerification(existingAnswers).catch(console.error);
       
-      console.log(`✅ Updated view count for ID: ${id}`);
       console.log(`🔍 === GET SHAREABLE ANSWER END (found) ===`);
       return answer;
     }
     
-    // If no exact match, try case-insensitive
-    console.log("🔍 No exact match, trying case-insensitive search...");
+    // Try case-insensitive match
     const caseInsensitiveMatch = availableIds.find(availableId => 
-      availableId.toLowerCase() === id.toLowerCase()
+      availableId.toLowerCase() === cleanId.toLowerCase()
     );
     
     if (caseInsensitiveMatch) {
@@ -326,21 +272,14 @@ export function getShareableAnswer(id: string): ShareableAnswer | null {
       return answer;
     }
     
-    // Log detailed information for debugging
-    console.log(`❌ No match found for ID: ${id}`);
-    console.log("🔍 Detailed comparison:");
-    availableIds.forEach(availableId => {
-      console.log(`  - Available: "${availableId}" (length: ${availableId.length})`);
-      console.log(`  - Searching: "${id}" (length: ${id.length})`);
-      console.log(`  - Match: ${availableId === id}`);
-    });
-    
-    console.log(`🔍 === GET SHAREABLE ANSWER END (not found) ===`);
+    console.log(`❌ No match found for ID: ${cleanId}`);
+    console.log("🔍 Available IDs:", availableIds);
     return null;
   } catch (error) {
     console.error('💥 Error retrieving shareable answer:', error);
-    console.log(`🔍 === GET SHAREABLE ANSWER END (error) ===`);
     return null;
+  } finally {
+    console.log(`🔍 === GET SHAREABLE ANSWER END ===`);
   }
 }
 
@@ -349,7 +288,7 @@ export function getShareableAnswer(id: string): ShareableAnswer | null {
  */
 export function trackShare(id: string, platform: string): void {
   try {
-    const existingAnswers = getSafeStorage();
+    const existingAnswers = loadDataWithFallback();
     const answer = existingAnswers[id];
     
     if (!answer) {
@@ -359,7 +298,7 @@ export function trackShare(id: string, platform: string): void {
     
     answer.shares += 1;
     existingAnswers[id] = answer;
-    setSafeStorage(existingAnswers);
+    saveDataWithVerification(existingAnswers).catch(console.error);
     
     console.log(`Tracked share for ID ${id} on ${platform}`);
   } catch (error) {
@@ -372,15 +311,14 @@ export function trackShare(id: string, platform: string): void {
  */
 function initializeExampleData(): void {
   try {
-    const existingAnswers = getSafeStorage();
+    const existingAnswers = loadDataWithFallback();
     
-    // Only add example if storage is empty or doesn't have the example
     if (!existingAnswers['example-demo-abc123']) {
       const exampleAnswer: ShareableAnswer = {
         id: 'example-demo-abc123',
         question: 'How does the share functionality work in the Unfold application?',
         answer: {
-          text: "The share functionality in Unfold allows users to create shareable links for answers generated by the system. The links are stored in both localStorage and sessionStorage for better persistence, which means they'll work across different browser sessions unless storage is explicitly cleared. The share feature includes metadata for social sharing and tracks usage analytics like views and share counts.",
+          text: "The share functionality in Unfold allows users to create shareable links for answers generated by the system. The links are stored in both localStorage and sessionStorage for better persistence, which means they'll work across different browser sessions unless storage is explicitly cleared.",
           confidence: 0.85,
           references: [
             {
@@ -388,33 +326,21 @@ function initializeExampleData(): void {
               lineNumbers: '10-250',
               snippet: 'export function createShareableAnswer(...) { ... }',
               lastUpdated: new Date().toISOString()
-            },
-            {
-              filePath: 'src/components/ShareButton.tsx',
-              lineNumbers: '20-90',
-              snippet: 'export default function ShareButton(...) { ... }',
-              lastUpdated: new Date().toISOString()
             }
           ],
-          lastUpdated: new Date().toISOString(),
-          visualContext: {
-            type: 'flowchart',
-            syntax: 'graph TD\n  A[User clicks Share] --> B[Generate unique ID]\n  B --> C[Store in localStorage]\n  C --> D[Create shareable URL]\n  D --> E[Copy to clipboard]\n  E --> F[Show success toast]'
-          }
+          lastUpdated: new Date().toISOString()
         },
         createdAt: new Date().toISOString(),
         views: 12,
         shares: 5,
-        referrers: [
-          {
-            url: 'direct',
-            date: new Date().toISOString()
-          }
-        ]
+        referrers: [{
+          url: 'direct',
+          date: new Date().toISOString()
+        }]
       };
       
       existingAnswers['example-demo-abc123'] = exampleAnswer;
-      setSafeStorage(existingAnswers);
+      saveDataWithVerification(existingAnswers).catch(console.error);
       console.log("Initialized example shareable answer");
     }
   } catch (error) {
@@ -425,11 +351,8 @@ function initializeExampleData(): void {
 // Initialize example data on module load
 initializeExampleData();
 
-/**
- * Listen for shareable answer events from other tabs/windows
- */
+// Enhanced cross-tab synchronization
 if (typeof window !== 'undefined') {
-  // Listen for changes in localStorage from other tabs
   window.addEventListener('storage', (event) => {
     if (event.key === STORAGE_KEY && event.newValue) {
       console.log("Storage event detected, synchronizing data");
@@ -440,9 +363,4 @@ if (typeof window !== 'undefined') {
       }
     }
   });
-  
-  // Listen for custom events from this tab
-  window.addEventListener('shareableAnswerCreated', ((event: CustomEvent) => {
-    console.log('Shareable answer created event:', event.detail.id);
-  }) as EventListener);
 }
