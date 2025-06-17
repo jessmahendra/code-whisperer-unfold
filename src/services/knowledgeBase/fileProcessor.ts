@@ -1,4 +1,3 @@
-
 import { getFileContent, getRepositoryContents } from '../githubConnector';
 import { extractKnowledge, ExtractedKnowledge } from '../codeParser';
 import { KnowledgeEntry } from './types';
@@ -6,6 +5,92 @@ import { extractKeywords } from './keywordUtils';
 
 // Cache for processed files to avoid redundant processing
 const processedFilesCache: Set<string> = new Set();
+
+/**
+ * Enhanced README content processor
+ */
+function processReadmeContent(content: string, filePath: string): KnowledgeEntry[] {
+  const entries: KnowledgeEntry[] = [];
+  
+  // Split README into sections by headers
+  const sections = content.split(/^#+\s+/m).filter(section => section.trim());
+  
+  // Add full README as primary entry
+  entries.push({
+    type: 'content',
+    content: content.substring(0, 2000), // Store substantial content
+    filePath,
+    keywords: extractKeywords(`readme documentation ${content.substring(0, 500)}`),
+    metadata: { 
+      isReadme: true, 
+      priority: 'high',
+      fileType: 'documentation',
+      sections: sections.length
+    }
+  });
+  
+  // Process each section separately for better searchability
+  sections.forEach((section, index) => {
+    if (section.trim().length > 50) {
+      const sectionTitle = section.split('\n')[0].trim();
+      entries.push({
+        type: 'content',
+        content: section.substring(0, 800),
+        filePath: `${filePath}#section-${index}`,
+        keywords: extractKeywords(`readme ${sectionTitle} ${section.substring(0, 200)}`),
+        metadata: {
+          isReadmeSection: true,
+          sectionTitle,
+          sectionIndex: index,
+          priority: 'medium'
+        }
+      });
+    }
+  });
+  
+  console.log(`📖 Processed README: ${entries.length} entries from ${filePath}`);
+  return entries;
+}
+
+/**
+ * Enhanced markdown content processor
+ */
+function processMarkdownContent(content: string, filePath: string): KnowledgeEntry[] {
+  const entries: KnowledgeEntry[] = [];
+  
+  // Detect if this is documentation
+  const isDocumentation = filePath.toLowerCase().includes('doc') || 
+                         filePath.toLowerCase().includes('guide') ||
+                         content.includes('##') || content.includes('###');
+  
+  if (isDocumentation) {
+    entries.push({
+      type: 'content',
+      content: content.substring(0, 1500),
+      filePath,
+      keywords: extractKeywords(`documentation ${content.substring(0, 300)}`),
+      metadata: {
+        isDocumentation: true,
+        priority: 'medium',
+        fileType: 'markdown'
+      }
+    });
+  } else {
+    // Regular markdown processing
+    entries.push({
+      type: 'content',
+      content: content.substring(0, 1000),
+      filePath,
+      keywords: extractKeywords(content.substring(0, 200)),
+      metadata: {
+        fileType: 'markdown',
+        priority: 'low'
+      }
+    });
+  }
+  
+  return entries;
+}
 
 /**
  * Processes a file by extracting knowledge from its content
@@ -29,7 +114,27 @@ export async function processFile(
     // Get file content
     const content = await getFileContent(filePath);
     
-    // Extract knowledge
+    // Enhanced README detection and processing
+    const fileName = filePath.split('/').pop()?.toLowerCase() || '';
+    const isReadme = fileName === 'readme.md' || fileName === 'readme.txt' || fileName === 'readme';
+    
+    if (isReadme) {
+      console.log(`🎯 Processing README file: ${filePath}`);
+      const readmeEntries = processReadmeContent(content, filePath);
+      knowledgeBase.push(...readmeEntries);
+      console.log(`✅ README processed: ${readmeEntries.length} entries added`);
+      return;
+    }
+    
+    // Enhanced markdown processing
+    if (filePath.endsWith('.md') || filePath.endsWith('.mdx')) {
+      const markdownEntries = processMarkdownContent(content, filePath);
+      knowledgeBase.push(...markdownEntries);
+      console.log(`📝 Markdown processed: ${markdownEntries.length} entries from ${filePath}`);
+      return;
+    }
+    
+    // Extract knowledge using existing parser
     const knowledge: ExtractedKnowledge = extractKnowledge(content, filePath);
     
     // Add JSDoc comments to knowledge base
@@ -163,9 +268,9 @@ export async function processFile(
     }
     
     // Log successful file processing
-    console.log(`Successfully processed file: ${filePath}`);
+    console.log(`✅ Successfully processed file: ${filePath}`);
   } catch (error) {
-    console.error(`Error processing file ${filePath}:`, error);
+    console.error(`❌ Error processing file ${filePath}:`, error);
   }
 }
 

@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 import { KnowledgeEntry, KnowledgeBaseStats } from './types';
 import { mockKnowledgeEntries } from './mockData';
@@ -255,13 +254,14 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
       initializationState.usingMockData = false;
       
       const stats = getKnowledgeBaseStats();
-      const successMsg = `Enhanced scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files.`;
+      const readmeFiles = diagnostics.scannedFiles.filter(f => f.toLowerCase().includes('readme'));
+      const successMsg = `Enhanced scan complete: ${stats.totalEntries} entries from ${diagnostics.scannedFiles.length} files (${readmeFiles.length} README files found).`;
       toast.success(successMsg, {
         description: 'Repository scan completed and cached for 2 weeks.',
         duration: 4000
       });
       console.log(successMsg);
-      console.log('Sample scanned files:', diagnostics.scannedFiles.slice(0, 5));
+      console.log('README files found:', readmeFiles);
       
       saveToCache();
     }
@@ -291,23 +291,42 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
     return [];
   }
   
-  console.log(`Enhanced search: ${keywords.join(', ')} across ${knowledgeBase.length} entries`);
+  console.log(`🔍 Enhanced search: ${keywords.join(', ')} across ${knowledgeBase.length} entries`);
   console.log(`Using mock data: ${initializationState.usingMockData}`);
   
-  // Enhanced scoring algorithm
+  // Enhanced scoring algorithm with file name and README boosting
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
+    const lowerQuery = query.toLowerCase();
+    const fileName = entry.filePath.split('/').pop()?.toLowerCase() || '';
+    const lowerContent = entry.content.toLowerCase();
     
-    // Exact keyword matches (highest weight)
+    // HIGHEST PRIORITY: README file requests
+    if (lowerQuery.includes('readme') && fileName.includes('readme')) {
+      score += 10.0;
+      console.log(`🎯 README match boost: ${entry.filePath}`);
+    }
+    
+    // HIGH PRIORITY: Exact file name matches
+    if (fileName.includes(lowerQuery.replace(/\s+/g, ''))) {
+      score += 5.0;
+    }
+    
+    // ENHANCED: File path matches for documentation requests
+    if (lowerQuery.includes('doc') && (entry.filePath.includes('doc') || entry.filePath.includes('readme'))) {
+      score += 3.0;
+    }
+    
+    // Enhanced keyword matching
     keywords.forEach(keyword => {
+      const lowerKeyword = keyword.toLowerCase();
+      
+      // Exact keyword matches in indexed keywords (highest weight)
       if (entry.keywords.includes(keyword)) {
         score += 2.0;
       }
       
-      // Content matches (medium weight)
-      const lowerContent = entry.content.toLowerCase();
-      const lowerKeyword = keyword.toLowerCase();
-      
+      // Content matches (medium weight) with context bonus
       if (lowerContent.includes(lowerKeyword)) {
         score += 1.0;
         
@@ -315,6 +334,11 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
         const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword}\\b`, 'i');
         if (wordBoundaryRegex.test(lowerContent)) {
           score += 0.5;
+        }
+        
+        // Extra bonus for matches in documentation/README content
+        if (entry.metadata?.isReadme || entry.metadata?.isDocumentation) {
+          score += 1.0;
         }
       }
       
@@ -332,20 +356,41 @@ export function searchKnowledge(query: string): KnowledgeEntry[] {
       }
     });
     
+    // Priority boost for high-priority content
+    if (entry.metadata?.priority === 'high') {
+      score *= 1.5;
+    } else if (entry.metadata?.priority === 'medium') {
+      score *= 1.2;
+    }
+    
     return {
       entry,
-      score: score / keywords.length
+      score: score / Math.max(keywords.length, 1),
+      debugInfo: {
+        filePath: entry.filePath,
+        isReadme: entry.metadata?.isReadme,
+        finalScore: score / Math.max(keywords.length, 1)
+      }
     };
   });
   
   // Enhanced filtering and sorting
   const results = scoredEntries
-    .filter(item => item.score > 0.02) // Lower threshold for better recall
+    .filter(item => item.score > 0.01) // Lower threshold for better recall
     .sort((a, b) => b.score - a.score)
-    .slice(0, 20) // Increase result limit
+    .slice(0, 25) // Increase result limit
     .map(item => item.entry);
   
-  console.log(`Enhanced search found ${results.length} results (scores: ${scoredEntries.filter(s => s.score > 0.02).slice(0, 3).map(s => s.score.toFixed(2)).join(', ')})`);
+  console.log(`🔍 Enhanced search found ${results.length} results`);
+  
+  // Debug logging for README searches
+  if (query.toLowerCase().includes('readme')) {
+    console.log('🔍 README search debug:');
+    scoredEntries
+      .filter(s => s.score > 0)
+      .slice(0, 5)
+      .forEach(s => console.log(`  ${s.debugInfo.filePath}: ${s.debugInfo.finalScore.toFixed(2)} (README: ${s.debugInfo.isReadme})`));
+  }
   
   return results;
 }
