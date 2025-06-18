@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
@@ -7,7 +8,7 @@ import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
 import { getCurrentRepository } from "@/services/githubConnector";
-import { initializeKnowledgeBase, isUsingMockData, getEnhancedDiagnostics } from "@/services/knowledgeBase";
+import { initializeKnowledgeBase, isUsingMockData, getEnhancedDiagnostics, searchKnowledge } from "@/services/knowledgeBase";
 
 export default function QuestionHandler({
   className
@@ -76,12 +77,14 @@ export default function QuestionHandler({
     if (currentRepo) {
       const repoName = currentRepo.repo;
       return [
+        `Summarize the README for ${repoName}`,
         `How does ${repoName} handle authentication?`,
         `What is the main architecture of ${repoName}?`,
         `How can I contribute to ${repoName}?`
       ];
     }
     return [
+      "Summarize the README file",
       "How does Ghost handle image uploads?",
       "What is the difference between a post and a page in Ghost?",
       "How can I integrate Ghost with other services?"
@@ -101,6 +104,18 @@ export default function QuestionHandler({
         knowledgeBaseSize: preDiagnostics.knowledgeBaseSize,
         repository: getCurrentRepository()
       });
+      
+      // Test the search function directly for README queries
+      const isReadmeQuestion = question.toLowerCase().includes("readme") || 
+                              question.toLowerCase().includes("summary") || 
+                              question.toLowerCase().includes("summarize") ||
+                              question.toLowerCase().includes("overview");
+      
+      if (isReadmeQuestion) {
+        console.log("README question detected, testing search function...");
+        const searchResults = await searchKnowledge(question);
+        console.log("Direct search results:", searchResults.length > 0 ? searchResults[0] : 'No results');
+      }
       
       // If asking about downloads and using mock data, force refresh
       const isDownloadQuestion = question.toLowerCase().includes("download") || 

@@ -17,6 +17,7 @@ import {
   clearScanCache 
 } from '../scanScheduler';
 import { getActiveRepository } from '../userRepositories';
+import { getFileContent } from '../githubConnector';
 
 // Knowledge base - initialized with mock data but will be populated with real data
 let knowledgeBase: KnowledgeEntry[] = [...mockKnowledgeEntries];
@@ -155,6 +156,93 @@ function saveToCache(): void {
 }
 
 /**
+ * Direct README fallback function - attempts to find README content directly
+ */
+async function findReadmeDirectly(): Promise<KnowledgeEntry | null> {
+  console.log('🔍 Attempting direct README lookup fallback...');
+  
+  // First, check if we have any README entries in knowledge base
+  const readmeEntries = knowledgeBase.filter(entry => {
+    const fileName = entry.filePath.split('/').pop()?.toLowerCase() || '';
+    const isReadmeFile = fileName === 'readme.md' || fileName === 'readme.txt' || fileName === 'readme' || fileName.startsWith('readme');
+    const hasReadmeMetadata = entry.metadata?.isReadme || entry.metadata?.isReadmeSection;
+    return isReadmeFile || hasReadmeMetadata;
+  });
+  
+  console.log(`📖 Found ${readmeEntries.length} README entries in knowledge base`);
+  
+  if (readmeEntries.length > 0) {
+    // Return the primary README entry (not a section)
+    const primaryReadme = readmeEntries.find(entry => entry.metadata?.isReadme && !entry.metadata?.isReadmeSection) || readmeEntries[0];
+    console.log(`📖 Returning primary README: ${primaryReadme.filePath}`);
+    return primaryReadme;
+  }
+  
+  // If no README in knowledge base, try to fetch directly from GitHub
+  try {
+    console.log('📖 Attempting direct GitHub README fetch...');
+    const readmePaths = ['README.md', 'readme.md', 'README.txt', 'readme.txt', 'README'];
+    
+    for (const path of readmePaths) {
+      try {
+        const content = await getFileContent(path);
+        if (content && content.length > 50) {
+          console.log(`📖 Successfully fetched README from ${path}`);
+          return {
+            type: 'content',
+            content: content.substring(0, 2000),
+            filePath: path,
+            keywords: extractKeywords(`readme documentation ${content.substring(0, 500)}`),
+            metadata: { 
+              isReadme: true, 
+              priority: 'high',
+              fileType: 'documentation',
+              fetchedDirectly: true
+            }
+          };
+        }
+      } catch (error) {
+        console.log(`📖 Could not fetch ${path}:`, error);
+      }
+    }
+  } catch (error) {
+    console.log('📖 Direct GitHub fetch failed:', error);
+  }
+  
+  return null;
+}
+
+/**
+ * Enhanced query normalization for README requests
+ */
+function normalizeReadmeQuery(query: string): { isReadmeQuery: boolean; normalizedQuery: string } {
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Common README query patterns
+  const readmePatterns = [
+    'readme', 'read me', 'summary', 'summarize', 'summarise', 'overview', 
+    'what is this', 'what does this do', 'about this project', 'project description',
+    'getting started', 'documentation', 'docs', 'introduction', 'intro'
+  ];
+  
+  const isReadmeQuery = readmePatterns.some(pattern => 
+    lowerQuery.includes(pattern) || 
+    lowerQuery.startsWith(pattern) ||
+    lowerQuery.endsWith(pattern)
+  );
+  
+  // Normalize variations
+  let normalizedQuery = lowerQuery
+    .replace(/\bsummarise\b/g, 'summarize')
+    .replace(/\bread me\b/g, 'readme')
+    .replace(/\babout this project\b/g, 'readme overview')
+    .replace(/\bwhat is this\b/g, 'readme overview')
+    .replace(/\bwhat does this do\b/g, 'readme overview');
+  
+  return { isReadmeQuery, normalizedQuery };
+}
+
+/**
  * Initializes the knowledge base by extracting information from repository files
  * @param {boolean} forceRefresh - Whether to force refresh the knowledge base
  * @returns {Promise<void>}
@@ -280,116 +368,192 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
 }
 
 /**
- * Searches the knowledge base for relevant entries
+ * Enhanced search function with better README handling and debugging
  * @param {string} query - Search query
  * @returns {KnowledgeEntry[]} Array of relevant knowledge entries
  */
-export function searchKnowledge(query: string): KnowledgeEntry[] {
-  const keywords = extractKeywords(query);
+export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> {
+  const { isReadmeQuery, normalizedQuery } = normalizeReadmeQuery(query);
+  
+  console.log(`🔍 Enhanced search: "${query}" (README query: ${isReadmeQuery})`);
+  console.log(`🔍 Normalized query: "${normalizedQuery}"`);
+  console.log(`🔍 Knowledge base size: ${knowledgeBase.length} entries`);
+  console.log(`🔍 Using mock data: ${initializationState.usingMockData}`);
+  
+  // For README-specific queries, try direct lookup first
+  if (isReadmeQuery) {
+    console.log('🎯 README query detected, attempting direct lookup...');
+    
+    const directReadme = await findReadmeDirectly();
+    if (directReadme) {
+      console.log('✅ Direct README lookup successful');
+      return [directReadme];
+    }
+    
+    console.log('⚠️ Direct README lookup failed, falling back to search...');
+  }
+  
+  const keywords = extractKeywords(normalizedQuery);
   
   if (keywords.length === 0) {
+    console.log('❌ No keywords extracted from query');
     return [];
   }
   
-  console.log(`🔍 Enhanced search: ${keywords.join(', ')} across ${knowledgeBase.length} entries`);
-  console.log(`Using mock data: ${initializationState.usingMockData}`);
+  console.log(`🔍 Extracted keywords: ${keywords.join(', ')}`);
   
-  // Enhanced scoring algorithm with file name and README boosting
+  // Enhanced scoring algorithm with much better README handling
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
-    const lowerQuery = query.toLowerCase();
+    const lowerQuery = normalizedQuery.toLowerCase();
     const fileName = entry.filePath.split('/').pop()?.toLowerCase() || '';
     const lowerContent = entry.content.toLowerCase();
+    const lowerFilePath = entry.filePath.toLowerCase();
     
-    // HIGHEST PRIORITY: README file requests
-    if (lowerQuery.includes('readme') && fileName.includes('readme')) {
-      score += 10.0;
-      console.log(`🎯 README match boost: ${entry.filePath}`);
+    // MASSIVE BOOST: Direct README file matching for README queries
+    if (isReadmeQuery) {
+      if (fileName.includes('readme') || entry.metadata?.isReadme) {
+        score += 50.0; // Huge boost for README queries
+        console.log(`🎯 MAJOR README boost: ${entry.filePath} (+50.0)`);
+      }
+      
+      if (entry.metadata?.isReadmeSection) {
+        score += 25.0; // Good boost for README sections
+        console.log(`🎯 README section boost: ${entry.filePath} (+25.0)`);
+      }
     }
     
-    // HIGH PRIORITY: Exact file name matches
+    // HIGHEST PRIORITY: Exact file name matches
     if (fileName.includes(lowerQuery.replace(/\s+/g, ''))) {
-      score += 5.0;
+      score += 20.0;
+      console.log(`📁 Filename match: ${entry.filePath} (+20.0)`);
     }
     
-    // ENHANCED: File path matches for documentation requests
-    if (lowerQuery.includes('doc') && (entry.filePath.includes('doc') || entry.filePath.includes('readme'))) {
-      score += 3.0;
+    // HIGH PRIORITY: File path matches
+    if (lowerFilePath.includes(lowerQuery)) {
+      score += 15.0;
+      console.log(`📂 File path match: ${entry.filePath} (+15.0)`);
     }
     
-    // Enhanced keyword matching
+    // ENHANCED: Documentation content matching
+    if (lowerQuery.includes('doc') && (lowerFilePath.includes('doc') || fileName.includes('readme'))) {
+      score += 10.0;
+    }
+    
+    // Enhanced keyword matching with lower thresholds
     keywords.forEach(keyword => {
       const lowerKeyword = keyword.toLowerCase();
       
-      // Exact keyword matches in indexed keywords (highest weight)
-      if (entry.keywords.includes(keyword)) {
+      // Exact keyword matches in indexed keywords (high weight)
+      if (entry.keywords.some(k => k.toLowerCase() === lowerKeyword)) {
+        score += 5.0;
+        console.log(`🎯 Exact keyword match: ${keyword} in ${entry.filePath} (+5.0)`);
+      }
+      
+      // Partial keyword matches
+      if (entry.keywords.some(k => k.toLowerCase().includes(lowerKeyword))) {
         score += 2.0;
+        console.log(`🎯 Partial keyword match: ${keyword} in ${entry.filePath} (+2.0)`);
       }
       
       // Content matches (medium weight) with context bonus
       if (lowerContent.includes(lowerKeyword)) {
-        score += 1.0;
+        score += 3.0;
         
         // Bonus for exact word matches
-        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword}\\b`, 'i');
+        const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
         if (wordBoundaryRegex.test(lowerContent)) {
-          score += 0.5;
+          score += 2.0;
+          console.log(`🎯 Word boundary match: ${keyword} in ${entry.filePath} (+2.0)`);
         }
         
         // Extra bonus for matches in documentation/README content
-        if (entry.metadata?.isReadme || entry.metadata?.isDocumentation) {
-          score += 1.0;
+        if (entry.metadata?.isReadme || entry.metadata?.isDocumentation || entry.metadata?.isReadmeSection) {
+          score += 3.0;
+          console.log(`📖 Documentation content bonus: ${keyword} in ${entry.filePath} (+3.0)`);
         }
       }
       
-      // File path matches (lower weight)
-      if (entry.filePath.toLowerCase().includes(lowerKeyword)) {
-        score += 0.5;
+      // File path matches (medium weight)
+      if (lowerFilePath.includes(lowerKeyword)) {
+        score += 1.5;
       }
       
       // Metadata matches (if available)
       if (entry.metadata && typeof entry.metadata === 'object') {
         const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
         if (metadataStr.includes(lowerKeyword)) {
-          score += 0.3;
+          score += 1.0;
         }
       }
     });
     
     // Priority boost for high-priority content
     if (entry.metadata?.priority === 'high') {
-      score *= 1.5;
+      score *= 2.0;
+      console.log(`⭐ High priority boost: ${entry.filePath} (x2.0)`);
     } else if (entry.metadata?.priority === 'medium') {
-      score *= 1.2;
+      score *= 1.5;
     }
+    
+    // Boost for content entries (vs. exports/functions)
+    if (entry.type === 'content') {
+      score *= 1.3;
+    }
+    
+    const normalizedScore = score / Math.max(keywords.length, 1);
     
     return {
       entry,
-      score: score / Math.max(keywords.length, 1),
+      score: normalizedScore,
       debugInfo: {
         filePath: entry.filePath,
         isReadme: entry.metadata?.isReadme,
-        finalScore: score / Math.max(keywords.length, 1)
+        isReadmeSection: entry.metadata?.isReadmeSection,
+        rawScore: score,
+        normalizedScore: normalizedScore,
+        fileName: fileName
       }
     };
   });
   
+  // Much lower threshold for better recall (especially important for README content)
+  const threshold = isReadmeQuery ? 0.1 : 0.001;
+  
   // Enhanced filtering and sorting
   const results = scoredEntries
-    .filter(item => item.score > 0.01) // Lower threshold for better recall
+    .filter(item => item.score > threshold)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 25) // Increase result limit
+    .slice(0, isReadmeQuery ? 10 : 25) // Limit results but allow more for README queries
     .map(item => item.entry);
   
-  console.log(`🔍 Enhanced search found ${results.length} results`);
+  console.log(`🔍 Enhanced search found ${results.length} results (threshold: ${threshold})`);
   
-  // Debug logging for README searches
-  if (query.toLowerCase().includes('readme')) {
-    console.log('🔍 README search debug:');
+  // Enhanced debug logging
+  if (results.length > 0) {
+    console.log('🔍 Top search results:');
     scoredEntries
-      .filter(s => s.score > 0)
+      .filter(s => s.score > threshold)
       .slice(0, 5)
-      .forEach(s => console.log(`  ${s.debugInfo.filePath}: ${s.debugInfo.finalScore.toFixed(2)} (README: ${s.debugInfo.isReadme})`));
+      .forEach((s, i) => {
+        console.log(`  ${i + 1}. ${s.debugInfo.filePath}: ${s.debugInfo.normalizedScore.toFixed(3)} (README: ${s.debugInfo.isReadme}, Section: ${s.debugInfo.isReadmeSection})`);
+      });
+  } else {
+    console.log('❌ No search results found');
+    console.log('🔍 Debug: Available entries sample:');
+    knowledgeBase.slice(0, 3).forEach(entry => {
+      console.log(`  - ${entry.filePath} (type: ${entry.type}, keywords: ${entry.keywords.slice(0, 3).join(', ')})`);
+    });
+  }
+  
+  // If no results and it's a README query, try one more direct approach
+  if (results.length === 0 && isReadmeQuery) {
+    console.log('🔍 No results for README query, trying final fallback...');
+    const fallbackReadme = await findReadmeDirectly();
+    if (fallbackReadme) {
+      console.log('✅ Final README fallback successful');
+      return [fallbackReadme];
+    }
   }
   
   return results;
