@@ -213,23 +213,54 @@ async function findReadmeDirectly(): Promise<KnowledgeEntry | null> {
 }
 
 /**
- * Enhanced query normalization for README requests
+ * Enhanced query classification for better multi-file search
  */
-function normalizeReadmeQuery(query: string): { isReadmeQuery: boolean; normalizedQuery: string } {
+function classifyQuery(query: string): {
+  isReadmeQuery: boolean;
+  isCodeQuery: boolean;
+  isArchitectureQuery: boolean;
+  isConfigQuery: boolean;
+  queryType: 'overview' | 'technical' | 'implementation' | 'configuration';
+  normalizedQuery: string;
+} {
   const lowerQuery = query.toLowerCase().trim();
   
-  // Common README query patterns
+  // README/overview patterns
   const readmePatterns = [
     'readme', 'read me', 'summary', 'summarize', 'summarise', 'overview', 
     'what is this', 'what does this do', 'about this project', 'project description',
-    'getting started', 'documentation', 'docs', 'introduction', 'intro'
+    'getting started', 'introduction', 'intro'
   ];
   
-  const isReadmeQuery = readmePatterns.some(pattern => 
-    lowerQuery.includes(pattern) || 
-    lowerQuery.startsWith(pattern) ||
-    lowerQuery.endsWith(pattern)
-  );
+  // Code/implementation patterns
+  const codePatterns = [
+    'how to', 'how do', 'how can', 'implement', 'function', 'method', 'component',
+    'api', 'endpoint', 'service', 'class', 'interface', 'type', 'export',
+    'import', 'module', 'library', 'package', 'dependency'
+  ];
+  
+  // Architecture patterns
+  const architecturePatterns = [
+    'architecture', 'structure', 'organization', 'folder', 'directory',
+    'design pattern', 'framework', 'tech stack', 'technology'
+  ];
+  
+  // Configuration patterns
+  const configPatterns = [
+    'config', 'configuration', 'setup', 'install', 'deployment', 'build',
+    'environment', 'env', 'settings', 'package.json', 'tsconfig'
+  ];
+  
+  const isReadmeQuery = readmePatterns.some(pattern => lowerQuery.includes(pattern));
+  const isCodeQuery = codePatterns.some(pattern => lowerQuery.includes(pattern));
+  const isArchitectureQuery = architecturePatterns.some(pattern => lowerQuery.includes(pattern));
+  const isConfigQuery = configPatterns.some(pattern => lowerQuery.includes(pattern));
+  
+  // Determine primary query type
+  let queryType: 'overview' | 'technical' | 'implementation' | 'configuration' = 'overview';
+  if (isCodeQuery || lowerQuery.includes('code')) queryType = 'technical';
+  if (isArchitectureQuery) queryType = 'implementation';
+  if (isConfigQuery) queryType = 'configuration';
   
   // Normalize variations
   let normalizedQuery = lowerQuery
@@ -239,7 +270,14 @@ function normalizeReadmeQuery(query: string): { isReadmeQuery: boolean; normaliz
     .replace(/\bwhat is this\b/g, 'readme overview')
     .replace(/\bwhat does this do\b/g, 'readme overview');
   
-  return { isReadmeQuery, normalizedQuery };
+  return { 
+    isReadmeQuery, 
+    isCodeQuery, 
+    isArchitectureQuery, 
+    isConfigQuery, 
+    queryType, 
+    normalizedQuery 
+  };
 }
 
 /**
@@ -368,21 +406,30 @@ export async function initializeKnowledgeBase(forceRefresh: boolean = false): Pr
 }
 
 /**
- * Enhanced search function with better README handling and debugging
+ * Enhanced search function with balanced multi-file results
  * @param {string} query - Search query
  * @returns {KnowledgeEntry[]} Array of relevant knowledge entries
  */
 export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> {
-  const { isReadmeQuery, normalizedQuery } = normalizeReadmeQuery(query);
+  const queryClassification = classifyQuery(query);
+  const { isReadmeQuery, isCodeQuery, isArchitectureQuery, isConfigQuery, queryType, normalizedQuery } = queryClassification;
   
-  console.log(`🔍 Enhanced search: "${query}" (README query: ${isReadmeQuery})`);
-  console.log(`🔍 Normalized query: "${normalizedQuery}"`);
+  console.log(`🔍 Enhanced search: "${query}"`);
+  console.log(`🔍 Query classification:`, queryClassification);
   console.log(`🔍 Knowledge base size: ${knowledgeBase.length} entries`);
   console.log(`🔍 Using mock data: ${initializationState.usingMockData}`);
   
+  // Log file type distribution in knowledge base
+  const fileTypeStats = knowledgeBase.reduce((acc, entry) => {
+    const fileType = entry.metadata?.fileType || 'unknown';
+    acc[fileType] = (acc[fileType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  console.log(`📊 Knowledge base file types:`, fileTypeStats);
+  
   // For README-specific queries, try direct lookup first
-  if (isReadmeQuery) {
-    console.log('🎯 README query detected, attempting direct lookup...');
+  if (isReadmeQuery && queryType === 'overview') {
+    console.log('🎯 Pure README query detected, attempting direct lookup...');
     
     const directReadme = await findReadmeDirectly();
     if (directReadme) {
@@ -402,49 +449,52 @@ export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> 
   
   console.log(`🔍 Extracted keywords: ${keywords.join(', ')}`);
   
-  // Enhanced scoring algorithm with much better README handling
+  // Enhanced scoring algorithm with balanced file type prioritization
   const scoredEntries = knowledgeBase.map(entry => {
     let score = 0;
     const lowerQuery = normalizedQuery.toLowerCase();
     const fileName = entry.filePath.split('/').pop()?.toLowerCase() || '';
     const lowerContent = entry.content.toLowerCase();
     const lowerFilePath = entry.filePath.toLowerCase();
+    const fileExtension = fileName.split('.').pop() || '';
     
-    // MASSIVE BOOST: Direct README file matching for README queries
-    if (isReadmeQuery) {
-      if (fileName.includes('readme') || entry.metadata?.isReadme) {
-        score += 50.0; // Huge boost for README queries
-        console.log(`🎯 MAJOR README boost: ${entry.filePath} (+50.0)`);
-      }
-      
-      if (entry.metadata?.isReadmeSection) {
-        score += 25.0; // Good boost for README sections
-        console.log(`🎯 README section boost: ${entry.filePath} (+25.0)`);
-      }
+    // FILE TYPE SPECIFIC SCORING based on query type
+    if (queryType === 'overview' && (entry.metadata?.isReadme || fileName.includes('readme'))) {
+      score += 15.0; // Moderate boost for README in overview queries
+    } else if (queryType === 'technical' && ['js', 'ts', 'tsx', 'jsx'].includes(fileExtension)) {
+      score += 12.0; // Strong boost for code files in technical queries
+    } else if (queryType === 'implementation' && (entry.type === 'function' || entry.type === 'export')) {
+      score += 10.0; // Boost for functions/exports in implementation queries
+    } else if (queryType === 'configuration' && ['json', 'yml', 'yaml', 'config'].includes(fileExtension)) {
+      score += 12.0; // Strong boost for config files
     }
     
-    // HIGHEST PRIORITY: Exact file name matches
+    // CONTENT TYPE SCORING
+    if (entry.type === 'function' && (isCodeQuery || queryType === 'technical')) {
+      score += 8.0; // Functions are valuable for code queries
+    } else if (entry.type === 'content' && (isReadmeQuery || queryType === 'overview')) {
+      score += 6.0; // Content is valuable for overview queries
+    } else if (entry.type === 'export' && (isArchitectureQuery || queryType === 'implementation')) {
+      score += 7.0; // Exports are valuable for architecture queries
+    }
+    
+    // EXACT MATCHES (highest priority)
     if (fileName.includes(lowerQuery.replace(/\s+/g, ''))) {
       score += 20.0;
       console.log(`📁 Filename match: ${entry.filePath} (+20.0)`);
     }
     
-    // HIGH PRIORITY: File path matches
+    // PATH MATCHES
     if (lowerFilePath.includes(lowerQuery)) {
       score += 15.0;
       console.log(`📂 File path match: ${entry.filePath} (+15.0)`);
     }
     
-    // ENHANCED: Documentation content matching
-    if (lowerQuery.includes('doc') && (lowerFilePath.includes('doc') || fileName.includes('readme'))) {
-      score += 10.0;
-    }
-    
-    // Enhanced keyword matching with lower thresholds
+    // KEYWORD MATCHING with balanced weights
     keywords.forEach(keyword => {
       const lowerKeyword = keyword.toLowerCase();
       
-      // Exact keyword matches in indexed keywords (high weight)
+      // Exact keyword matches in indexed keywords
       if (entry.keywords.some(k => k.toLowerCase() === lowerKeyword)) {
         score += 5.0;
         console.log(`🎯 Exact keyword match: ${keyword} in ${entry.filePath} (+5.0)`);
@@ -453,52 +503,40 @@ export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> 
       // Partial keyword matches
       if (entry.keywords.some(k => k.toLowerCase().includes(lowerKeyword))) {
         score += 2.0;
-        console.log(`🎯 Partial keyword match: ${keyword} in ${entry.filePath} (+2.0)`);
       }
       
-      // Content matches (medium weight) with context bonus
+      // Content matches with context awareness
       if (lowerContent.includes(lowerKeyword)) {
         score += 3.0;
         
-        // Bonus for exact word matches
+        // Word boundary bonus
         const wordBoundaryRegex = new RegExp(`\\b${lowerKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
         if (wordBoundaryRegex.test(lowerContent)) {
           score += 2.0;
-          console.log(`🎯 Word boundary match: ${keyword} in ${entry.filePath} (+2.0)`);
         }
         
-        // Extra bonus for matches in documentation/README content
-        if (entry.metadata?.isReadme || entry.metadata?.isDocumentation || entry.metadata?.isReadmeSection) {
-          score += 3.0;
-          console.log(`📖 Documentation content bonus: ${keyword} in ${entry.filePath} (+3.0)`);
+        // Balanced documentation bonus (not overwhelming)
+        if (entry.metadata?.isReadme || entry.metadata?.isDocumentation) {
+          score += isReadmeQuery ? 3.0 : 1.0; // Less aggressive boost
         }
       }
       
-      // File path matches (medium weight)
+      // File path matches
       if (lowerFilePath.includes(lowerKeyword)) {
         score += 1.5;
       }
-      
-      // Metadata matches (if available)
-      if (entry.metadata && typeof entry.metadata === 'object') {
-        const metadataStr = JSON.stringify(entry.metadata).toLowerCase();
-        if (metadataStr.includes(lowerKeyword)) {
-          score += 1.0;
-        }
-      }
     });
     
-    // Priority boost for high-priority content
+    // METADATA PRIORITY (balanced)
     if (entry.metadata?.priority === 'high') {
-      score *= 2.0;
-      console.log(`⭐ High priority boost: ${entry.filePath} (x2.0)`);
+      score *= 1.5; // Reduced from 2.0 to be less aggressive
     } else if (entry.metadata?.priority === 'medium') {
-      score *= 1.5;
+      score *= 1.3;
     }
     
-    // Boost for content entries (vs. exports/functions)
+    // Content type boost (balanced)
     if (entry.type === 'content') {
-      score *= 1.3;
+      score *= 1.2; // Reduced from 1.3
     }
     
     const normalizedScore = score / Math.max(keywords.length, 1);
@@ -508,55 +546,85 @@ export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> 
       score: normalizedScore,
       debugInfo: {
         filePath: entry.filePath,
+        fileType: entry.metadata?.fileType || 'unknown',
+        entryType: entry.type,
         isReadme: entry.metadata?.isReadme,
-        isReadmeSection: entry.metadata?.isReadmeSection,
         rawScore: score,
         normalizedScore: normalizedScore,
-        fileName: fileName
+        fileName: fileName,
+        queryType: queryType
       }
     };
   });
   
-  // Much lower threshold for better recall (especially important for README content)
-  const threshold = isReadmeQuery ? 0.1 : 0.001;
+  // Adaptive threshold based on query type
+  const threshold = isReadmeQuery && queryType === 'overview' ? 0.1 : 0.001;
   
-  // Enhanced filtering and sorting
-  const results = scoredEntries
+  // Enhanced filtering and sorting with diversity
+  let results = scoredEntries
     .filter(item => item.score > threshold)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, isReadmeQuery ? 10 : 25) // Limit results but allow more for README queries
+    .sort((a, b) => b.score - a.score);
+  
+  // Ensure diversity in results for non-README queries
+  if (!isReadmeQuery || queryType !== 'overview') {
+    const diverseResults: typeof results = [];
+    const seenFileTypes = new Set<string>();
+    const maxPerType = Math.max(2, Math.floor(25 / 4)); // Max 6 per file type
+    
+    // First pass: ensure representation from different file types
+    for (const result of results) {
+      const fileType = result.debugInfo.fileType;
+      const typeCount = Array.from(seenFileTypes).filter(t => t === fileType).length;
+      
+      if (typeCount < maxPerType) {
+        diverseResults.push(result);
+        seenFileTypes.add(fileType);
+      }
+      
+      if (diverseResults.length >= 25) break;
+    }
+    
+    // Fill remaining slots with best scores
+    for (const result of results) {
+      if (!diverseResults.includes(result) && diverseResults.length < 25) {
+        diverseResults.push(result);
+      }
+    }
+    
+    results = diverseResults;
+  }
+  
+  const finalResults = results
+    .slice(0, 25)
     .map(item => item.entry);
   
-  console.log(`🔍 Enhanced search found ${results.length} results (threshold: ${threshold})`);
+  console.log(`🔍 Enhanced search found ${finalResults.length} results (threshold: ${threshold})`);
   
-  // Enhanced debug logging
-  if (results.length > 0) {
-    console.log('🔍 Top search results:');
-    scoredEntries
-      .filter(s => s.score > threshold)
-      .slice(0, 5)
-      .forEach((s, i) => {
-        console.log(`  ${i + 1}. ${s.debugInfo.filePath}: ${s.debugInfo.normalizedScore.toFixed(3)} (README: ${s.debugInfo.isReadme}, Section: ${s.debugInfo.isReadmeSection})`);
+  // Enhanced debug logging with file type breakdown
+  if (finalResults.length > 0) {
+    console.log('🔍 Top search results by file type:');
+    const resultsByType = finalResults.reduce((acc, entry) => {
+      const fileType = entry.metadata?.fileType || 'unknown';
+      if (!acc[fileType]) acc[fileType] = [];
+      acc[fileType].push(entry);
+      return acc;
+    }, {} as Record<string, KnowledgeEntry[]>);
+    
+    Object.entries(resultsByType).forEach(([type, entries]) => {
+      console.log(`  ${type}: ${entries.length} entries`);
+      entries.slice(0, 2).forEach((entry, i) => {
+        console.log(`    ${i + 1}. ${entry.filePath} (${entry.type})`);
       });
+    });
   } else {
     console.log('❌ No search results found');
     console.log('🔍 Debug: Available entries sample:');
     knowledgeBase.slice(0, 3).forEach(entry => {
-      console.log(`  - ${entry.filePath} (type: ${entry.type}, keywords: ${entry.keywords.slice(0, 3).join(', ')})`);
+      console.log(`  - ${entry.filePath} (type: ${entry.type}, fileType: ${entry.metadata?.fileType || 'unknown'})`);
     });
   }
   
-  // If no results and it's a README query, try one more direct approach
-  if (results.length === 0 && isReadmeQuery) {
-    console.log('🔍 No results for README query, trying final fallback...');
-    const fallbackReadme = await findReadmeDirectly();
-    if (fallbackReadme) {
-      console.log('✅ Final README fallback successful');
-      return [fallbackReadme];
-    }
-  }
-  
-  return results;
+  return finalResults;
 }
 
 /**

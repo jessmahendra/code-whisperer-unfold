@@ -1,3 +1,4 @@
+
 import { searchKnowledge } from './knowledgeBase';
 import { KnowledgeEntry } from './knowledgeBase/types';
 
@@ -29,10 +30,20 @@ export async function generateAnswer(
       return null;
     }
     
-    // Log first few entries for debugging
-    console.log('Sample relevant entries:');
-    relevantEntries.slice(0, 3).forEach((entry, index) => {
-      console.log(`  ${index + 1}. ${entry.filePath} (${entry.type}): ${entry.content.substring(0, 100)}...`);
+    // Log entries by file type for debugging
+    const entriesByType = relevantEntries.reduce((acc, entry) => {
+      const fileType = entry.metadata?.fileType || 'unknown';
+      if (!acc[fileType]) acc[fileType] = [];
+      acc[fileType].push(entry);
+      return acc;
+    }, {} as Record<string, KnowledgeEntry[]>);
+    
+    console.log('Relevant entries by file type:');
+    Object.entries(entriesByType).forEach(([type, entries]) => {
+      console.log(`  ${type}: ${entries.length} entries`);
+      entries.slice(0, 2).forEach((entry, i) => {
+        console.log(`    ${i + 1}. ${entry.filePath}: ${entry.content.substring(0, 100)}...`);
+      });
     });
     
     // Generate a structured answer based on the relevant entries
@@ -40,6 +51,7 @@ export async function generateAnswer(
     
     if (answer) {
       console.log(`Answer generated successfully with confidence: ${answer.confidence}`);
+      console.log(`Answer includes ${answer.references.length} references from ${new Set(answer.references.map(r => r.metadata?.fileType || 'unknown')).size} file types`);
     } else {
       console.log('Failed to generate answer from relevant entries');
     }
@@ -49,6 +61,94 @@ export async function generateAnswer(
     console.error('Error in generateAnswer:', error);
     return null;
   }
+}
+
+/**
+ * Classifies the question type for better answer generation
+ */
+function classifyQuestionForAnswering(question: string): {
+  type: 'readme' | 'howto' | 'architecture' | 'technical' | 'configuration' | 'general';
+  needsMultiSource: boolean;
+  preferredSources: string[];
+} {
+  const lowerQuestion = question.toLowerCase();
+  
+  if (lowerQuestion.includes('readme') || lowerQuestion.includes('summary') || lowerQuestion.includes('overview')) {
+    return {
+      type: 'readme',
+      needsMultiSource: false,
+      preferredSources: ['documentation', 'markdown']
+    };
+  }
+  
+  if (lowerQuestion.includes('how to') || lowerQuestion.includes('how do') || lowerQuestion.includes('implement')) {
+    return {
+      type: 'howto',
+      needsMultiSource: true,
+      preferredSources: ['typescript', 'javascript', 'documentation']
+    };
+  }
+  
+  if (lowerQuestion.includes('architecture') || lowerQuestion.includes('structure') || lowerQuestion.includes('organization')) {
+    return {
+      type: 'architecture',
+      needsMultiSource: true,
+      preferredSources: ['typescript', 'javascript', 'json', 'documentation']
+    };
+  }
+  
+  if (lowerQuestion.includes('config') || lowerQuestion.includes('setup') || lowerQuestion.includes('install')) {
+    return {
+      type: 'configuration',
+      needsMultiSource: true,
+      preferredSources: ['json', 'yaml', 'documentation']
+    };
+  }
+  
+  if (lowerQuestion.includes('function') || lowerQuestion.includes('component') || lowerQuestion.includes('api')) {
+    return {
+      type: 'technical',
+      needsMultiSource: true,
+      preferredSources: ['typescript', 'javascript', 'documentation']
+    };
+  }
+  
+  return {
+    type: 'general',
+    needsMultiSource: true,
+    preferredSources: ['documentation', 'typescript', 'javascript']
+  };
+}
+
+/**
+ * Groups entries by source type for multi-source answers
+ */
+function groupEntriesBySource(entries: KnowledgeEntry[]): {
+  documentation: KnowledgeEntry[];
+  code: KnowledgeEntry[];
+  config: KnowledgeEntry[];
+  other: KnowledgeEntry[];
+} {
+  return entries.reduce((acc, entry) => {
+    const fileType = entry.metadata?.fileType || 'unknown';
+    
+    if (fileType === 'documentation' || fileType === 'markdown' || entry.metadata?.isReadme) {
+      acc.documentation.push(entry);
+    } else if (['typescript', 'javascript'].includes(fileType) || entry.type === 'function') {
+      acc.code.push(entry);
+    } else if (['json', 'yaml'].includes(fileType)) {
+      acc.config.push(entry);
+    } else {
+      acc.other.push(entry);
+    }
+    
+    return acc;
+  }, {
+    documentation: [] as KnowledgeEntry[],
+    code: [] as KnowledgeEntry[],
+    config: [] as KnowledgeEntry[],
+    other: [] as KnowledgeEntry[]
+  });
 }
 
 /**
@@ -67,74 +167,33 @@ function generateStructuredAnswer(
     return null;
   }
   
-  const lowerQuestion = question.toLowerCase();
+  const questionClassification = classifyQuestionForAnswering(question);
+  console.log(`Question classification:`, questionClassification);
   
-  // Determine question type for better answer formatting
-  const isReadmeQuestion = lowerQuestion.includes('readme') || 
-                          lowerQuestion.includes('summary') || 
-                          lowerQuestion.includes('summarize') ||
-                          lowerQuestion.includes('overview') ||
-                          lowerQuestion.includes('what is this') ||
-                          lowerQuestion.includes('about this project');
+  // Group entries by source type
+  const groupedEntries = groupEntriesBySource(entries);
   
-  const isHowToQuestion = lowerQuestion.includes('how to') || 
-                         lowerQuestion.startsWith('how do') ||
-                         lowerQuestion.startsWith('how can');
-  
-  const isArchitectureQuestion = lowerQuestion.includes('architecture') ||
-                                lowerQuestion.includes('structure') ||
-                                lowerQuestion.includes('organization');
-  
-  // Prioritize entries based on question type
-  let sortedEntries = [...entries];
-  
-  if (isReadmeQuestion) {
-    // For README questions, prioritize README content
-    sortedEntries.sort((a, b) => {
-      const aIsReadme = a.metadata?.isReadme || a.filePath.toLowerCase().includes('readme');
-      const bIsReadme = b.metadata?.isReadme || b.filePath.toLowerCase().includes('readme');
-      
-      if (aIsReadme && !bIsReadme) return -1;
-      if (!aIsReadme && bIsReadme) return 1;
-      return 0;
-    });
-  }
-  
-  // Take the most relevant entries (limit based on question type)
-  const maxEntries = isReadmeQuestion ? 3 : isHowToQuestion ? 5 : 8;
-  const topEntries = sortedEntries.slice(0, maxEntries);
-  
-  // Generate answer content based on question type
+  // Generate answer based on question type and available sources
   let answerText = '';
   let confidence = 0.5;
   
-  if (isReadmeQuestion && topEntries.some(e => e.metadata?.isReadme || e.filePath.toLowerCase().includes('readme'))) {
-    // README-specific answer generation
-    const readmeEntry = topEntries.find(e => e.metadata?.isReadme || e.filePath.toLowerCase().includes('readme'));
-    if (readmeEntry) {
-      answerText = generateReadmeAnswer(readmeEntry);
-      confidence = 0.9;
-    }
-  } else if (isHowToQuestion) {
-    // How-to specific answer generation
-    answerText = generateHowToAnswer(question, topEntries, options);
-    confidence = calculateConfidence(topEntries, question);
-  } else if (isArchitectureQuestion) {
-    // Architecture-specific answer generation
-    answerText = generateArchitectureAnswer(topEntries);
-    confidence = calculateConfidence(topEntries, question);
+  if (questionClassification.type === 'readme' && groupedEntries.documentation.length > 0) {
+    answerText = generateReadmeAnswer(groupedEntries.documentation[0]);
+    confidence = 0.9;
+  } else if (questionClassification.needsMultiSource) {
+    answerText = generateMultiSourceAnswer(question, groupedEntries, questionClassification, options);
+    confidence = calculateMultiSourceConfidence(groupedEntries, question);
   } else {
-    // General answer generation
-    answerText = generateGeneralAnswer(question, topEntries, options);
-    confidence = calculateConfidence(topEntries, question);
+    answerText = generateSingleSourceAnswer(question, entries.slice(0, 5), options);
+    confidence = calculateConfidence(entries.slice(0, 5), question);
   }
   
   if (!answerText) {
     return null;
   }
   
-  // Create references from the entries used
-  const references = topEntries.map(entry => ({
+  // Create comprehensive references from all relevant entries
+  const references = entries.slice(0, 8).map(entry => ({
     path: entry.filePath,
     type: entry.type,
     snippet: entry.content.substring(0, 200) + (entry.content.length > 200 ? '...' : ''),
@@ -145,9 +204,99 @@ function generateStructuredAnswer(
     text: answerText,
     confidence: Math.min(confidence, 1.0),
     references: references,
-    questionType: isReadmeQuestion ? 'readme' : isHowToQuestion ? 'howto' : isArchitectureQuestion ? 'architecture' : 'general',
+    questionType: questionClassification.type,
+    sourcesUsed: {
+      documentation: groupedEntries.documentation.length,
+      code: groupedEntries.code.length,
+      config: groupedEntries.config.length,
+      other: groupedEntries.other.length
+    },
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * Generates a multi-source answer combining information from different file types
+ */
+function generateMultiSourceAnswer(
+  question: string,
+  groupedEntries: ReturnType<typeof groupEntriesBySource>,
+  classification: ReturnType<typeof classifyQuestionForAnswering>,
+  options: AnswerGenerationOptions
+): string {
+  const sections: string[] = [];
+  
+  // Add overview from documentation if available
+  if (groupedEntries.documentation.length > 0 && classification.type !== 'technical') {
+    const docContent = groupedEntries.documentation[0].content.substring(0, 300);
+    if (docContent.trim()) {
+      sections.push(`## Overview\n\n${docContent}`);
+    }
+  }
+  
+  // Add technical implementation details from code
+  if (groupedEntries.code.length > 0) {
+    const codeEntries = groupedEntries.code.slice(0, 3);
+    const codeInfo = codeEntries.map(entry => {
+      if (entry.type === 'function') {
+        return `**${entry.filePath}**: ${entry.content}`;
+      } else {
+        return `**${entry.filePath}**: ${entry.content.substring(0, 200)}`;
+      }
+    }).join('\n\n');
+    
+    if (codeInfo.trim()) {
+      sections.push(`## Implementation\n\n${codeInfo}`);
+    }
+  }
+  
+  // Add configuration details if relevant
+  if (groupedEntries.config.length > 0 && classification.type === 'configuration') {
+    const configContent = groupedEntries.config[0].content.substring(0, 300);
+    if (configContent.trim()) {
+      sections.push(`## Configuration\n\n${configContent}`);
+    }
+  }
+  
+  // Add other relevant information
+  if (groupedEntries.other.length > 0 && sections.length < 2) {
+    const otherContent = groupedEntries.other[0].content.substring(0, 200);
+    if (otherContent.trim()) {
+      sections.push(`## Additional Information\n\n${otherContent}`);
+    }
+  }
+  
+  return sections.join('\n\n');
+}
+
+/**
+ * Generates a single-source answer (fallback)
+ */
+function generateSingleSourceAnswer(
+  question: string,
+  entries: KnowledgeEntry[],
+  options: AnswerGenerationOptions
+): string {
+  const topContent = entries
+    .slice(0, 4)
+    .map(entry => {
+      if (entry.type === 'content') {
+        return entry.content.substring(0, 300);
+      } else if (entry.type === 'function') {
+        return `**Function**: ${entry.content}`;
+      } else {
+        return entry.content.substring(0, 200);
+      }
+    })
+    .join('\n\n');
+  
+  if (!topContent) {
+    return '';
+  }
+  
+  const intro = options.skipBenefits ? '' : 'Based on the available information:\n\n';
+  
+  return `${intro}${topContent}`;
 }
 
 /**
@@ -175,97 +324,38 @@ function generateReadmeAnswer(readmeEntry: KnowledgeEntry): string {
     summary = content.substring(0, 500);
   }
   
-  return `Based on the README file:\n\n${summary}${summary.length >= 500 ? '...' : ''}`;
+  return `## Project Overview\n\n${summary}${summary.length >= 500 ? '...' : ''}`;
 }
 
 /**
- * Generates a how-to specific answer
- * @param {string} question - The user's question
- * @param {KnowledgeEntry[]} entries - Relevant entries
- * @param {AnswerGenerationOptions} options - Generation options
- * @returns {string} Generated answer text
+ * Calculates confidence score for multi-source answers
  */
-function generateHowToAnswer(
-  question: string, 
-  entries: KnowledgeEntry[], 
-  options: AnswerGenerationOptions
-): string {
-  const relevantContent = entries
-    .filter(entry => entry.type === 'function' || entry.type === 'content')
-    .slice(0, 3)
-    .map(entry => entry.content)
-    .join('\n\n');
+function calculateMultiSourceConfidence(
+  groupedEntries: ReturnType<typeof groupEntriesBySource>,
+  question: string
+): number {
+  const totalEntries = Object.values(groupedEntries).reduce((sum, entries) => sum + entries.length, 0);
+  if (totalEntries === 0) return 0;
   
-  if (!relevantContent) {
-    return '';
+  let baseConfidence = Math.min(totalEntries / 8, 0.8);
+  
+  // Boost for diversity of sources
+  const sourceTypes = Object.values(groupedEntries).filter(entries => entries.length > 0).length;
+  baseConfidence += (sourceTypes - 1) * 0.05; // Up to +0.15 for diverse sources
+  
+  // Boost for high-priority content
+  const hasHighPriority = Object.values(groupedEntries)
+    .flat()
+    .some(entry => entry.metadata?.priority === 'high');
+  if (hasHighPriority) {
+    baseConfidence += 0.1;
   }
   
-  const conciseIntro = options.concise ? '' : 'Here\'s how you can accomplish this:\n\n';
-  
-  return `${conciseIntro}${relevantContent.substring(0, 800)}${relevantContent.length > 800 ? '...' : ''}`;
+  return Math.min(baseConfidence, 0.95);
 }
 
 /**
- * Generates an architecture-specific answer
- * @param {KnowledgeEntry[]} entries - Relevant entries
- * @returns {string} Generated answer text
- */
-function generateArchitectureAnswer(entries: KnowledgeEntry[]): string {
-  const structuralEntries = entries.filter(entry => 
-    entry.type === 'export' || 
-    entry.filePath.includes('src/') || 
-    entry.filePath.includes('components/') ||
-    entry.filePath.includes('services/')
-  );
-  
-  if (structuralEntries.length === 0) {
-    return '';
-  }
-  
-  const architectureInfo = structuralEntries
-    .slice(0, 5)
-    .map(entry => `**${entry.filePath}**: ${entry.content.substring(0, 200)}`)
-    .join('\n\n');
-  
-  return `Based on the codebase structure:\n\n${architectureInfo}`;
-}
-
-/**
- * Generates a general answer
- * @param {string} question - The user's question
- * @param {KnowledgeEntry[]} entries - Relevant entries
- * @param {AnswerGenerationOptions} options - Generation options
- * @returns {string} Generated answer text
- */
-function generateGeneralAnswer(
-  question: string, 
-  entries: KnowledgeEntry[], 
-  options: AnswerGenerationOptions
-): string {
-  const topContent = entries
-    .slice(0, 4)
-    .map(entry => {
-      if (entry.type === 'content') {
-        return entry.content.substring(0, 300);
-      } else if (entry.type === 'function') {
-        return `Function: ${entry.content}`;
-      } else {
-        return entry.content.substring(0, 200);
-      }
-    })
-    .join('\n\n');
-  
-  if (!topContent) {
-    return '';
-  }
-  
-  const intro = options.skipBenefits ? '' : 'Based on the available information:\n\n';
-  
-  return `${intro}${topContent}${topContent.length > 1000 ? '...' : ''}`;
-}
-
-/**
- * Calculates confidence score based on entries and question match
+ * Calculates confidence score based on entries and question match (fallback)
  * @param {KnowledgeEntry[]} entries - Knowledge entries
  * @param {string} question - User's question
  * @returns {number} Confidence score between 0 and 1

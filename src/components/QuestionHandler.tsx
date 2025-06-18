@@ -4,6 +4,7 @@ import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
 import SuggestedQuestions from "./SuggestedQuestions";
 import ShareSessionButton from "./ShareSessionButton";
+import KnowledgeBaseDiagnostics from "./KnowledgeBaseDiagnostics";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
@@ -22,6 +23,7 @@ export default function QuestionHandler({
     hasError?: boolean;
   }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
   
   // Create a ref for the most recent answer to scroll to
@@ -205,11 +207,22 @@ export default function QuestionHandler({
   
   return (
     <div className={`relative ${className}`}>
-      {/* Header with share button - only show when there are answers */}
+      {/* Header with share button and diagnostics - only show when there are answers */}
       {hasAnswers && (
-        <div className="flex justify-end mb-6">
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showDiagnostics ? 'Hide' : 'Show'} Knowledge Base Stats
+          </button>
           <ShareSessionButton answers={answers.filter(a => !a.hasError)} />
         </div>
+      )}
+
+      {/* Knowledge Base Diagnostics */}
+      {hasAnswers && showDiagnostics && (
+        <KnowledgeBaseDiagnostics />
       )}
 
       {/* Initial view when no answers yet - search is at the top */}
