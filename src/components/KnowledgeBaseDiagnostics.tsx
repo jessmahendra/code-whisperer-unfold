@@ -107,7 +107,7 @@ export default function KnowledgeBaseDiagnostics() {
                   {getFileTypeIcon(type)}
                   <span className="capitalize">{type}</span>
                 </div>
-                <Badge variant="secondary">{count}</Badge>
+                <Badge variant="secondary">{count as number}</Badge>
               </div>
             ))}
           </div>
