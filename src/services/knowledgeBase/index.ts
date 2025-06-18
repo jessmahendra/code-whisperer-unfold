@@ -1,3 +1,4 @@
+
 import { KnowledgeEntry } from './types';
 import { exploreRepositoryPaths, getScanDiagnostics } from './pathExplorer';
 import { processFile, clearProcessedFilesCache } from './fileProcessor';
@@ -21,10 +22,11 @@ let initializationState = {
 };
 
 /**
- * Enhanced search with Ghost-specific optimizations and multi-source ranking
+ * Enhanced search with better scoring and debugging
  */
 export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> {
-  console.log(`🔍 Enhanced search for: "${query}"`);
+  console.log(`🔍 Searching for: "${query}"`);
+  console.log(`📊 Knowledge base size: ${knowledgeBase.length}`);
   
   if (knowledgeBase.length === 0) {
     console.log('Knowledge base is empty, initializing...');
@@ -36,196 +38,86 @@ export async function searchKnowledge(query: string): Promise<KnowledgeEntry[]> 
     return [];
   }
   
+  // Log all entries for debugging
+  console.log('📁 All knowledge base entries:');
+  knowledgeBase.forEach((entry, index) => {
+    console.log(`  ${index + 1}. ${entry.filePath}: ${entry.content.substring(0, 100)}...`);
+  });
+  
   const queryLower = query.toLowerCase();
   const searchTerms = extractSearchTerms(query);
-  console.log(`🔎 Search terms extracted:`, searchTerms);
+  console.log(`🔎 Search terms:`, searchTerms);
   
-  // Phase 1: Direct keyword matching with priority scoring
-  const keywordMatches = knowledgeBase.map(entry => {
+  // Enhanced scoring with better debugging
+  const scoredResults = knowledgeBase.map(entry => {
     let score = 0;
     const entryText = `${entry.content} ${entry.filePath}`.toLowerCase();
-    const entryKeywords = entry.keywords || [];
+    const reasons: string[] = [];
     
-    // Ghost-specific term boosting
-    const ghostTerms = ['ghost', 'member', 'membership', 'subscription', 'stripe', 'payment', 'pricing', 'plan', 'tier'];
-    const isGhostQuery = searchTerms.some(term => ghostTerms.includes(term));
-    
-    if (isGhostQuery && entry.metadata?.isGhostMembership) {
-      score += 10; // High boost for Ghost membership files
-    }
-    
-    // Priority-based scoring
-    if (entry.metadata?.priority === 'high') score += 5;
-    if (entry.metadata?.priority === 'medium') score += 2;
-    
-    // Content type scoring
-    if (entry.metadata?.isReadme && (queryLower.includes('readme') || queryLower.includes('overview') || queryLower.includes('summary'))) {
-      score += 8;
-    }
-    
-    // Direct term matching
+    // Content matching (primary scoring)
     searchTerms.forEach(term => {
-      // Exact phrase matching
       if (entryText.includes(term)) {
         score += 3;
-      }
-      
-      // Keyword matching
-      if (entryKeywords.some(keyword => keyword.toLowerCase().includes(term))) {
-        score += 2;
-      }
-      
-      // File path matching
-      if (entry.filePath.toLowerCase().includes(term)) {
-        score += 1;
+        reasons.push(`content:${term}`);
       }
     });
     
-    // Boost for multiple term matches
-    const matchingTerms = searchTerms.filter(term => entryText.includes(term));
-    if (matchingTerms.length > 1) {
-      score += matchingTerms.length;
+    // Keyword matching
+    if (entry.keywords) {
+      entry.keywords.forEach(keyword => {
+        searchTerms.forEach(term => {
+          if (keyword.toLowerCase().includes(term)) {
+            score += 2;
+            reasons.push(`keyword:${term}`);
+          }
+        });
+      });
     }
     
-    return { entry, score };
-  });
-  
-  // Phase 2: Semantic matching for better coverage
-  const semanticMatches = knowledgeBase.map(entry => {
-    let semanticScore = 0;
-    const entryText = entry.content.toLowerCase();
-    
-    // Semantic term mapping for Ghost
-    const semanticMap: Record<string, string[]> = {
-      'membership': ['member', 'subscriber', 'user', 'account', 'profile'],
-      'pricing': ['price', 'cost', 'fee', 'payment', 'billing', 'subscription'],
-      'plan': ['tier', 'level', 'package', 'subscription', 'membership'],
-      'free': ['trial', 'basic', 'starter', 'complimentary'],
-      'premium': ['paid', 'pro', 'advanced', 'upgraded', 'subscription'],
-      'feature': ['functionality', 'capability', 'option', 'benefit'],
-      'download': ['install', 'setup', 'deploy', 'distribution'],
-      'compare': ['difference', 'versus', 'vs', 'comparison', 'contrast']
-    };
-    
+    // File path matching (reduced weight)
     searchTerms.forEach(term => {
-      const semanticTerms = semanticMap[term] || [];
-      semanticTerms.forEach(semanticTerm => {
-        if (entryText.includes(semanticTerm)) {
-          semanticScore += 1;
-        }
-      });
+      if (entry.filePath.toLowerCase().includes(term)) {
+        score += 0.5; // Reduced from 1
+        reasons.push(`path:${term}`);
+      }
     });
     
-    return { entry, semanticScore };
+    // Priority boost
+    if (entry.metadata?.priority === 'high') {
+      score += 1;
+      reasons.push('high-priority');
+    }
+    
+    // Penalize GitHub metadata files for general queries
+    if (entry.filePath.startsWith('.github/') && !queryLower.includes('support') && !queryLower.includes('contribute')) {
+      score *= 0.1;
+      reasons.push('github-penalty');
+    }
+    
+    return { entry, score, reasons };
   });
   
-  // Phase 3: Combine and rank results
-  const combinedResults = keywordMatches.map((match, index) => ({
-    entry: match.entry,
-    totalScore: match.score + (semanticMatches[index]?.semanticScore || 0)
-  }));
+  // Filter and sort
+  const results = scoredResults
+    .filter(result => result.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
   
-  // Filter and sort by score
-  const filteredResults = combinedResults
-    .filter(result => result.totalScore > 0)
-    .sort((a, b) => b.totalScore - a.totalScore);
+  console.log(`📊 Search results (top 5):`);
+  results.slice(0, 5).forEach((result, index) => {
+    console.log(`  ${index + 1}. ${result.entry.filePath} (score: ${result.score.toFixed(2)}) - ${result.reasons.join(', ')}`);
+  });
   
-  console.log(`📊 Search results: ${filteredResults.length} matches found`);
-  
-  // Phase 4: Ensure diversity in results (multi-source)
-  const diverseResults = ensureResultDiversity(filteredResults.map(r => r.entry));
-  
-  console.log(`🎯 Final diverse results: ${diverseResults.length} entries`);
-  console.log(`📁 Result sources:`, diverseResults.slice(0, 5).map(r => ({
-    file: r.filePath,
-    type: r.metadata?.fileType || 'unknown',
-    priority: r.metadata?.priority || 'none'
-  })));
-  
-  return diverseResults;
+  return results.map(r => r.entry);
 }
 
-/**
- * Extract search terms with enhanced processing
- */
 function extractSearchTerms(query: string): string[] {
-  // Clean and normalize the query
   const cleaned = query.toLowerCase()
     .replace(/[^\w\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   
-  const terms = cleaned.split(' ').filter(term => term.length > 2);
-  
-  // Add common variations and synonyms
-  const expandedTerms = [...terms];
-  
-  terms.forEach(term => {
-    // Add partial matches for compound words
-    if (term.length > 5) {
-      expandedTerms.push(term.substring(0, term.length - 1));
-    }
-    
-    // Add Ghost-specific expansions
-    if (term === 'member') expandedTerms.push('membership', 'subscriber');
-    if (term === 'price') expandedTerms.push('pricing', 'cost');
-    if (term === 'plan') expandedTerms.push('tier', 'subscription');
-  });
-  
-  return [...new Set(expandedTerms)];
-}
-
-/**
- * Ensure diversity in search results to avoid clustering from single files
- */
-function ensureResultDiversity(entries: KnowledgeEntry[]): KnowledgeEntry[] {
-  const diverse: KnowledgeEntry[] = [];
-  const filePathCounts: Record<string, number> = {};
-  const maxPerFile = 3; // Maximum entries per file
-  const maxTotal = 20; // Maximum total results
-  
-  // First pass: Add high-priority entries
-  entries.forEach(entry => {
-    if (diverse.length >= maxTotal) return;
-    
-    const basePath = entry.filePath.split('#')[0]; // Remove chunk identifiers
-    const currentCount = filePathCounts[basePath] || 0;
-    
-    if (entry.metadata?.priority === 'high' && currentCount < maxPerFile) {
-      diverse.push(entry);
-      filePathCounts[basePath] = currentCount + 1;
-    }
-  });
-  
-  // Second pass: Add medium priority entries
-  entries.forEach(entry => {
-    if (diverse.length >= maxTotal) return;
-    if (diverse.includes(entry)) return;
-    
-    const basePath = entry.filePath.split('#')[0];
-    const currentCount = filePathCounts[basePath] || 0;
-    
-    if (entry.metadata?.priority === 'medium' && currentCount < maxPerFile) {
-      diverse.push(entry);
-      filePathCounts[basePath] = currentCount + 1;
-    }
-  });
-  
-  // Third pass: Fill remaining slots with any relevant entries
-  entries.forEach(entry => {
-    if (diverse.length >= maxTotal) return;
-    if (diverse.includes(entry)) return;
-    
-    const basePath = entry.filePath.split('#')[0];
-    const currentCount = filePathCounts[basePath] || 0;
-    
-    if (currentCount < maxPerFile) {
-      diverse.push(entry);
-      filePathCounts[basePath] = currentCount + 1;
-    }
-  });
-  
-  return diverse;
+  return cleaned.split(' ').filter(term => term.length > 2);
 }
 
 export async function initializeKnowledgeBase(forceRefresh = false): Promise<void> {
@@ -243,7 +135,7 @@ export async function initializeKnowledgeBase(forceRefresh = false): Promise<voi
   
   initializationPromise = (async () => {
     try {
-      console.log('🚀 Initializing enhanced knowledge base...');
+      console.log('🚀 Initializing knowledge base...');
       initializationState = {
         status: 'initializing',
         lastInitTime: Date.now(),
@@ -265,12 +157,12 @@ export async function initializeKnowledgeBase(forceRefresh = false): Promise<voi
         console.log(`📡 Scanning repository: ${repo.owner}/${repo.repo}`);
         const success = await exploreRepositoryPaths(knowledgeBase);
         
+        console.log(`📊 Repository scan result: success=${success}, entries=${knowledgeBase.length}`);
+        
         if (!success || knowledgeBase.length === 0) {
-          console.log('⚠️ Repository scan failed or returned no results, using mock data');
+          console.log('⚠️ Repository scan failed, using mock data');
           knowledgeBase = generateMockData();
           usingMockData = true;
-        } else {
-          console.log(`✅ Repository scan successful: ${knowledgeBase.length} entries`);
         }
       }
       
@@ -294,6 +186,7 @@ export async function initializeKnowledgeBase(forceRefresh = false): Promise<voi
   return initializationPromise;
 }
 
+// Export missing functions that other components need
 export function isUsingMockData(): boolean {
   return usingMockData;
 }
@@ -327,4 +220,21 @@ export function clearKnowledgeBase(): void {
     error: null,
     repository: null
   };
+}
+
+// Add missing exports for other components
+export function getKnowledgeBaseStats() {
+  return {
+    totalEntries: knowledgeBase.length,
+    usingMockData,
+    lastInitialized: initializationState.lastInitTime
+  };
+}
+
+export function isInitializing(): boolean {
+  return initializationState.status === 'initializing';
+}
+
+export function getInitializationState() {
+  return initializationState;
 }
