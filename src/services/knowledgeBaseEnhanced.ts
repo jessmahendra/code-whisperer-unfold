@@ -1,6 +1,15 @@
 import { searchKnowledge } from './knowledgeBase';
 import { fetchCommitHistory } from './githubClient';
 import { getCurrentRepository } from './githubConnector';
+import { KnowledgeEntry } from './knowledgeBase/types';
+
+// Define SearchOptions interface
+interface SearchOptions {
+  limit?: number;
+  minScore?: number;
+  prioritizeReadme?: boolean;
+  includeContent?: boolean;
+}
 
 // Store search history to provide context for future queries
 let searchHistory: { query: string, timestamp: number }[] = [];
@@ -72,8 +81,8 @@ export async function searchKnowledgeWithHistory(query: string): Promise<Array<a
       .map(item => item.query)
   ].join(' ');
   
-  // Get base results from knowledge base
-  const results = searchKnowledge(contextualizedQuery);
+  // Get base results from knowledge base - await the Promise first
+  const results = await searchKnowledge(contextualizedQuery);
   
   // Enhance results with version information
   const enhancedResults = await Promise.all(
