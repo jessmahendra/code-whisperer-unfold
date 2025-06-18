@@ -1,42 +1,74 @@
 
 import { KnowledgeEntry } from './types';
 
-export function generateMockData(): KnowledgeEntry[] {
-  return [
-    {
-      type: 'content',
-      content: 'Ghost is a powerful app for new-media creators to publish, share, and grow a business around their content. It comes with modern tools to build a website, publish content, send newsletters & offer paid subscriptions to members.',
-      filePath: 'README.md',
-      keywords: ['ghost', 'publishing', 'content', 'business', 'creators'],
-      metadata: { isReadme: true, priority: 'high', fileType: 'documentation' }
+// Mock knowledge base entries for demo purposes
+export const mockKnowledgeEntries: KnowledgeEntry[] = [
+  {
+    type: 'content',
+    content: 'Download Granola for Mac, Windows, iOS, and Android (waitlist available)',
+    filePath: 'app/downloads/page.tsx',
+    keywords: ['download', 'mac', 'windows', 'ios', 'android', 'app', 'install', 'platform'],
+  },
+  {
+    type: 'content',
+    content: 'Download links and installation instructions for Granola app across platforms',
+    filePath: 'app/components/DownloadSection.tsx',
+    keywords: ['download', 'links', 'installation', 'platform', 'app', 'granola'],
+  },
+  {
+    type: 'comment',
+    content: '/** Processes subscription payments through Stripe integration */',
+    filePath: 'ghost/core/core/server/services/members/payment.js',
+    keywords: ['subscription', 'payment', 'process', 'stripe', 'members'],
+  },
+  {
+    type: 'comment',
+    content: '/** When subscription expires, member status is changed to free */',
+    filePath: 'ghost/core/core/server/services/members/subscriptions.js',
+    keywords: ['subscription', 'expires', 'expiration', 'member', 'free'],
+  },
+  {
+    type: 'function',
+    content: 'function handleSubscriptionExpiration(memberId) { ... }',
+    filePath: 'ghost/core/core/server/services/members/api/index.js',
+    metadata: {
+      name: 'handleSubscriptionExpiration',
+      params: 'memberId',
     },
-    {
-      type: 'content',
-      content: 'Ghost offers different membership tiers: Free members get access to public content, Paid members get access to premium content and features, and Complimentary members get special access.',
-      filePath: 'core/server/services/members/index.js',
-      keywords: ['membership', 'free', 'paid', 'premium', 'tiers'],
-      metadata: { isGhostMembership: true, priority: 'high', fileType: 'javascript' }
+    keywords: ['subscription', 'expiration', 'handle', 'member'],
+  },
+  {
+    type: 'comment',
+    content: '/** No limits on post count in Ghost - verified in post access controller */',
+    filePath: 'ghost/core/core/server/api/v2/content/posts.js',
+    keywords: ['limits', 'posts', 'count', 'restriction'],
+  },
+  {
+    type: 'comment',
+    content: '/** Premium content restricted to paid members via visibility settings */',
+    filePath: 'ghost/core/core/server/api/v2/content/posts.js',
+    keywords: ['premium', 'content', 'paid', 'members', 'visibility'],
+  },
+  {
+    type: 'comment',
+    content: '/** Ghost subscription management handles tier upgrades and downgrades */',
+    filePath: 'ghost/core/core/server/services/members/subscriptions.js',
+    keywords: ['subscription', 'upgrade', 'downgrade', 'tier', 'management'],
+  },
+  {
+    type: 'function',
+    content: 'function processMemberTierChange(memberId, fromTierId, toTierId) { ... }',
+    filePath: 'ghost/core/core/server/services/members/api/index.js',
+    metadata: {
+      name: 'processMemberTierChange',
+      params: 'memberId, fromTierId, toTierId',
     },
-    {
-      type: 'content',
-      content: 'Free membership plan includes: Access to public posts, Newsletter subscription, Community access. No payment required.',
-      filePath: 'core/server/services/members/plans/free.js',
-      keywords: ['free', 'plan', 'membership', 'public', 'newsletter'],
-      metadata: { isGhostMembership: true, priority: 'high', fileType: 'javascript' }
-    },
-    {
-      type: 'content',
-      content: 'Premium membership plan includes: All free features plus: Access to premium posts, Premium newsletter content, Priority support, Member-only features.',
-      filePath: 'core/server/services/members/plans/premium.js',
-      keywords: ['premium', 'paid', 'plan', 'membership', 'exclusive'],
-      metadata: { isGhostMembership: true, priority: 'high', fileType: 'javascript' }
-    },
-    {
-      type: 'content',
-      content: 'Ghost Admin interface allows you to configure membership plans, set pricing, manage subscribers, and customize member portal settings.',
-      filePath: 'core/client/app/components/gh-members-settings.js',
-      keywords: ['admin', 'membership', 'pricing', 'settings', 'portal'],
-      metadata: { isGhostAdmin: true, priority: 'medium', fileType: 'javascript' }
-    }
-  ];
-}
+    keywords: ['tier', 'change', 'process', 'member'],
+  },
+  {
+    type: 'comment',
+    content: '/** Email features require newsletter subscription status to be active */',
+    filePath: 'ghost/core/core/server/services/mail/index.js',
+    keywords: ['email', 'newsletter', 'subscription', 'active'],
+  },
+]

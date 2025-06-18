@@ -1,15 +1,13 @@
-
 import { useState, useRef, useEffect } from "react";
 import AnswerDisplay from "./AnswerDisplay";
 import QuestionInput from "./QuestionInput";
 import SuggestedQuestions from "./SuggestedQuestions";
 import ShareSessionButton from "./ShareSessionButton";
-import KnowledgeBaseDiagnostics from "./KnowledgeBaseDiagnostics";
 import { generateAnswer } from "@/services/answerGenerator";
 import { addChatEntry } from "@/services/chatHistoryService";
 import NoAnswerFallback from "./NoAnswerFallback";
 import { getCurrentRepository } from "@/services/githubConnector";
-import { initializeKnowledgeBase, isUsingMockData, getEnhancedDiagnostics, searchKnowledge } from "@/services/knowledgeBase";
+import { initializeKnowledgeBase, isUsingMockData, getEnhancedDiagnostics } from "@/services/knowledgeBase";
 
 export default function QuestionHandler({
   className
@@ -23,7 +21,6 @@ export default function QuestionHandler({
     hasError?: boolean;
   }>>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [currentRepo, setCurrentRepo] = useState<{ owner: string; repo: string } | null>(null);
   
   // Create a ref for the most recent answer to scroll to
@@ -79,14 +76,12 @@ export default function QuestionHandler({
     if (currentRepo) {
       const repoName = currentRepo.repo;
       return [
-        `Summarize the README for ${repoName}`,
         `How does ${repoName} handle authentication?`,
         `What is the main architecture of ${repoName}?`,
         `How can I contribute to ${repoName}?`
       ];
     }
     return [
-      "Summarize the README file",
       "How does Ghost handle image uploads?",
       "What is the difference between a post and a page in Ghost?",
       "How can I integrate Ghost with other services?"
@@ -106,18 +101,6 @@ export default function QuestionHandler({
         knowledgeBaseSize: preDiagnostics.knowledgeBaseSize,
         repository: getCurrentRepository()
       });
-      
-      // Test the search function directly for README queries
-      const isReadmeQuestion = question.toLowerCase().includes("readme") || 
-                              question.toLowerCase().includes("summary") || 
-                              question.toLowerCase().includes("summarize") ||
-                              question.toLowerCase().includes("overview");
-      
-      if (isReadmeQuestion) {
-        console.log("README question detected, testing search function...");
-        const searchResults = await searchKnowledge(question);
-        console.log("Direct search results:", searchResults.length > 0 ? searchResults[0] : 'No results');
-      }
       
       // If asking about downloads and using mock data, force refresh
       const isDownloadQuestion = question.toLowerCase().includes("download") || 
@@ -207,22 +190,11 @@ export default function QuestionHandler({
   
   return (
     <div className={`relative ${className}`}>
-      {/* Header with share button and diagnostics - only show when there are answers */}
+      {/* Header with share button - only show when there are answers */}
       {hasAnswers && (
-        <div className="flex justify-between items-center mb-6">
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showDiagnostics ? 'Hide' : 'Show'} Knowledge Base Stats
-          </button>
+        <div className="flex justify-end mb-6">
           <ShareSessionButton answers={answers.filter(a => !a.hasError)} />
         </div>
-      )}
-
-      {/* Knowledge Base Diagnostics */}
-      {hasAnswers && showDiagnostics && (
-        <KnowledgeBaseDiagnostics />
       )}
 
       {/* Initial view when no answers yet - search is at the top */}

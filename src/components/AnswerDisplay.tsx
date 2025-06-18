@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Copy, Mail } from "lucide-react";
@@ -210,13 +209,9 @@ Best regards,
         <CardFooter className="flex-col items-start border-t pt-4">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
           
-          {/* Always display file reference pills - with null check */}
+          {/* Always display file reference pills */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {Array.from(new Set(references
-              .filter(ref => ref && ref.filePath) // Filter out undefined refs and refs without filePath
-              .map(ref => ref.filePath.split('/').pop())
-              .filter(filename => filename) // Filter out undefined filenames
-            )).map((filename, index) => (
+            {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
               <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
                 {filename}
               </span>
@@ -235,9 +230,7 @@ Best regards,
           {/* Show code references directly when button is clicked */}
           {showReferences && (
             <div className="space-y-3 mt-4">
-              {references
-                .filter(ref => ref && ref.filePath) // Filter out undefined refs
-                .map((reference, index) => (
+              {references.map((reference, index) => (
                 <CodeReference 
                   key={index} 
                   filePath={reference.filePath}
