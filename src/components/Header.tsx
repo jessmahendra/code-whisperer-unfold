@@ -326,7 +326,7 @@ export default function Header({ isOnboarding = false }: HeaderProps) {
             onClick={handleLogoClick}
             className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
           >
-            <span className="inline-block font-bold text-xl text-green-800">
+            <span className="inline-block font-bold text-xl text-black">
               story
             </span>
           </button>

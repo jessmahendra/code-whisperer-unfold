@@ -33,6 +33,9 @@ export async function processFile(
       return;
     }
     
+    // Store the actual file content for business logic extraction
+    await storeActualFileContent(filePath, content, knowledgeBase);
+    
     // Extract knowledge
     const knowledge: ExtractedKnowledge = extractKnowledge(content, filePath);
     
@@ -47,6 +50,126 @@ export async function processFile(
   } catch (error) {
     console.error(`Error processing file ${filePath}:`, error);
   }
+}
+
+/**
+ * Store the actual file content for business logic extraction
+ */
+async function storeActualFileContent(
+  filePath: string,
+  content: string,
+  knowledgeBase: KnowledgeEntry[]
+): Promise<void> {
+  // Only store content for files that are likely to contain business logic
+  const businessLogicFilePatterns = [
+    /\.(js|ts|jsx|tsx|json|yaml|yml|toml|ini|conf|config)$/i,
+    /(config|settings|integration|service|api|webhook|provider|client|connector)/i
+  ];
+  
+  const isBusinessLogicFile = businessLogicFilePatterns.some(pattern => 
+    pattern.test(filePath)
+  );
+  
+  if (isBusinessLogicFile && content.length > 50) {
+    // Store the actual file content
+    knowledgeBase.push({
+      type: 'content',
+      content: content, // Store the actual file content
+      filePath,
+      keywords: extractKeywords(content),
+      metadata: {
+        contentType: 'actual-file-content',
+        fileSize: content.length,
+        fileName: filePath.split('/').pop() || filePath
+      }
+    });
+    
+    console.log(`📄 Stored actual content for ${filePath} (${content.length} characters)`);
+    
+    // Also store a summary for easier searching
+    const contentSummary = generateContentSummary(content, filePath);
+    if (contentSummary) {
+      knowledgeBase.push({
+        type: 'content',
+        content: contentSummary,
+        filePath,
+        keywords: extractKeywords(contentSummary),
+        metadata: {
+          contentType: 'content-summary',
+          originalContentLength: content.length
+        }
+      });
+    }
+  }
+}
+
+/**
+ * Generate a summary of file content for easier searching
+ */
+function generateContentSummary(content: string, filePath: string): string | null {
+  const fileName = filePath.split('/').pop() || filePath;
+  const lowerContent = content.toLowerCase();
+  
+  // Extract key information based on file type
+  if (fileName.includes('integration') || fileName.includes('service')) {
+    // Look for service definitions and configurations
+    const serviceMatches = content.match(/(?:const|let|var)\s+(\w+)\s*=\s*\{/g);
+    const importMatches = content.match(/import.*from.*['"]([^'"]+)['"]/g);
+    const configMatches = content.match(/(\w+)\s*[:=]\s*['"][^'"]+['"]/g);
+    
+    const summary = [];
+    if (serviceMatches) summary.push(`Services: ${serviceMatches.length} defined`);
+    if (importMatches) summary.push(`Imports: ${importMatches.length} external packages`);
+    if (configMatches) summary.push(`Configs: ${configMatches.length} configuration items`);
+    
+    if (summary.length > 0) {
+      return `Integration File Summary: ${summary.join(', ')}`;
+    }
+  }
+  
+  if (fileName.includes('config') || fileName.includes('settings')) {
+    // Look for configuration objects
+    const configMatches = content.match(/(\w+)\s*[:=]\s*['"][^'"]+['"]/g);
+    const objectMatches = content.match(/(\w+)\s*[:=]\s*\{/g);
+    
+    const summary = [];
+    if (configMatches) summary.push(`Settings: ${configMatches.length} configuration values`);
+    if (objectMatches) summary.push(`Objects: ${objectMatches.length} configuration objects`);
+    
+    if (summary.length > 0) {
+      return `Configuration File Summary: ${summary.join(', ')}`;
+    }
+  }
+  
+  if (fileName.includes('api') || fileName.includes('endpoint')) {
+    // Look for API endpoints and routes
+    const routeMatches = content.match(/(?:router\.|app\.)(get|post|put|delete|patch)\s*\(/g);
+    const endpointMatches = content.match(/['"]([^'"]*\/[^'"]*)['"]/g);
+    
+    const summary = [];
+    if (routeMatches) summary.push(`Routes: ${routeMatches.length} API routes`);
+    if (endpointMatches) summary.push(`Endpoints: ${endpointMatches.length} endpoints defined`);
+    
+    if (summary.length > 0) {
+      return `API File Summary: ${summary.join(', ')}`;
+    }
+  }
+  
+  // Generic summary for other files
+  const lines = content.split('\n').length;
+  const functions = (content.match(/function\s+\w+|const\s+\w+\s*=\s*\(/g) || []).length;
+  const classes = (content.match(/class\s+\w+/g) || []).length;
+  
+  const summary = [];
+  if (lines > 0) summary.push(`${lines} lines`);
+  if (functions > 0) summary.push(`${functions} functions`);
+  if (classes > 0) summary.push(`${classes} classes`);
+  
+  if (summary.length > 0) {
+    return `File Summary: ${summary.join(', ')}`;
+  }
+  
+  return null;
 }
 
 /**
@@ -91,6 +214,11 @@ async function processGhostFile(
 ): Promise<void> {
   // Enhanced Ghost-specific content extraction
   
+  // Extract JSX content for React components (highest priority for Portal Settings)
+  if (filePath.endsWith('.tsx') || filePath.endsWith('.jsx')) {
+    await extractJSXContent(content, filePath, knowledgeBase);
+  }
+  
   // Add JSDoc comments with Ghost context
   for (const comment of knowledge.jsDocComments) {
     const ghostContext = extractGhostContext(comment, filePath);
@@ -104,39 +232,18 @@ async function processGhostFile(
   
   // Add function definitions with Ghost service context
   for (const func of knowledge.functions) {
-    const serviceType = determineGhostServiceType(filePath);
-    const funcContent = `function ${func.name}(${func.params}) { ... }`;
-    knowledgeBase.push({
-      type: 'function',
-      content: `Ghost ${serviceType}: ${funcContent}`,
-      filePath,
-      metadata: { ...func, serviceType },
-      keywords: extractKeywords(funcContent + ' ' + func.name + ' ' + serviceType),
-    });
-  }
-  
-  // Process Ghost-specific patterns
-  if (filePath.includes('members')) {
-    await processGhostMembershipContent(content, filePath, knowledgeBase);
-  }
-  
-  if (filePath.includes('api')) {
-    await processGhostApiContent(content, filePath, knowledgeBase);
-  }
-  
-  if (filePath.includes('admin')) {
-    await processGhostAdminContent(content, filePath, knowledgeBase);
-  }
-  
-  // Add exports to knowledge base
-  for (const [key, value] of Object.entries(knowledge.exports)) {
+    const ghostContext = extractGhostContext(func.name, filePath);
     knowledgeBase.push({
       type: 'export',
-      content: `module.exports.${key} = ${value}`,
+      content: `Ghost Function: ${func.name}${ghostContext ? ` [${ghostContext}]` : ''}`,
       filePath,
-      keywords: extractKeywords(key + ' ' + value),
+      metadata: func,
+      keywords: extractKeywords(`${func.name} ${func.params} ${ghostContext}`),
     });
   }
+  
+  // Enhanced UI pattern extraction
+  await extractUIPatterns(content, filePath, knowledgeBase);
   
   // Add API routes if available
   if (knowledge.apiRoutes) {
@@ -166,13 +273,14 @@ async function processGhostFile(
   
   // Add class definitions if available
   if (knowledge.classes) {
-    for (const classInfo of knowledge.classes) {
+    for (const cls of knowledge.classes) {
+      const ghostContext = extractGhostContext(cls.name, filePath);
       knowledgeBase.push({
         type: 'export',
-        content: `Class: ${classInfo.name}${classInfo.extends ? ` extends ${classInfo.extends}` : ''} with methods: ${classInfo.methods.join(', ')}`,
+        content: `Ghost Class: ${cls.name}${ghostContext ? ` [${ghostContext}]` : ''}`,
         filePath,
-        metadata: classInfo,
-        keywords: extractKeywords(`class ${classInfo.name} ${classInfo.methods.join(' ')}`),
+        metadata: cls,
+        keywords: extractKeywords(`class ${cls.name} ${cls.methods.join(' ')} ${ghostContext}`),
       });
     }
   }
@@ -180,26 +288,23 @@ async function processGhostFile(
   // Add markdown content if available
   if (knowledge.markdownMetadata) {
     const metadata = knowledge.markdownMetadata;
-    const contentType = filePath.includes('/posts/') || filePath.includes('/blog/') ? 'blog post' : 'page';
-    
     knowledgeBase.push({
-      type: 'export',
-      content: `${contentType}: ${metadata.title || 'Untitled'} ${metadata.description ? '- ' + metadata.description : ''}`,
+      type: 'content',
+      content: `Documentation: ${metadata.title || 'Untitled'} - ${metadata.description || ''}`,
       filePath,
-      metadata: { ...metadata, contentType },
-      keywords: extractKeywords(`${contentType} ${metadata.title || ''} ${metadata.description || ''} ${metadata.tags?.join(' ') || ''}`),
+      keywords: extractKeywords(`${metadata.title || ''} ${metadata.description || ''}`),
     });
   }
   
-  // Add page routing information if available
+  // Add page routing if available
   if (knowledge.pageRouting) {
     const routing = knowledge.pageRouting;
     knowledgeBase.push({
       type: 'export',
-      content: `${routing.type || 'file'}: ${routing.route || filePath} ${routing.dynamic ? '(dynamic)' : ''}`,
+      content: `Page Route: ${routing.route || filePath} => ${routing.type || 'page'}`,
       filePath,
       metadata: routing,
-      keywords: extractKeywords(`page route ${routing.type || ''} ${routing.route || ''} ${routing.dynamic ? 'dynamic' : ''}`),
+      keywords: extractKeywords(`page route ${routing.route || ''} ${routing.type || ''}`),
     });
   }
   
@@ -208,10 +313,10 @@ async function processGhostFile(
     const config = knowledge.cmsConfig;
     knowledgeBase.push({
       type: 'export',
-      content: `CMS: ${config.platform || 'Unknown'} with content types: ${config.contentTypes?.join(', ') || 'none'} ${config.collections ? 'collections: ' + config.collections.join(', ') : ''}`,
+      content: `CMS Config: ${config.platform || 'Unknown'} with content types: ${config.contentTypes?.join(', ') || 'none'}`,
       filePath,
       metadata: config,
-      keywords: extractKeywords(`cms ${config.platform || ''} ${config.contentTypes?.join(' ') || ''} ${config.collections?.join(' ') || ''}`),
+      keywords: extractKeywords(`cms config ${config.platform || ''} ${config.contentTypes?.join(' ') || ''}`),
     });
   }
   
@@ -227,11 +332,11 @@ async function processGhostFile(
     
     if (countContent.length > 0) {
       knowledgeBase.push({
-        type: 'comment',
-        content: `Content count: ${countContent.join(', ')}`,
+        type: 'export',
+        content: `Content Count: ${countContent.join(', ')}`,
         filePath,
         metadata: counts,
-        keywords: extractKeywords(`content count ${countContent.join(' ')} posts pages files`),
+        keywords: extractKeywords(`content count ${countContent.join(' ')}`),
       });
     }
   }
@@ -557,4 +662,302 @@ export function clearProcessedFilesCache(): void {
  */
 export function getProcessedFileCount(): number {
   return processedFilesCache.size;
+}
+
+/**
+ * Process Ghost UI components for Portal Settings and Membership
+ */
+async function processGhostUIComponents(
+  content: string,
+  filePath: string,
+  knowledgeBase: KnowledgeEntry[]
+): Promise<void> {
+  // Extract React component definitions
+  const componentMatches = content.match(/export\s+(?:default\s+)?(?:function|const)\s+(\w+)(?:Component|Page|Settings)?/g);
+  if (componentMatches) {
+    for (const match of componentMatches) {
+      const componentName = match.match(/(\w+)(?:Component|Page|Settings)?/)?.[1];
+      if (componentName) {
+        knowledgeBase.push({
+          type: 'export',
+          content: `Ghost UI Component: ${componentName} - ${filePath.includes('admin-x-settings') ? 'Portal Settings' : 'Membership'}`,
+          filePath,
+          metadata: { componentName, type: 'ui-component' },
+          keywords: extractKeywords(`component ${componentName} portal settings membership ui`),
+        });
+      }
+    }
+  }
+  
+  // Extract JSX patterns for UI elements
+  const jsxPatterns = [
+    /<h[1-6][^>]*>([^<]+)<\/h[1-6]>/g,  // Headings
+    /<title[^>]*>([^<]+)<\/title>/g,   // Titles
+    /<label[^>]*>([^<]+)<\/label>/g,   // Labels
+    /placeholder\s*=\s*["']([^"']+)["']/g, // Placeholders
+    /aria-label\s*=\s*["']([^"']+)["']/g   // ARIA labels
+  ];
+  
+  jsxPatterns.forEach(pattern => {
+    const matches = content.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const textContent = match.replace(/<[^>]*>/g, '').replace(/["']/g, '').trim();
+        if (textContent.length > 3) {
+          knowledgeBase.push({
+            type: 'content',
+            content: `UI Element: ${textContent}`,
+            filePath,
+            metadata: { uiElement: textContent, pattern: pattern.source },
+            keywords: extractKeywords(`ui element ${textContent} portal settings membership`),
+          });
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Extract UI patterns from file content
+ */
+async function extractUIPatterns(
+  content: string,
+  filePath: string,
+  knowledgeBase: KnowledgeEntry[]
+): Promise<void> {
+  // Look for subtitle-related patterns
+  const subtitlePatterns = [
+    /subtitle\s*[:=]\s*["']([^"']+)["']/g,
+    /className\s*=\s*["'][^"']*subtitle[^"']*["']/g,
+    /<h[1-6][^>]*>([^<]*subtitle[^<]*)<\/h[1-6]>/gi
+  ];
+  
+  subtitlePatterns.forEach(pattern => {
+    const matches = content.match(pattern);
+    if (matches) {
+      knowledgeBase.push({
+        type: 'content',
+        content: `Subtitle Pattern: ${matches[0]}`,
+        filePath,
+        metadata: { pattern: 'subtitle', matches: matches.length },
+        keywords: extractKeywords('subtitle subheading description label'),
+      });
+    }
+  });
+  
+  // Look for Portal Settings patterns
+  if (content.toLowerCase().includes('portal settings')) {
+    knowledgeBase.push({
+      type: 'content',
+      content: 'Portal Settings Configuration',
+      filePath,
+      metadata: { pattern: 'portal-settings' },
+      keywords: extractKeywords('portal settings configuration admin'),
+    });
+  }
+  
+  // Look for Membership patterns
+  if (content.toLowerCase().includes('membership')) {
+    knowledgeBase.push({
+      type: 'content',
+      content: 'Membership System Configuration',
+      filePath,
+      metadata: { pattern: 'membership' },
+      keywords: extractKeywords('membership member subscription portal'),
+    });
+  }
+}
+
+/**
+ * Enhanced JSX content extraction for complete text content
+ */
+async function extractJSXContent(
+  content: string,
+  filePath: string,
+  knowledgeBase: KnowledgeEntry[]
+): Promise<void> {
+  console.log(`🎭 Extracting enhanced JSX content from ${filePath}`);
+  
+  // Extract complete text blocks
+  const textBlocks = extractCompleteTextContent(content, filePath);
+  
+  // Add each text block as a separate knowledge entry
+  textBlocks.forEach((text, index) => {
+    if (text.length > 5) { // Only add meaningful text blocks
+      knowledgeBase.push({
+        type: 'content',
+        content: `Text Content: ${text}`,
+        filePath,
+        keywords: extractKeywords(text),
+        metadata: {
+          textType: 'jsx-content',
+          textIndex: index,
+          originalText: text
+        }
+      });
+      
+      console.log(`📝 Added text block ${index + 1}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    }
+  });
+  
+  // Extract component props and descriptions
+  const propMatches = content.match(/(\w+)="([^"]{10,})"/g);
+  if (propMatches) {
+    propMatches.forEach((match, index) => {
+      const [propName, propValue] = match.split('=');
+      const value = propValue.replace(/"/g, '').trim();
+      
+      if (value.length > 10 && !value.includes('http') && !value.includes('className')) {
+        knowledgeBase.push({
+          type: 'content',
+          content: `Component Prop: ${propName}="${value}"`,
+          filePath,
+          keywords: extractKeywords(`${propName} ${value}`),
+          metadata: {
+            textType: 'component-prop',
+            propName: propName,
+            propValue: value
+          }
+        });
+      }
+    });
+  }
+  
+  // Extract string literals that look like descriptions
+  const stringMatches = content.match(/"([^"]{15,})"/g);
+  if (stringMatches) {
+    stringMatches.forEach((match, index) => {
+      const text = match.replace(/"/g, '').trim();
+      
+      // Filter out URLs, class names, and other non-descriptive strings
+      if (text.length > 15 && 
+          !text.includes('http') && 
+          !text.includes('className') && 
+          !text.includes('import') &&
+          !text.includes('export') &&
+          text.includes(' ')) { // Must contain spaces to be descriptive
+        
+        knowledgeBase.push({
+          type: 'content',
+          content: `String Literal: ${text}`,
+          filePath,
+          keywords: extractKeywords(text),
+          metadata: {
+            textType: 'string-literal',
+            originalText: text
+          }
+        });
+        
+        console.log(`💬 Added string literal: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+      }
+    });
+  }
+  
+  // Extract template literals
+  const templateMatches = content.match(/`([^`]{15,})`/g);
+  if (templateMatches) {
+    templateMatches.forEach((match, index) => {
+      const text = match.replace(/`/g, '').trim();
+      
+      if (text.length > 15 && !text.includes('${')) {
+        knowledgeBase.push({
+          type: 'content',
+          content: `Template Literal: ${text}`,
+          filePath,
+          keywords: extractKeywords(text),
+          metadata: {
+            textType: 'template-literal',
+            originalText: text
+          }
+        });
+      }
+    });
+  }
+  
+  // Extract comments that might contain descriptions
+  const commentMatches = content.match(/\/\*([^*]+)\*\//g);
+  if (commentMatches) {
+    commentMatches.forEach((match, index) => {
+      const text = match.replace(/\/\*|\*\//g, '').trim();
+      
+      if (text.length > 10) {
+        knowledgeBase.push({
+          type: 'content',
+          content: `Comment: ${text}`,
+          filePath,
+          keywords: extractKeywords(text),
+          metadata: {
+            textType: 'comment',
+            originalText: text
+          }
+        });
+      }
+    });
+  }
+  
+  console.log(`✅ Enhanced JSX extraction complete for ${filePath}: ${textBlocks.length} text blocks, ${propMatches?.length || 0} props, ${stringMatches?.length || 0} strings`);
+}
+
+/**
+ * Extract complete text content from JSX/TSX files
+ */
+function extractCompleteTextContent(content: string, filePath: string): string[] {
+  const textBlocks: string[] = [];
+  
+  // Extract JSX text content (text between tags)
+  const jsxTextMatches = content.match(/>([^<>{}\n]+)</g);
+  if (jsxTextMatches) {
+    jsxTextMatches.forEach(match => {
+      const text = match.replace(/[<>]/g, '').trim();
+      if (text.length > 3 && !text.match(/^[a-z]+$/)) {
+        textBlocks.push(text);
+      }
+    });
+  }
+  
+  // Extract string literals that look like descriptions
+  const stringLiteralMatches = content.match(/"([^"]{10,})"/g);
+  if (stringLiteralMatches) {
+    stringLiteralMatches.forEach(match => {
+      const text = match.replace(/"/g, '').trim();
+      if (text.length > 10 && !text.includes('http') && !text.includes('className')) {
+        textBlocks.push(text);
+      }
+    });
+  }
+  
+  // Extract template literals
+  const templateLiteralMatches = content.match(/`([^`]{10,})`/g);
+  if (templateLiteralMatches) {
+    templateLiteralMatches.forEach(match => {
+      const text = match.replace(/`/g, '').trim();
+      if (text.length > 10 && !text.includes('${')) {
+        textBlocks.push(text);
+      }
+    });
+  }
+  
+  // Extract comments that might contain descriptions
+  const commentMatches = content.match(/\/\*([^*]+)\*\//g);
+  if (commentMatches) {
+    commentMatches.forEach(match => {
+      const text = match.replace(/\/\*|\*\//g, '').trim();
+      if (text.length > 10) {
+        textBlocks.push(text);
+      }
+    });
+  }
+  
+  // Extract JSX attributes that might contain descriptions
+  const jsxAttributeMatches = content.match(/(title="([^"]+)"|alt="([^"]+)"|aria-label="([^"]+)")/g);
+  if (jsxAttributeMatches) {
+    jsxAttributeMatches.forEach(match => {
+      const text = match.replace(/title="|alt="|aria-label="|"/g, '').trim();
+      if (text.length > 5) {
+        textBlocks.push(text);
+      }
+    });
+  }
+  
+  return [...new Set(textBlocks)]; // Remove duplicates
 }

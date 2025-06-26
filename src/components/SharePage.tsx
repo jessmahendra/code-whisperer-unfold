@@ -176,8 +176,8 @@ export default function SharePage() {
               onClick={handleLogoClick}
               className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
             >
-              <BookOpen className="h-6 w-6 text-unfold-purple" />
-              <span className="inline-block font-bold text-xl text-green-800">
+              <BookOpen className="h-6 w-6 text-black" />
+              <span className="inline-block font-bold text-xl text-black">
                 Unfold
               </span>
             </button>
@@ -262,8 +262,8 @@ export default function SharePage() {
             onClick={handleLogoClick}
             className="flex items-center space-x-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
           >
-            <BookOpen className="h-6 w-6 text-unfold-purple" />
-            <span className="inline-block font-bold text-xl text-green-800">
+            <BookOpen className="h-6 w-6 text-black" />
+            <span className="inline-block font-bold text-xl text-black">
               Unfold
             </span>
           </button>

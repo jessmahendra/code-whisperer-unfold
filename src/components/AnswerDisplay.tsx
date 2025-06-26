@@ -6,7 +6,12 @@ import ReactMarkdown from "react-markdown";
 import ConfidenceScore from "./ConfidenceScore";
 import CodeReference from "./CodeReference";
 import ScreenshotGallery from "./ScreenshotGallery";
-import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardFooter,
+} from "@/components/ui/card";
 
 interface Reference {
   filePath: string;
@@ -26,13 +31,15 @@ interface Screenshot {
 }
 
 interface VisualContext {
-  type: 'flowchart' | 'component' | 'state';
+  type: "flowchart" | "component" | "state";
   syntax: string;
 }
 
 export interface AnswerDisplayProps {
   question?: string;
-  answer: string | { text: string; screenshots?: Screenshot[]; [key: string]: any };
+  answer:
+    | string
+    | { text: string; screenshots?: Screenshot[]; [key: string]: any };
   confidence?: number;
   references?: Reference[];
   timestamp?: string;
@@ -53,23 +60,32 @@ export default function AnswerDisplay({
   const [showVersionInfo, setShowVersionInfo] = useState(false);
   const [showReferences, setShowReferences] = useState(false);
   const typingSpeed = 300; // milliseconds per paragraph
-  
-  // Handle the answer text and screenshots based on its type
-  const answerContent = typeof answer === 'string' ? answer : 
-                       (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
-                       "No answer text available";
 
-  const screenshots = typeof answer === 'object' && answer && 'screenshots' in answer ? answer.screenshots : undefined;
-                       
-  const paragraphs = answerContent.split('\n\n').filter(p => p.trim() !== '');
+  // Handle the answer text and screenshots based on its type
+  const answerContent =
+    typeof answer === "string"
+      ? answer
+      : answer && typeof answer === "object" && "text" in answer
+      ? answer.text
+      : "No answer text available";
+
+  const screenshots =
+    typeof answer === "object" && answer && "screenshots" in answer
+      ? answer.screenshots
+      : undefined;
+
+  const paragraphs = answerContent.split("\n\n").filter((p) => p.trim() !== "");
   const fullTextRef = useRef(paragraphs);
 
   useEffect(() => {
-    const content = typeof answer === 'string' ? answer : 
-                   (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
-                   "No answer text available";
-                   
-    fullTextRef.current = content.split('\n\n').filter(p => p.trim() !== '');
+    const content =
+      typeof answer === "string"
+        ? answer
+        : answer && typeof answer === "object" && "text" in answer
+        ? answer.text
+        : "No answer text available";
+
+    fullTextRef.current = content.split("\n\n").filter((p) => p.trim() !== "");
     setParagraphIndex(0);
     setDisplayedParagraphs([]);
     setIsTyping(true);
@@ -80,8 +96,11 @@ export default function AnswerDisplay({
 
     if (paragraphIndex < fullTextRef.current.length) {
       const timeout = setTimeout(() => {
-        setDisplayedParagraphs(prev => [...prev, fullTextRef.current[paragraphIndex]]);
-        setParagraphIndex(prev => prev + 1);
+        setDisplayedParagraphs((prev) => [
+          ...prev,
+          fullTextRef.current[paragraphIndex],
+        ]);
+        setParagraphIndex((prev) => prev + 1);
       }, typingSpeed);
 
       return () => clearTimeout(timeout);
@@ -91,9 +110,12 @@ export default function AnswerDisplay({
   }, [paragraphIndex, isTyping]);
 
   const handleCopyAnswer = () => {
-    const textToCopy = typeof answer === 'string' ? answer : 
-                      (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
-                      "No answer text available";
+    const textToCopy =
+      typeof answer === "string"
+        ? answer
+        : answer && typeof answer === "object" && "text" in answer
+        ? answer.text
+        : "No answer text available";
     navigator.clipboard.writeText(textToCopy);
     toast.success("Answer copied to clipboard");
   };
@@ -103,16 +125,21 @@ export default function AnswerDisplay({
     setParagraphIndex(fullTextRef.current.length);
     setIsTyping(false);
   };
-  
+
   const handleCreateEmailTemplate = () => {
-    const textAnswer = typeof answer === 'string' ? answer : 
-                     (answer && typeof answer === 'object' && 'text' in answer) ? answer.text : 
-                     "No answer text available";
-    
+    const textAnswer =
+      typeof answer === "string"
+        ? answer
+        : answer && typeof answer === "object" && "text" in answer
+        ? answer.text
+        : "No answer text available";
+
     const subject = `RE: ${question || "Your inquiry"}`;
     const body = `Hello,
 
-Thank you for reaching out with your question${question ? ` about "${question}"` : ""}.
+Thank you for reaching out with your question${
+      question ? ` about "${question}"` : ""
+    }.
 
 ${textAnswer}
 
@@ -122,29 +149,43 @@ Best regards,
 [Your Name]`;
 
     // Create mailto link
-    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
+    const mailtoLink = `mailto:?subject=${encodeURIComponent(
+      subject
+    )}&body=${encodeURIComponent(body)}`;
+
     // Open default email client
     window.open(mailtoLink);
     toast.success("Email template created");
   };
 
-  const hasVersionInfo = references.some(ref => ref.lastUpdated);
+  const hasVersionInfo = references.some((ref) => ref.lastUpdated);
 
   // Convert confidence from 0-1 scale to 0-100 scale for the ConfidenceScore component
   const confidencePercentage = Math.round(confidence * 100);
 
   // Custom components for ReactMarkdown with enhanced heading styles
   const markdownComponents = {
-    h1: (props: any) => <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />,
-    h2: (props: any) => <h2 className="text-xl font-bold mt-5 mb-3" {...props} />,
-    h3: (props: any) => <h3 className="text-lg font-semibold mt-4 mb-2" {...props} />,
-    h4: (props: any) => <h4 className="text-md font-semibold mt-3 mb-2" {...props} />,
-    h5: (props: any) => <h5 className="text-base font-semibold mt-3 mb-1" {...props} />,
-    h6: (props: any) => <h6 className="text-sm font-semibold mt-3 mb-1" {...props} />,
+    h1: (props: any) => (
+      <h1 className="text-2xl font-bold mt-6 mb-4" {...props} />
+    ),
+    h2: (props: any) => (
+      <h2 className="text-xl font-bold mt-5 mb-3" {...props} />
+    ),
+    h3: (props: any) => (
+      <h3 className="text-lg font-semibold mt-4 mb-2" {...props} />
+    ),
+    h4: (props: any) => (
+      <h4 className="text-md font-semibold mt-3 mb-2" {...props} />
+    ),
+    h5: (props: any) => (
+      <h5 className="text-base font-semibold mt-3 mb-1" {...props} />
+    ),
+    h6: (props: any) => (
+      <h6 className="text-sm font-semibold mt-3 mb-1" {...props} />
+    ),
     ul: (props: any) => <ul className="list-disc pl-6 my-4" {...props} />,
     ol: (props: any) => <ol className="list-decimal pl-6 my-4" {...props} />,
-    li: (props: any) => <li className="my-1" {...props} />
+    li: (props: any) => <li className="my-1" {...props} />,
   };
 
   return (
@@ -156,8 +197,13 @@ Best regards,
       <CardContent className="pt-4">
         <div className="text-sm space-y-4 mb-4">
           {displayedParagraphs.map((paragraph, index) => (
-            <div key={index} className="animate-fade-in prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown components={markdownComponents}>{paragraph}</ReactMarkdown>
+            <div
+              key={index}
+              className="animate-fade-in prose prose-sm max-w-none dark:prose-invert"
+            >
+              <ReactMarkdown components={markdownComponents}>
+                {paragraph}
+              </ReactMarkdown>
             </div>
           ))}
           {isTyping && displayedParagraphs.length < paragraphs.length && (
@@ -175,12 +221,12 @@ Best regards,
         )}
 
         {/* Action buttons inside card */}
-        <div className="flex justify-end gap-2 mt-4 border-t pt-4">
+        <div className="flex justify-end gap-2 mt-4 border-t border-black/10 pt-4">
           {isTyping && (
             <Button
               variant="outline"
               size="sm"
-              className="text-xs"
+              className="text-xs border-black/20 hover:bg-black hover:text-white hover:border-black transition-all duration-200"
               onClick={handleCompleteTyping}
             >
               Complete
@@ -189,6 +235,7 @@ Best regards,
           <Button
             variant="outline"
             size="sm"
+            className="border-black/20 hover:bg-black hover:text-white hover:border-black transition-all duration-200"
             onClick={handleCreateEmailTemplate}
           >
             <Mail className="h-4 w-4 mr-1" />
@@ -197,6 +244,7 @@ Best regards,
           <Button
             variant="outline"
             size="sm"
+            className="border-black/20 hover:bg-black hover:text-white hover:border-black transition-all duration-200"
             onClick={handleCopyAnswer}
           >
             <Copy className="h-4 w-4 mr-1" />
@@ -208,11 +256,16 @@ Best regards,
       {references && references.length > 0 && (
         <CardFooter className="flex-col items-start border-t pt-4">
           <h2 className="text-lg font-medium mb-4">Sources</h2>
-          
+
           {/* Always display file reference pills */}
           <div className="flex flex-wrap gap-2 mb-4">
-            {Array.from(new Set(references.map(ref => ref.filePath.split('/').pop()))).map((filename, index) => (
-              <span key={index} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm">
+            {Array.from(
+              new Set(references.map((ref) => ref.filePath.split("/").pop()))
+            ).map((filename, index) => (
+              <span
+                key={index}
+                className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm"
+              >
                 {filename}
               </span>
             ))}
@@ -226,27 +279,29 @@ Best regards,
           >
             {showReferences ? "Hide source code" : "Show source code"}
           </Button>
-          
+
           {/* Show code references directly when button is clicked */}
           {showReferences && (
             <div className="space-y-3 mt-4">
               {references.map((reference, index) => (
-                <CodeReference 
-                  key={index} 
+                <CodeReference
+                  key={index}
                   filePath={reference.filePath}
                   lineNumbers={reference.lineNumbers}
                   snippet={reference.snippet}
-                  lastUpdated={showVersionInfo ? reference.lastUpdated : undefined}
+                  lastUpdated={
+                    showVersionInfo ? reference.lastUpdated : undefined
+                  }
                   author={reference.author}
                   authorEmail={reference.authorEmail}
                 />
               ))}
             </div>
           )}
-          
+
           <div className="flex justify-between items-center mt-8 w-full">
             <ConfidenceScore score={confidencePercentage} />
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -256,7 +311,7 @@ Best regards,
               {showVersionInfo ? "Hide version info" : "Show version info"}
             </Button>
           </div>
-          
+
           <div className="text-xs text-muted-foreground mt-2">
             Generated on {timestamp}
           </div>

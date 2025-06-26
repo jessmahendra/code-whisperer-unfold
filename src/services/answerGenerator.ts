@@ -404,7 +404,15 @@ export async function generateAnswer(query: string, options?: {
       try {
         // Prepare enhanced context with more detail
         const context = results.slice(0, 15).map(result => {
-          return `File: ${result.filePath}\nType: ${result.type}\nContent: ${result.content.substring(0, 800)}\n${result.metadata ? `Metadata: ${JSON.stringify(result.metadata)}` : ''}\n---`;
+          let metadataStr = '';
+          if (result.metadata) {
+            try {
+              metadataStr = `\nMetadata: ${JSON.stringify(result.metadata)}`;
+            } catch (error) {
+              metadataStr = '\nMetadata: [Circular Reference]';
+            }
+          }
+          return `File: ${result.filePath}\nType: ${result.type}\nContent: ${result.content.substring(0, 800)}${metadataStr}\n---`;
         });
         
         console.log(`Sending ${context.length} enhanced context items to AI`);

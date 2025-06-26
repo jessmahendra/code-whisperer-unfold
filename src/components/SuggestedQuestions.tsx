@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { getFrequentQuestions } from "@/services/chatHistoryService";
@@ -12,20 +11,20 @@ interface SuggestedQuestionsProps {
 export default function SuggestedQuestions({
   questions,
   onSelectQuestion,
-  isProcessing
+  isProcessing,
 }: SuggestedQuestionsProps) {
   const [frequentQuestions, setFrequentQuestions] = useState<string[]>([]);
 
   useEffect(() => {
     // Get frequently asked questions from history
-    const frequent = getFrequentQuestions(3).map(pattern => pattern.question);
+    const frequent = getFrequentQuestions(3).map((pattern) => pattern.question);
     setFrequentQuestions(frequent);
   }, []);
 
   // Combine predefined questions with frequent questions, avoiding duplicates
   const allQuestions = [...questions];
-  frequentQuestions.forEach(fq => {
-    if (!allQuestions.some(q => q.toLowerCase() === fq.toLowerCase())) {
+  frequentQuestions.forEach((fq) => {
+    if (!allQuestions.some((q) => q.toLowerCase() === fq.toLowerCase())) {
       allQuestions.push(fq);
     }
   });
@@ -40,7 +39,7 @@ export default function SuggestedQuestions({
           <Button
             key={index}
             variant="outline"
-            className="text-sm rounded-full border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+            className="text-sm rounded-full border-black/20 hover:bg-black hover:text-white hover:border-black transition-all duration-200"
             onClick={() => onSelectQuestion(question)}
             disabled={isProcessing}
           >

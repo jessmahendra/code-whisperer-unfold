@@ -1,75 +1,101 @@
-
 import React, { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { Trash2, Edit, Plus, Star, StarOff } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  GitBranch,
+  Lock,
+  Globe,
+  Plus,
+  Trash2,
+  Settings,
+  RefreshCw,
+  Calendar,
+  ExternalLink,
+} from "lucide-react";
 import { toast } from "sonner";
-import { validateGithubToken, initGithubClient } from "@/services/githubClient";
+import {
+  getActiveRepository,
+  getUserRepositories,
+  removeUserRepository,
+  UserRepository,
+} from "@/services/userRepositories";
+import { saveRepositoryConfig } from "@/services/repositoryConfig";
+import { validateGithubToken } from "@/services/githubClient";
 import { initializeKnowledgeBase } from "@/services/knowledgeBase";
-import { saveRepositoryConfig, getRepositoryConfig, clearRepositoryConfig } from "@/services/repositoryConfig";
+import {
+  getGitHubAuthState,
+  logoutGitHub,
+  GitHubRepository,
+} from "@/services/githubOAuth";
+import EnhancedRepositoryBrowser from "./EnhancedRepositoryBrowser";
 
 interface RepositoryManagerProps {
-  onRepositoryChange?: () => void;
+  className?: string;
 }
 
-export default function RepositoryManager({ onRepositoryChange }: RepositoryManagerProps) {
-  const [currentRepo, setCurrentRepo] = useState<any>(null);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  
-  // Form state
+export default function RepositoryManager({
+  className = "",
+}: RepositoryManagerProps) {
+  const [repositories, setRepositories] = useState<UserRepository[]>([]);
+  const [activeRepo, setActiveRepo] = useState<UserRepository | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showOAuthBrowser, setShowOAuthBrowser] = useState(false);
+  const [githubAuth, setGithubAuth] = useState(getGitHubAuthState());
+
+  // Manual repository form state
   const [owner, setOwner] = useState("");
   const [repo, setRepo] = useState("");
   const [token, setToken] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   useEffect(() => {
-    updateRepository();
+    loadRepositories();
   }, []);
 
-  const updateRepository = () => {
-    const config = getRepositoryConfig();
-    setCurrentRepo(config);
-  };
-
-  const resetForm = () => {
-    setOwner("");
-    setRepo("");
-    setToken("");
+  const loadRepositories = async () => {
+    setIsLoading(true);
+    try {
+      const userRepos = getUserRepositories();
+      const active = getActiveRepository();
+      setRepositories(userRepos);
+      setActiveRepo(active);
+      setGithubAuth(getGitHubAuthState());
+    } catch (error) {
+      console.error("Failed to load repositories:", error);
+      toast.error("Failed to load repositories");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAddRepository = async () => {
     if (!owner.trim() || !repo.trim() || !token.trim()) {
-      toast.error("Please fill in all required fields");
+      toast.error("Please fill in all fields");
       return;
     }
 
-    setIsSubmitting(true);
+    setIsConnecting(true);
     try {
-      // Validate token first
+      // Validate GitHub token
       const user = await validateGithubToken(token);
       if (!user) {
         toast.error("Invalid GitHub token");
@@ -80,90 +106,60 @@ export default function RepositoryManager({ onRepositoryChange }: RepositoryMana
       saveRepositoryConfig({
         owner: owner.trim(),
         repo: repo.trim(),
-        token: token.trim()
+        token: token.trim(),
       });
-      
-      // Initialize GitHub client and knowledge base
-      initGithubClient(token.trim());
-      toast.loading("Initializing repository...", { id: "init-repo", duration: 5000 });
-      await initializeKnowledgeBase(true);
-      toast.dismiss("init-repo");
 
-      updateRepository();
-      setIsAddDialogOpen(false);
-      resetForm();
-      
       toast.success(`Repository ${owner}/${repo} added successfully`);
-      onRepositoryChange?.();
+      setShowAddDialog(false);
+      setOwner("");
+      setRepo("");
+      setToken("");
+      loadRepositories();
     } catch (error) {
       console.error("Error adding repository:", error);
       toast.error("Failed to add repository");
     } finally {
-      setIsSubmitting(false);
+      setIsConnecting(false);
     }
   };
 
-  const handleEditRepository = async () => {
-    if (!owner.trim() || !repo.trim() || !token.trim()) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleRemoveRepository = async (repoId: string) => {
     try {
-      // Validate token first
-      const user = await validateGithubToken(token);
-      if (!user) {
-        toast.error("Invalid GitHub token");
-        return;
-      }
-
-      // Update repository configuration
-      saveRepositoryConfig({
-        owner: owner.trim(),
-        repo: repo.trim(),
-        token: token.trim()
-      });
-      
-      // Re-initialize GitHub client and knowledge base
-      initGithubClient(token.trim());
-      toast.loading("Updating repository...", { id: "update-repo", duration: 3000 });
-      await initializeKnowledgeBase(true);
-      toast.dismiss("update-repo");
-      
-      updateRepository();
-      setIsEditDialogOpen(false);
-      resetForm();
-      
-      toast.success("Repository updated successfully");
-      onRepositoryChange?.();
+      removeUserRepository(repoId);
+      toast.success("Repository removed successfully");
+      loadRepositories();
     } catch (error) {
-      console.error("Error updating repository:", error);
-      toast.error("Failed to update repository");
-    } finally {
-      setIsSubmitting(false);
+      console.error("Error removing repository:", error);
+      toast.error("Failed to remove repository");
     }
   };
 
-  const handleDeleteRepository = () => {
-    clearRepositoryConfig();
-    updateRepository();
-    toast.success("Repository configuration cleared");
-    onRepositoryChange?.();
-  };
+  const handleRepositorySelect = async (selectedRepos: GitHubRepository[]) => {
+    try {
+      // For now, we'll add the first repository as the primary one
+      // In the future, we can enhance this to support multiple repositories
+      const primaryRepo = selectedRepos[0];
 
-  const openEditDialog = () => {
-    if (currentRepo) {
-      setOwner(currentRepo.owner);
-      setRepo(currentRepo.repo);
-      setToken(currentRepo.token);
-      setIsEditDialogOpen(true);
+      // Save repository configuration
+      saveRepositoryConfig({
+        owner: primaryRepo.owner.login,
+        repo: primaryRepo.name,
+        token: githubAuth.token!,
+      });
+
+      toast.success(`Repository ${primaryRepo.full_name} added successfully`);
+      setShowOAuthBrowser(false);
+      loadRepositories();
+    } catch (error) {
+      console.error("Error adding repository:", error);
+      toast.error("Failed to add repository");
     }
   };
 
-  const closeEditDialog = () => {
-    setIsEditDialogOpen(false);
-    resetForm();
+  const handleLogoutGitHub = () => {
+    logoutGitHub();
+    setGithubAuth(getGitHubAuthState());
+    toast.success("Disconnected from GitHub");
   };
 
   const formatDate = (dateString: string) => {
@@ -171,211 +167,271 @@ export default function RepositoryManager({ onRepositoryChange }: RepositoryMana
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <GitHubLogoIcon className="h-5 w-5" />
-              Repository Configuration
-            </CardTitle>
-            <CardDescription>
-              Configure your GitHub repository connection
-            </CardDescription>
-          </div>
-          
-          {!currentRepo && (
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
+    <div className={`space-y-6 ${className}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold">Repository Management</h2>
+          <p className="text-muted-foreground">
+            Manage your connected repositories and GitHub integration
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={loadRepositories}
+            disabled={isLoading}
+          >
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* GitHub Connection Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GitBranch className="h-5 w-5" />
+            GitHub Connection
+          </CardTitle>
+          <CardDescription>
+            Manage your GitHub OAuth connection and repository access
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {githubAuth.isAuthenticated ? (
+            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div>
+                <h4 className="font-medium text-green-900">
+                  Connected as {githubAuth.user?.name || githubAuth.user?.login}
+                </h4>
+                <p className="text-sm text-green-700">
+                  You can browse and add repositories from your GitHub account
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowOAuthBrowser(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
                   Add Repository
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Repository</DialogTitle>
-                  <DialogDescription>
-                    Connect a GitHub repository to use with Unfold
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="add-owner">Repository Owner</Label>
-                      <Input
-                        id="add-owner"
-                        placeholder="e.g., TryGhost"
-                        value={owner}
-                        onChange={(e) => setOwner(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="add-repo">Repository Name</Label>
-                      <Input
-                        id="add-repo"
-                        placeholder="e.g., Ghost"
-                        value={repo}
-                        onChange={(e) => setRepo(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="add-token">GitHub Personal Access Token</Label>
-                    <Input
-                      id="add-token"
-                      type="password"
-                      placeholder="ghp_..."
-                      value={token}
-                      onChange={(e) => setToken(e.target.value)}
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleAddRepository} disabled={isSubmitting}>
-                    {isSubmitting ? "Adding..." : "Add Repository"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogoutGitHub}
+                >
+                  Disconnect
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div>
+                <h4 className="font-medium text-amber-900">
+                  Not connected to GitHub
+                </h4>
+                <p className="text-sm text-amber-700">
+                  Connect your GitHub account to easily browse and add
+                  repositories
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOAuthBrowser(true)}
+              >
+                Connect GitHub
+              </Button>
+            </div>
           )}
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        {!currentRepo ? (
-          <div className="text-center py-8">
-            <GitHubLogoIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No repository connected</h3>
-            <p className="text-muted-foreground mb-4">
-              Connect a GitHub repository to get started with Unfold
-            </p>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              Add Repository
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4 border-primary bg-primary/5">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium">
-                      {currentRepo.owner}/{currentRepo.repo}
-                    </h3>
-                    <Star className="h-4 w-4 text-yellow-500 fill-current" />
+        </CardContent>
+      </Card>
+
+      {/* Manual Repository Addition */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Add Repository Manually
+          </CardTitle>
+          <CardDescription>
+            Add a repository using owner, name, and personal access token
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setShowAddDialog(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Repository
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Connected Repositories */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Connected Repositories
+          </CardTitle>
+          <CardDescription>
+            Manage your connected repositories and their settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-muted rounded" />
+                    <div>
+                      <div className="h-4 w-32 bg-muted rounded mb-1" />
+                      <div className="h-3 w-24 bg-muted rounded" />
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Active repository
-                  </p>
-                  {currentRepo.lastAccessed && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Last accessed {formatDate(currentRepo.lastAccessed)}
-                    </p>
-                  )}
+                  <div className="w-16 h-6 bg-muted rounded" />
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={openEditDialog}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm" className="text-destructive">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove Repository</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to remove "{currentRepo.owner}/{currentRepo.repo}"?
-                          This will clear your current repository configuration.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteRepository}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+              ))}
+            </div>
+          ) : repositories.length === 0 ? (
+            <div className="text-center py-8">
+              <GitBranch className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">
+                No repositories connected
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                Connect your first repository to start exploring your codebase
+              </p>
+              <div className="flex gap-2 justify-center">
+                <Button onClick={() => setShowOAuthBrowser(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add from GitHub
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAddDialog(true)}
+                >
+                  Add Manually
+                </Button>
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* Edit Repository Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={(open) => !open && closeEditDialog()}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit Repository</DialogTitle>
-              <DialogDescription>
-                Update repository information
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-owner">Repository Owner</Label>
-                  <Input
-                    id="edit-owner"
-                    placeholder="e.g., TryGhost"
-                    value={owner}
-                    onChange={(e) => setOwner(e.target.value)}
-                  />
+          ) : (
+            <div className="space-y-3">
+              {repositories.map((repo) => (
+                <div
+                  key={repo.id}
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        {repo.owner}/{repo.repo}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Added {formatDate(repo.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {activeRepo?.id === repo.id && (
+                      <Badge variant="default">Active</Badge>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveRepository(repo.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-repo">Repository Name</Label>
-                  <Input
-                    id="edit-repo"
-                    placeholder="e.g., Ghost"
-                    value={repo}
-                    onChange={(e) => setRepo(e.target.value)}
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="edit-token">GitHub Personal Access Token</Label>
-                <Input
-                  id="edit-token"
-                  type="password"
-                  placeholder="ghp_..."
-                  value={token}
-                  onChange={(e) => setToken(e.target.value)}
-                />
-              </div>
+              ))}
             </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={closeEditDialog}>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Add Repository Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Repository</DialogTitle>
+            <DialogDescription>
+              Enter the repository details and GitHub token to connect
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="owner">Repository Owner</Label>
+              <Input
+                id="owner"
+                placeholder="e.g., TryGhost"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="repo">Repository Name</Label>
+              <Input
+                id="repo"
+                placeholder="e.g., Ghost"
+                value={repo}
+                onChange={(e) => setRepo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="token">GitHub Personal Access Token</Label>
+              <Input
+                id="token"
+                type="password"
+                placeholder="github_pat_..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleEditRepository} disabled={isSubmitting}>
-                {isSubmitting ? "Updating..." : "Update Repository"}
+              <Button
+                onClick={handleAddRepository}
+                disabled={
+                  isConnecting || !owner.trim() || !repo.trim() || !token.trim()
+                }
+              >
+                {isConnecting ? "Adding..." : "Add Repository"}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </CardContent>
-    </Card>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* OAuth Repository Browser Dialog */}
+      <Dialog open={showOAuthBrowser} onOpenChange={setShowOAuthBrowser}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Select Repository from GitHub</DialogTitle>
+            <DialogDescription>
+              Browse and select repositories from your GitHub account
+            </DialogDescription>
+          </DialogHeader>
+          <EnhancedRepositoryBrowser
+            onRepositorySelect={handleRepositorySelect}
+            onBack={() => setShowOAuthBrowser(false)}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

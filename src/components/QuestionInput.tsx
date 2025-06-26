@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
@@ -14,7 +13,7 @@ interface QuestionInputProps {
 export default function QuestionInput({
   onAskQuestion,
   isProcessing,
-  centered = false
+  centered = false,
 }: QuestionInputProps) {
   const [question, setQuestion] = useState("");
 
@@ -43,24 +42,36 @@ export default function QuestionInput({
   };
 
   return (
-    <form onSubmit={handleSubmit} className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}>
+    <form
+      onSubmit={handleSubmit}
+      className={`relative ${centered ? "max-w-2xl mx-auto text-center" : ""}`}
+    >
       <div className="relative">
-        <div className={`${centered ? "py-6 text-base" : "pl-4 pr-24 py-5"} border border-input rounded-md shadow-sm focus-within:ring-2 focus-within:ring-sky-900`}>
+        <div
+          className={`${
+            centered ? "py-6 text-base" : "pl-4 pr-24 py-5"
+          } border-2 border-black/20 rounded-md shadow-sm focus-within:ring-2 focus-within:ring-black focus-within:border-black transition-all duration-200`}
+        >
           <QuestionAutoComplete
             value={question}
             onChange={setQuestion}
             onSelect={handleSelectQuestion}
-            placeholder={centered ? "What do you want to know today?" : "Ask another question..."}
+            placeholder={
+              centered
+                ? "What do you want to know today?"
+                : "Ask another question..."
+            }
             disabled={isProcessing}
             className="w-full"
           />
         </div>
-        <Button 
+        <Button
           type="submit"
-          className={`${centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"} bg-sky-900 hover:bg-sky-800 border-sky-900`}
+          className={`${
+            centered ? "mt-4" : "absolute right-1 top-1/2 -translate-y-1/2"
+          } bg-black hover:bg-gray-800 border-black shadow-sm hover:shadow-md transition-all duration-200`}
           disabled={isProcessing}
           variant="default"
-          style={{ backgroundColor: "#0c4a6e" }}
           onClick={!question.trim() ? handleEmptyButtonClick : undefined}
         >
           {isProcessing ? "Processing..." : centered ? "Search" : "Ask"}

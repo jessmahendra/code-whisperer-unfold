@@ -1,4 +1,3 @@
-
 /**
  * Service for handling shareable answer creation and retrieval
  */
@@ -39,10 +38,56 @@ export interface ShareableAnswer {
 // Storage key for local and session storage
 const STORAGE_KEY = 'unfold_shareableAnswers';
 
+// Safe JSON serialization to handle circular references
+function safeStringify(obj: unknown): string {
+  try {
+    if (obj === null || obj === undefined) return '';
+    if (typeof obj !== 'object') return String(obj);
+    
+    const seen = new WeakSet();
+    
+    function safeStringifyHelper(obj: unknown): unknown {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj !== 'object') return obj;
+      
+      if (seen.has(obj as object)) return '[Circular Reference]';
+      seen.add(obj as object);
+      
+      try {
+        if (Array.isArray(obj)) {
+          return obj.map(item => safeStringifyHelper(item));
+        } else {
+          const result: Record<string, unknown> = {};
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              // Skip problematic properties
+              if (key === 'frontmatter' && typeof (obj as Record<string, unknown>)[key] === 'object') {
+                result[key] = '[Frontmatter Object]';
+              } else {
+                result[key] = safeStringifyHelper((obj as Record<string, unknown>)[key]);
+              }
+            }
+          }
+          return result;
+        }
+      } catch (error) {
+        return '[Serialization Error]';
+      } finally {
+        seen.delete(obj as object);
+      }
+    }
+    
+    return JSON.stringify(safeStringifyHelper(obj));
+  } catch (error) {
+    console.error('Safe JSON stringify failed:', error);
+    return '{}';
+  }
+}
+
 // Enhanced storage operations with redundancy and verification
 async function saveDataWithVerification(data: Record<string, ShareableAnswer>): Promise<boolean> {
   console.log("💾 === ENHANCED STORAGE SAVE START ===");
-  const dataString = JSON.stringify(data);
+  const dataString = safeStringify(data);
   const keys = Object.keys(data);
   console.log("💾 Saving", keys.length, "items:", keys);
   

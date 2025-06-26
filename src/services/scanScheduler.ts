@@ -1,4 +1,3 @@
-
 import { getActiveRepository } from './userRepositories';
 
 // Cache duration: 2 weeks in milliseconds
@@ -13,6 +12,52 @@ interface ScanCache {
 
 const SCAN_CACHE_KEY = 'unfold_scan_cache';
 const CACHE_VERSION = '1.0';
+
+// Safe JSON serialization to handle circular references
+function safeStringify(obj: unknown): string {
+  try {
+    if (obj === null || obj === undefined) return '';
+    if (typeof obj !== 'object') return String(obj);
+    
+    const seen = new WeakSet();
+    
+    function safeStringifyHelper(obj: unknown): unknown {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj !== 'object') return obj;
+      
+      if (seen.has(obj as object)) return '[Circular Reference]';
+      seen.add(obj as object);
+      
+      try {
+        if (Array.isArray(obj)) {
+          return obj.map(item => safeStringifyHelper(item));
+        } else {
+          const result: Record<string, unknown> = {};
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              // Skip problematic properties
+              if (key === 'frontmatter' && typeof (obj as Record<string, unknown>)[key] === 'object') {
+                result[key] = '[Frontmatter Object]';
+              } else {
+                result[key] = safeStringifyHelper((obj as Record<string, unknown>)[key]);
+              }
+            }
+          }
+          return result;
+        }
+      } catch (error) {
+        return '[Serialization Error]';
+      } finally {
+        seen.delete(obj as object);
+      }
+    }
+    
+    return JSON.stringify(safeStringifyHelper(obj));
+  } catch (error) {
+    console.error('Safe JSON stringify failed:', error);
+    return '{}';
+  }
+}
 
 /**
  * Get cached scan data for a repository
@@ -45,7 +90,7 @@ export function getCachedScanData(repositoryId: string): ScanCache | null {
 /**
  * Save scan data to cache
  */
-export function saveScanDataToCache(repositoryId: string, scanData: any): void {
+export function saveScanDataToCache(repositoryId: string, scanData: any): boolean {
   try {
     const cache: ScanCache = {
       repositoryId,
@@ -54,10 +99,12 @@ export function saveScanDataToCache(repositoryId: string, scanData: any): void {
       version: CACHE_VERSION
     };
     
-    localStorage.setItem(`${SCAN_CACHE_KEY}_${repositoryId}`, JSON.stringify(cache));
+    localStorage.setItem(`${SCAN_CACHE_KEY}_${repositoryId}`, safeStringify(cache));
     console.log(`Scan data cached for repository ${repositoryId}`);
+    return true;
   } catch (error) {
     console.error('Error saving scan cache:', error);
+    return false;
   }
 }
 

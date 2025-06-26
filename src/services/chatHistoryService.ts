@@ -1,4 +1,3 @@
-
 export interface ChatEntry {
   id: string;
   question: string;
@@ -16,6 +15,52 @@ export interface QuestionPattern {
 // Store chat history in local storage
 const CHAT_HISTORY_KEY = 'unfold_chat_history';
 const QUESTION_PATTERNS_KEY = 'unfold_question_patterns';
+
+// Safe JSON serialization to handle circular references
+function safeStringify(obj: unknown): string {
+  try {
+    if (obj === null || obj === undefined) return '';
+    if (typeof obj !== 'object') return String(obj);
+    
+    const seen = new WeakSet();
+    
+    function safeStringifyHelper(obj: unknown): unknown {
+      if (obj === null || obj === undefined) return obj;
+      if (typeof obj !== 'object') return obj;
+      
+      if (seen.has(obj as object)) return '[Circular Reference]';
+      seen.add(obj as object);
+      
+      try {
+        if (Array.isArray(obj)) {
+          return obj.map(item => safeStringifyHelper(item));
+        } else {
+          const result: Record<string, unknown> = {};
+          for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+              // Skip problematic properties
+              if (key === 'frontmatter' && typeof (obj as Record<string, unknown>)[key] === 'object') {
+                result[key] = '[Frontmatter Object]';
+              } else {
+                result[key] = safeStringifyHelper((obj as Record<string, unknown>)[key]);
+              }
+            }
+          }
+          return result;
+        }
+      } catch (error) {
+        return '[Serialization Error]';
+      } finally {
+        seen.delete(obj as object);
+      }
+    }
+    
+    return JSON.stringify(safeStringifyHelper(obj));
+  } catch (error) {
+    console.error('Safe JSON stringify failed:', error);
+    return '{}';
+  }
+}
 
 // Get all chat history entries
 export function getChatHistory(): ChatEntry[] {
@@ -89,7 +134,7 @@ export function addChatEntry(question: string, answer: any): ChatEntry {
   const limitedHistory = updatedHistory.slice(0, 50);
   
   try {
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(limitedHistory));
+    localStorage.setItem(CHAT_HISTORY_KEY, safeStringify(limitedHistory));
   } catch (error) {
     console.error("Error saving chat history:", error);
   }
@@ -134,7 +179,7 @@ function updateQuestionPatterns(question: string): void {
       .sort((a, b) => b.count - a.count)
       .slice(0, 100);
     
-    localStorage.setItem(QUESTION_PATTERNS_KEY, JSON.stringify(sortedPatterns));
+    localStorage.setItem(QUESTION_PATTERNS_KEY, safeStringify(sortedPatterns));
   } catch (error) {
     console.error("Error updating question patterns:", error);
   }

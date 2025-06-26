@@ -3,7 +3,7 @@ import { processFile, processModule } from './fileProcessor';
 import { KnowledgeEntry } from './types';
 
 // Track successful path patterns
-let successfulPathPatterns: Set<string> = new Set();
+const successfulPathPatterns: Set<string> = new Set();
 let explorationProgress = {
   pathsAttempted: 0,
   pathsSuccessful: 0,
@@ -14,79 +14,62 @@ let explorationProgress = {
   totalAttempts: 0,
   successfulPaths: 0,
   scannedFiles: [] as string[],
-  repositoryFingerprint: null as string | null
+  repositoryFingerprint: null as string | null,
+  // Enhanced tracking for universal scanning
+  totalFilesAvailable: 0,
+  directoriesExplored: [] as string[],
+  currentDirectory: "",
+  scanStartTime: 0,
+  scanDuration: 0,
+  rateLimitRemaining: null as number | null,
+  connectionErrors: [] as string[]
 };
 
 // Progress update callback
 let progressUpdateCallback: ((progress: number) => void) | null = null;
 
-// Ghost-specific repository paths for comprehensive scanning
-const GHOST_SPECIFIC_PATHS = [
-  // Core Ghost application
-  'ghost/core',
-  'ghost/core/core',
-  'ghost/core/core/server',
-  'ghost/core/core/server/services',
-  'ghost/core/core/server/services/members',
-  'ghost/core/core/server/api',
-  'ghost/core/core/server/models',
-  'ghost/core/core/server/data',
-  'ghost/core/core/frontend',
-  
-  // Admin interface
-  'ghost/admin',
-  'ghost/admin/app',
-  'ghost/admin/app/services',
-  'ghost/admin/app/models',
-  'ghost/admin/app/controllers',
-  
-  // Admin-X applications
-  'apps/admin-x-settings',
-  'apps/admin-x-activitypub',
-  'apps/admin-x-design',
-  'apps/admin-x-framework',
-  
-  // Portal and membership
-  'apps/portal',
-  'apps/portal/src',
-  'apps/signup-form',
-  'apps/comments-ui',
-  
-  // API and services
-  'ghost/core/core/server/api/endpoints',
-  'ghost/core/core/server/services/auth',
-  'ghost/core/core/server/services/mail',
-  'ghost/core/core/server/services/themes',
-  'ghost/core/core/server/services/settings',
-  
-  // Content and themes
-  'ghost/core/core/server/services/posts',
-  'ghost/core/core/server/services/pages',
-  'ghost/core/core/frontend/services',
-  
-  // Database and migrations
-  'ghost/core/core/server/data/migrations',
-  'ghost/core/core/server/data/schema',
-  
-  // Configuration files
-  'ghost/core/core/server/config',
-  'package.json',
-  'apps/portal/package.json',
-  'ghost/admin/package.json'
-];
+// Universal repository scanning configuration
+const SCANNING_CONFIG = {
+  MIN_FILES_TO_SCAN: 100,
+  TARGET_FILES_TO_SCAN: 500,
+  MAX_FILES_TO_SCAN: 1000,
+  MAX_RECURSION_DEPTH: 8,
+  MAX_FILES_PER_DIRECTORY: 200,
+  RATE_LIMIT_DELAY: 100, // ms between API calls
+  TIMEOUT_PER_REQUEST: 10000, // 10 seconds
+  RETRY_ATTEMPTS: 3
+};
 
-// General paths for non-Ghost repositories
-const GENERAL_REPOSITORY_PATHS = [
-  'src',
-  'app',
-  'lib',
-  'components',
-  'pages',
-  'services',
-  'utils',
-  'api',
-  'package.json',
-  'README.md'
+// Universal directory patterns for comprehensive scanning
+const UNIVERSAL_DIRECTORY_PATTERNS = [
+  // Root level important files
+  'package.json', 'README.md', 'tsconfig.json', 'vite.config.ts', 'next.config.js',
+  'tailwind.config.js', 'webpack.config.js', 'rollup.config.js', 'jest.config.js',
+  
+  // Common source directories
+  'src', 'app', 'lib', 'components', 'pages', 'services', 'utils', 'hooks',
+  'api', 'routes', 'controllers', 'models', 'middleware', 'types', 'interfaces',
+  'store', 'context', 'providers', 'helpers', 'adapters', 'plugins', 'extensions',
+  
+  // Configuration and documentation
+  'config', 'settings', 'docs', 'documentation', 'examples', 'tests', 'spec',
+  'scripts', 'tools', 'build', 'dist', 'public', 'assets', 'static',
+  
+  // Framework-specific directories
+  'pages', 'components', 'layouts', 'templates', 'views', 'screens',
+  'services', 'repositories', 'entities', 'dto', 'guards', 'decorators',
+  
+  // Integration and external services
+  'integrations', 'providers', 'clients', 'connectors', 'adapters',
+  'webhooks', 'callbacks', 'handlers', 'processors', 'validators',
+  
+  // Business logic directories
+  'business', 'domain', 'core', 'features', 'modules', 'packages',
+  'apps', 'microservices', 'services', 'api', 'graphql', 'rest',
+  
+  // Ghost-specific paths (for backward compatibility)
+  'ghost', 'ghost/core', 'ghost/admin', 'apps/portal', 'apps/admin-x-settings',
+  'apps/admin-x-activitypub', 'apps/admin-x-design', 'apps/signup-form'
 ];
 
 /**
@@ -116,21 +99,22 @@ function updateProgress(progress: number): void {
 }
 
 /**
- * Explores repository paths to find and process files
+ * Enhanced universal repository scanning with comprehensive coverage
  */
 export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): Promise<boolean> {
   const repo = getCurrentRepository();
   if (!repo) {
-    console.log('No repository configured for path exploration');
+    console.log('❌ No repository configured for path exploration');
     explorationProgress.status = "error";
     explorationProgress.error = "No repository configured";
     return false;
   }
 
   const currentFingerprint = generateRepositoryFingerprint();
-  console.log(`Starting Ghost-aware repository exploration for ${repo.owner}/${repo.repo}`);
+  console.log(`🚀 Starting UNIVERSAL repository exploration for ${repo.owner}/${repo.repo}`);
+  console.log(`📊 Target: ${SCANNING_CONFIG.TARGET_FILES_TO_SCAN} files, Max: ${SCANNING_CONFIG.MAX_FILES_TO_SCAN} files`);
   
-  // Reset progress tracking
+  // Reset progress tracking with enhanced metrics
   explorationProgress = {
     pathsAttempted: 0,
     pathsSuccessful: 0,
@@ -141,248 +125,387 @@ export async function exploreRepositoryPaths(knowledgeBase: KnowledgeEntry[]): P
     totalAttempts: 0,
     successfulPaths: 0,
     scannedFiles: [],
-    repositoryFingerprint: currentFingerprint
+    repositoryFingerprint: currentFingerprint,
+    totalFilesAvailable: 0,
+    directoriesExplored: [],
+    currentDirectory: "",
+    scanStartTime: Date.now(),
+    scanDuration: 0,
+    rateLimitRemaining: null,
+    connectionErrors: []
   };
 
   let hasProcessedAnyFiles = false;
-  
-  // Determine if this is a Ghost repository
-  const isGhostRepo = repo.repo.toLowerCase().includes('ghost') || repo.owner.toLowerCase().includes('ghost');
-  const pathsToTry = isGhostRepo ? GHOST_SPECIFIC_PATHS : GENERAL_REPOSITORY_PATHS;
-  
-  console.log(`Detected ${isGhostRepo ? 'Ghost' : 'general'} repository, using ${pathsToTry.length} specialized paths`);
+  let totalFilesFound = 0;
+  const directoriesToExplore: string[] = [];
+  const exploredDirectories = new Set<string>();
 
   try {
-    // Try each path pattern
-    for (let i = 0; i < pathsToTry.length; i++) {
-      const path = pathsToTry[i];
+    // Step 1: Start from repository root to understand structure
+    console.log(`🔍 Step 1: Analyzing repository root structure...`);
+    updateProgress(5);
+    
+    const rootContents = await getRepositoryContents("");
+    if (Array.isArray(rootContents)) {
+      console.log(`📁 Root directory contains ${rootContents.length} items`);
       
-      explorationProgress.pathsAttempted++;
-      explorationProgress.totalAttempts = explorationProgress.pathsAttempted;
-      
-      // Update progress
-      const progress = Math.round((i / pathsToTry.length) * 100);
-      updateProgress(progress);
-      
-      try {
-        console.log(`Scanning path: ${path}`);
-        
-        const contents = await getRepositoryContents(path);
-        
-        if (Array.isArray(contents)) {
-          console.log(`Found ${contents.length} items in ${path}`);
-          successfulPathPatterns.add(path);
-          explorationProgress.pathsSuccessful++;
-          explorationProgress.successfulPaths = explorationProgress.pathsSuccessful;
+      // Count total files and identify directories to explore
+      for (const item of rootContents) {
+        if (item && typeof item === 'object' && 'type' in item && 'name' in item && 'path' in item) {
+          const typedItem = item as { type: string; name: string; path: string };
           
-          // Process files in this directory
-          let filesProcessedInDir = 0;
-          const maxFilesPerDir = isGhostRepo ? 100 : 50; // Higher limit for Ghost repos
-          
-          for (const item of contents) {
-            if (filesProcessedInDir >= maxFilesPerDir) {
-              console.log(`Reached file limit for directory ${path}`);
-              break;
-            }
-            
-            if (item && typeof item === 'object' && 'type' in item && 'name' in item && 'path' in item) {
-              const typedItem = item as { type: string; name: string; path: string };
-              
-              if (typedItem.type === 'file') {
-                if (isRelevantFile(typedItem.name, isGhostRepo)) {
-                  try {
-                    console.log(`Processing file: ${typedItem.path}`);
-                    await processFile(typedItem.path, knowledgeBase);
-                    hasProcessedAnyFiles = true;
-                    explorationProgress.filesProcessed++;
-                    explorationProgress.scannedFiles.push(typedItem.path);
-                    filesProcessedInDir++;
-                  } catch (error) {
-                    console.error(`Error processing file ${typedItem.path}:`, error);
-                  }
-                }
-              } else if (typedItem.type === 'dir' && shouldExploreDirectory(typedItem.name, isGhostRepo)) {
-                // Recursive directory processing for important subdirectories
-                try {
-                  await processDirectoryRecursively(typedItem.path, knowledgeBase, 25, 1, isGhostRepo);
-                  hasProcessedAnyFiles = true;
-                } catch (error) {
-                  console.error(`Error processing directory ${typedItem.path}:`, error);
-                }
+          if (typedItem.type === 'file') {
+            totalFilesFound++;
+            if (isRelevantFile(typedItem.name, false)) {
+              try {
+                console.log(`📄 Processing root file: ${typedItem.path}`);
+                await processFile(typedItem.path, knowledgeBase);
+                hasProcessedAnyFiles = true;
+                explorationProgress.filesProcessed++;
+                explorationProgress.scannedFiles.push(typedItem.path);
+              } catch (error) {
+                console.error(`Error processing root file ${typedItem.path}:`, error);
+                explorationProgress.connectionErrors.push(`Root file error: ${error}`);
               }
             }
-          }
-        } else if (contents && typeof contents === 'object' && 'type' in contents) {
-          // Single file
-          const typedContents = contents as { type: string; name?: string; path: string };
-          if (typedContents.type === 'file' && typedContents.name && isRelevantFile(typedContents.name, isGhostRepo)) {
-            try {
-              console.log(`Processing single file: ${path}`);
-              await processFile(path, knowledgeBase);
-              hasProcessedAnyFiles = true;
-              explorationProgress.filesProcessed++;
-              explorationProgress.scannedFiles.push(path);
-              successfulPathPatterns.add(path);
-              explorationProgress.pathsSuccessful++;
-              explorationProgress.successfulPaths = explorationProgress.pathsSuccessful;
-            } catch (error) {
-              console.error(`Error processing single file ${path}:`, error);
-            }
+          } else if (typedItem.type === 'dir') {
+            directoriesToExplore.push(typedItem.path);
+            console.log(`📂 Found directory to explore: ${typedItem.path}`);
           }
         }
-      } catch (error) {
-        console.error(`Error exploring path ${path}:`, error);
-        // Continue to next path
       }
     }
 
-    // Mark as complete
+    // Step 2: Explore important directories systematically
+    console.log(`🔍 Step 2: Exploring ${directoriesToExplore.length} directories systematically...`);
+    updateProgress(15);
+
+    // Sort directories by importance for better coverage
+    const sortedDirectories = sortDirectoriesByImportance(directoriesToExplore);
+    
+    for (let i = 0; i < sortedDirectories.length; i++) {
+      const dirPath = sortedDirectories[i];
+      
+      if (explorationProgress.filesProcessed >= SCANNING_CONFIG.MAX_FILES_TO_SCAN) {
+        console.log(`⚠️ Reached maximum file limit (${SCANNING_CONFIG.MAX_FILES_TO_SCAN}), stopping exploration`);
+        break;
+      }
+      
+      if (exploredDirectories.has(dirPath)) continue;
+      
+      explorationProgress.currentDirectory = dirPath;
+      explorationProgress.pathsAttempted++;
+      
+      const progress = 15 + Math.round((i / sortedDirectories.length) * 70);
+      updateProgress(progress);
+      
+      try {
+        console.log(`🔍 Exploring directory ${i + 1}/${sortedDirectories.length}: ${dirPath}`);
+        const filesInDir = await exploreDirectoryRecursively(dirPath, knowledgeBase, 1, exploredDirectories);
+        totalFilesFound += filesInDir;
+        
+        if (filesInDir > 0) {
+          explorationProgress.pathsSuccessful++;
+          explorationProgress.directoriesExplored.push(dirPath);
+          hasProcessedAnyFiles = true;
+        }
+        
+        // Add delay to respect rate limits
+        await delay(SCANNING_CONFIG.RATE_LIMIT_DELAY);
+        
+      } catch (error) {
+        console.error(`Error exploring directory ${dirPath}:`, error);
+        explorationProgress.connectionErrors.push(`Directory error: ${error}`);
+      }
+    }
+
+    // Step 3: Try specific important paths if we haven't found enough files
+    if (explorationProgress.filesProcessed < SCANNING_CONFIG.MIN_FILES_TO_SCAN) {
+      console.log(`🔍 Step 3: Trying specific important paths to reach minimum file count...`);
+      updateProgress(90);
+      
+      for (const pattern of UNIVERSAL_DIRECTORY_PATTERNS) {
+        if (explorationProgress.filesProcessed >= SCANNING_CONFIG.MIN_FILES_TO_SCAN) break;
+        
+        if (!exploredDirectories.has(pattern)) {
+          try {
+            console.log(`🔍 Trying specific path: ${pattern}`);
+            const filesInPath = await exploreDirectoryRecursively(pattern, knowledgeBase, 1, exploredDirectories);
+            totalFilesFound += filesInPath;
+            
+            if (filesInPath > 0) {
+              explorationProgress.pathsSuccessful++;
+              explorationProgress.directoriesExplored.push(pattern);
+              hasProcessedAnyFiles = true;
+            }
+            
+            await delay(SCANNING_CONFIG.RATE_LIMIT_DELAY);
+          } catch (error) {
+            // Silently continue - this path might not exist
+          }
+        }
+      }
+    }
+
+    // Calculate final statistics
+    explorationProgress.scanDuration = Date.now() - explorationProgress.scanStartTime;
+    explorationProgress.totalFilesAvailable = totalFilesFound;
     explorationProgress.status = "complete";
     updateProgress(100);
     
-    console.log(`Repository scan complete: ${explorationProgress.pathsSuccessful} paths, ${explorationProgress.filesProcessed} files`);
-    console.log(`Sample scanned files:`, explorationProgress.scannedFiles.slice(0, 10));
+    console.log(`🎉 UNIVERSAL Repository scan complete!`);
+    console.log(`📊 Comprehensive Scan Summary:`);
+    console.log(`   ⏱️  Duration: ${explorationProgress.scanDuration}ms`);
+    console.log(`   📁 Directories explored: ${explorationProgress.directoriesExplored.length}`);
+    console.log(`   📄 Files processed: ${explorationProgress.filesProcessed}/${totalFilesFound} available`);
+    console.log(`   🎯 Success rate: ${Math.round((explorationProgress.filesProcessed / totalFilesFound) * 100)}%`);
+    console.log(`   📍 Repository: ${explorationProgress.repositoryFingerprint}`);
+    
+    if (explorationProgress.connectionErrors.length > 0) {
+      console.log(`⚠️  Connection errors: ${explorationProgress.connectionErrors.length}`);
+    }
+    
+    console.log(`📋 Sample scanned files:`, explorationProgress.scannedFiles.slice(0, 10));
+    console.log(`📂 Explored directories:`, explorationProgress.directoriesExplored.slice(0, 10));
 
     return hasProcessedAnyFiles;
   } catch (error) {
     explorationProgress.status = "error";
     explorationProgress.error = error instanceof Error ? error.message : "Unknown error";
-    console.error("Error during repository exploration:", error);
+    explorationProgress.scanDuration = Date.now() - explorationProgress.scanStartTime;
+    console.error("❌ Error during universal repository exploration:", error);
     return false;
   }
 }
 
 /**
- * Recursive directory processing
+ * Enhanced recursive directory exploration with better file handling
  */
-async function processDirectoryRecursively(
+async function exploreDirectoryRecursively(
   dirPath: string, 
   knowledgeBase: KnowledgeEntry[], 
-  maxFiles: number, 
   currentDepth: number,
-  isGhostRepo: boolean
-): Promise<void> {
-  if (currentDepth > 3) return; // Limit recursion depth
+  exploredDirectories: Set<string>
+): Promise<number> {
+  if (currentDepth > SCANNING_CONFIG.MAX_RECURSION_DEPTH) {
+    console.log(`⚠️ Max recursion depth (${SCANNING_CONFIG.MAX_RECURSION_DEPTH}) reached for: ${dirPath}`);
+    return 0;
+  }
+  
+  if (exploredDirectories.has(dirPath)) {
+    return 0;
+  }
+  
+  exploredDirectories.add(dirPath);
+  
+  console.log(`🔍 Exploring directory at depth ${currentDepth}: ${dirPath}`);
   
   try {
     const contents = await getRepositoryContents(dirPath);
-    if (!Array.isArray(contents)) return;
+    if (!Array.isArray(contents)) {
+      console.log(`📄 Single file found: ${dirPath}`);
+      return 0;
+    }
+    
+    console.log(`📁 Found ${contents.length} items in directory: ${dirPath}`);
     
     let filesProcessed = 0;
+    let subdirectoriesFound = 0;
+    
+    // Process files first
     for (const item of contents) {
-      if (filesProcessed >= maxFiles) break;
+      if (explorationProgress.filesProcessed >= SCANNING_CONFIG.MAX_FILES_TO_SCAN) {
+        console.log(`⚠️ Reached maximum file limit, stopping file processing`);
+        break;
+      }
+      
+      if (filesProcessed >= SCANNING_CONFIG.MAX_FILES_PER_DIRECTORY) {
+        console.log(`⚠️ Reached directory file limit (${SCANNING_CONFIG.MAX_FILES_PER_DIRECTORY}) for: ${dirPath}`);
+        break;
+      }
       
       if (item && typeof item === 'object' && 'type' in item && 'name' in item && 'path' in item) {
         const typedItem = item as { type: string; name: string; path: string };
         
-        if (typedItem.type === 'file' && isRelevantFile(typedItem.name, isGhostRepo)) {
+        if (typedItem.type === 'file' && isRelevantFile(typedItem.name, false)) {
           try {
+            console.log(`📄 Processing file: ${typedItem.path}`);
             await processFile(typedItem.path, knowledgeBase);
             explorationProgress.filesProcessed++;
             explorationProgress.scannedFiles.push(typedItem.path);
             filesProcessed++;
           } catch (error) {
-            console.error(`Error in recursive processing of ${typedItem.path}:`, error);
+            console.error(`Error processing file ${typedItem.path}:`, error);
+            explorationProgress.connectionErrors.push(`File error: ${error}`);
           }
-        } else if (typedItem.type === 'dir' && shouldExploreDirectory(typedItem.name, isGhostRepo)) {
-          await processDirectoryRecursively(typedItem.path, knowledgeBase, Math.floor(maxFiles / 2), currentDepth + 1, isGhostRepo);
+        } else if (typedItem.type === 'dir') {
+          subdirectoriesFound++;
         }
       }
     }
+    
+    // Then explore subdirectories if we haven't hit limits
+    if (explorationProgress.filesProcessed < SCANNING_CONFIG.MAX_FILES_TO_SCAN) {
+      for (const item of contents) {
+        if (explorationProgress.filesProcessed >= SCANNING_CONFIG.MAX_FILES_TO_SCAN) break;
+        
+        if (item && typeof item === 'object' && 'type' in item && 'name' in item && 'path' in item) {
+          const typedItem = item as { type: string; name: string; path: string };
+          
+          if (typedItem.type === 'dir' && shouldExploreDirectory(typedItem.name, false)) {
+            console.log(`📂 Recursing into subdirectory: ${typedItem.name}`);
+            const subFiles = await exploreDirectoryRecursively(
+              typedItem.path, 
+              knowledgeBase, 
+              currentDepth + 1, 
+              exploredDirectories
+            );
+            filesProcessed += subFiles;
+          }
+        }
+      }
+    }
+    
+    console.log(`✅ Completed directory: ${dirPath} (processed ${filesProcessed} files, found ${subdirectoriesFound} subdirectories)`);
+    return filesProcessed;
   } catch (error) {
-    console.error(`Error in recursive directory processing for ${dirPath}:`, error);
+    console.error(`Error exploring directory ${dirPath}:`, error);
+    explorationProgress.connectionErrors.push(`Directory exploration error: ${error}`);
+    return 0;
   }
 }
 
 /**
- * Enhanced file relevance checking with Ghost-specific logic
+ * Sort directories by importance for better scanning coverage
+ */
+function sortDirectoriesByImportance(directories: string[]): string[] {
+  const importanceScores: { [key: string]: number } = {};
+  
+  for (const dir of directories) {
+    let score = 0;
+    
+    // High priority patterns
+    if (dir.includes('src') || dir.includes('app') || dir.includes('lib')) score += 100;
+    if (dir.includes('components') || dir.includes('pages')) score += 90;
+    if (dir.includes('services') || dir.includes('api')) score += 80;
+    if (dir.includes('config') || dir.includes('settings')) score += 70;
+    if (dir.includes('utils') || dir.includes('helpers')) score += 60;
+    
+    // Framework-specific patterns
+    if (dir.includes('ghost') || dir.includes('admin-x')) score += 50;
+    if (dir.includes('portal') || dir.includes('membership')) score += 45;
+    
+    // General patterns
+    if (dir.includes('types') || dir.includes('interfaces')) score += 40;
+    if (dir.includes('hooks') || dir.includes('context')) score += 35;
+    if (dir.includes('store') || dir.includes('state')) score += 30;
+    
+    // Lower priority
+    if (dir.includes('test') || dir.includes('spec')) score += 10;
+    if (dir.includes('docs') || dir.includes('documentation')) score += 5;
+    
+    importanceScores[dir] = score;
+  }
+  
+  return directories.sort((a, b) => importanceScores[b] - importanceScores[a]);
+}
+
+/**
+ * Enhanced universal file relevance checking
  */
 function isRelevantFile(fileName: string, isGhostRepo: boolean): boolean {
   // Skip unimportant files first
   const skipFiles = [
     'package-lock.json', 'yarn.lock', 'bun.lockb', '.gitignore',
     '.env', '.env.local', '.env.example', 'LICENSE', 'CHANGELOG.md',
-    '.github/CODE_OF_CONDUCT.md', '.github/CONTRIBUTING.md'
+    '.github/CODE_OF_CONDUCT.md', '.github/CONTRIBUTING.md',
+    '.DS_Store', 'Thumbs.db', '.vscode/settings.json'
   ];
   
   if (skipFiles.includes(fileName)) return false;
   
-  // Skip GitHub workflow and script files unless they're important
-  if (fileName.includes('.github/') && !fileName.includes('package.json')) {
+  // Skip GitHub workflow files unless they're important
+  if (fileName.includes('.github/workflows/') && !fileName.includes('package.json')) {
     return false;
   }
   
   // Important files regardless of type
   const importantFiles = [
     'package.json', 'README.md', 'tsconfig.json', 'vite.config.ts',
-    'vite.config.js', 'next.config.js', 'tailwind.config.js'
+    'vite.config.js', 'next.config.js', 'tailwind.config.js',
+    'webpack.config.js', 'rollup.config.js', 'jest.config.js',
+    'dockerfile', 'docker-compose.yml', '.env.example'
   ];
   
-  if (importantFiles.includes(fileName)) return true;
-  
-  if (isGhostRepo) {
-    // Ghost-specific important files
-    const ghostImportantFiles = [
-      'index.js', 'app.js', 'server.js', 'boot.js', 'config.js',
-      'routes.js', 'members.js', 'auth.js', 'mail.js', 'posts.js',
-      'pages.js', 'settings.js', 'themes.js', 'api.js'
-    ];
-    
-    if (ghostImportantFiles.some(f => fileName.includes(f))) return true;
-    
-    // Ghost file extensions
-    const ghostExtensions = [
-      '.js', '.ts', '.tsx', '.jsx', '.hbs', '.json', '.yaml', '.yml'
-    ];
-    
-    return ghostExtensions.some(ext => fileName.endsWith(ext));
-  } else {
-    // General relevant extensions
-    const relevantExtensions = [
-      '.ts', '.tsx', '.js', '.jsx', '.md', '.json', '.yaml', '.yml',
-      '.vue', '.svelte', '.css', '.scss', '.html'
-    ];
-    
-    return relevantExtensions.some(ext => fileName.endsWith(ext));
+  if (importantFiles.some(f => fileName.toLowerCase().includes(f.toLowerCase()))) {
+    return true;
   }
+  
+  // Universal relevant extensions
+  const relevantExtensions = [
+    '.ts', '.tsx', '.js', '.jsx', '.md', '.json', '.yaml', '.yml',
+    '.vue', '.svelte', '.css', '.scss', '.html', '.xml', '.toml',
+    '.ini', '.conf', '.config', '.env'
+  ];
+  
+  return relevantExtensions.some(ext => fileName.toLowerCase().endsWith(ext));
 }
 
 /**
- * Enhanced directory exploration logic with Ghost-specific priorities
+ * Enhanced universal directory exploration logic
  */
 function shouldExploreDirectory(dirName: string, isGhostRepo: boolean): boolean {
   // Always skip these directories
   const skipDirs = [
     'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
     '.vscode', '.idea', 'target', 'out', '.cache', 'tmp', 'temp',
-    'test', 'tests', '__tests__', 'spec'
+    'test', 'tests', '__tests__', 'spec', '.nyc_output', 'coverage'
   ];
   
   if (skipDirs.includes(dirName)) return false;
   
+  // Skip hidden directories
+  if (dirName.startsWith('.') && dirName !== '.github') return false;
+  
+  // Universal important directories
+  const importantDirs = [
+    'components', 'pages', 'services', 'utils', 'hooks', 'lib', 'api',
+    'types', 'store', 'context', 'providers', 'src', 'app', 'routes',
+    'controllers', 'models', 'middleware', 'helpers', 'adapters',
+    'plugins', 'extensions', 'integrations', 'providers', 'clients',
+    'connectors', 'webhooks', 'callbacks', 'handlers', 'processors',
+    'validators', 'business', 'domain', 'core', 'features', 'modules',
+    'packages', 'apps', 'microservices', 'graphql', 'rest'
+  ];
+  
+  if (importantDirs.includes(dirName)) return true;
+  
+  // Framework-specific directories
+  const frameworkDirs = [
+    'layouts', 'templates', 'views', 'screens', 'repositories',
+    'entities', 'dto', 'guards', 'decorators', 'filters', 'pipes'
+  ];
+  
+  if (frameworkDirs.includes(dirName)) return true;
+  
+  // Ghost-specific directories (for backward compatibility)
   if (isGhostRepo) {
-    // Ghost-specific important directories
-    const ghostImportantDirs = [
-      'server', 'services', 'api', 'models', 'data', 'frontend',
-      'admin', 'core', 'app', 'src', 'lib', 'utils', 'controllers',
-      'middleware', 'routes', 'themes', 'helpers', 'adapters'
+    const ghostDirs = [
+      'server', 'admin', 'core', 'frontend', 'admin-x-settings',
+      'admin-x-activitypub', 'admin-x-design', 'portal', 'signup-form'
     ];
     
-    if (ghostImportantDirs.includes(dirName)) return true;
-  } else {
-    // General important directories
-    const importantDirs = [
-      'components', 'pages', 'services', 'utils', 'hooks', 'lib', 'api',
-      'types', 'store', 'context', 'providers', 'src', 'app'
-    ];
-    
-    if (importantDirs.includes(dirName)) return true;
+    if (ghostDirs.includes(dirName)) return true;
   }
   
-  // Skip hidden directories
-  if (dirName.startsWith('.') || dirName.startsWith('_')) return false;
-  
-  return false; // Be more restrictive to focus on important directories
+  return false;
+}
+
+/**
+ * Utility function to add delay between API calls
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -413,7 +536,14 @@ export function resetExplorationProgress(): void {
     totalAttempts: 0,
     successfulPaths: 0,
     scannedFiles: [],
-    repositoryFingerprint: null
+    repositoryFingerprint: null,
+    totalFilesAvailable: 0,
+    directoriesExplored: [],
+    currentDirectory: "",
+    scanStartTime: 0,
+    scanDuration: 0,
+    rateLimitRemaining: null,
+    connectionErrors: []
   };
 }
 
